@@ -1,0 +1,101 @@
+/* Build 4 additions: town trader and permanent equipment. */
+#trade-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(5, 9, 7, .58);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  pointer-events: auto;
+}
+
+.trade-panel {
+  position: absolute;
+  z-index: 21;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 28px));
+  max-height: min(650px, calc(100vh - 30px));
+  overflow: auto;
+  border-radius: 18px;
+  padding: 14px;
+  pointer-events: auto;
+}
+.trade-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.trade-header h2 { margin: 0; font-size: 18px; }
+.trade-header p { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+.trade-balance { color: var(--gold); font-size: 11px; font-weight: 900; margin-top: 5px; }
+.trade-close {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.06);
+  color: var(--ink);
+  font-size: 20px;
+  cursor: pointer;
+}
+.trade-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+.trade-item {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 4px;
+  min-height: 150px;
+  padding: 11px;
+  border-radius: 13px;
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.07);
+}
+.trade-item .trade-icon { font-size: 25px; line-height: 1; }
+.trade-item strong { font-size: 12px; }
+.trade-item p { color: var(--muted); font-size: 9px; line-height: 1.35; margin: 0; }
+.trade-item button {
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.13);
+  background: rgba(106, 83, 52, .72);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.trade-item button:disabled { opacity: .42; cursor: default; }
+.trade-item.sell button { background: rgba(72, 105, 75, .72); }
+
+.gear-card {
+  margin-top: 10px;
+  border-radius: 12px;
+  padding: 9px 10px;
+  background: rgba(225,184,107,.055);
+  border: 1px solid rgba(225,184,107,.14);
+}
+.gear-card > strong { display: block; font-size: 10px; color: var(--gold); margin-bottom: 6px; letter-spacing: .08em; }
+.gear-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.gear-slot { padding: 8px; border-radius: 9px; background: rgba(255,255,255,.035); }
+.gear-slot b { display: block; font-size: 10px; }
+.gear-slot small { display: block; color: var(--muted); font-size: 8px; margin-top: 2px; }
+.gear-slot small[data-owned="true"] { color: #a9d6a4; }
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .trade-panel {
+    top: max(12px, env(safe-area-inset-top));
+    transform: translateX(-50%);
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+  }
+  .trade-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .trade-item { min-height: 136px; padding: 9px; }
+  .trade-item .trade-icon { font-size: 21px; }
+}
+
+@media (max-width: 360px) {
+  .trade-grid, .gear-slots { grid-template-columns: 1fr; }
+}

@@ -45,7 +45,7 @@ try {
         });
         await page.waitForFunction(() => {
           const canvas = document.querySelector('#game');
-          return Boolean(window.__BRIAR_GLENDebug?.getRPGState && canvas && canvas.width > 0 && canvas.height > 0);
+          return Boolean(window.__BRIAR_GLENDebug?.getEconomyState && canvas && canvas.width > 0 && canvas.height > 0);
         }, { timeout: 6000 });
         loaded = true;
         break;
@@ -174,8 +174,67 @@ try {
     if (!rpg.patrol.complete || rpg.patrol.active) throw new Error(`${vp.name}: Hollow Patrol did not complete`);
     if (state.player.inventory.tonic < 1) throw new Error(`${vp.name}: Hollow Patrol reward tonic missing`);
 
-    if (runtimeErrors.length) throw new Error(`${vp.name}: runtime errors after RPG tests:\n${runtimeErrors.join('\n')}`);
-    console.log(`PASS ${vp.name}: ${result.canvasWidth}x${result.canvasHeight}, ${result.distinctCanvasColors} canvas colors, Build 3 RPG systems active`);
+    // Build 4: open Rowan's real trader interaction.
+    await page.evaluate(() => {
+      const d = window.__BRIAR_GLENDebug;
+      d.setPlayer({ coins: 500, hp: 85, dashCd: 0, dashTimer: 0 });
+      d.setInventory({ hide: 2 });
+      d.teleport(-335, -205);
+      d.interact();
+    });
+    if (!(await page.locator('#trade-panel').isVisible())) throw new Error(`${vp.name}: Rowan trader did not open`);
+    const tradeBox = await page.locator('#trade-panel').boundingBox();
+    if (!tradeBox || tradeBox.x < -2 || tradeBox.y < -2 || tradeBox.x + tradeBox.width > vp.width + 2 || tradeBox.y + tradeBox.height > vp.height + 2) {
+      throw new Error(`${vp.name}: trader panel is outside viewport: ${JSON.stringify(tradeBox)}`);
+    }
+
+    await page.locator('#buy-vest-btn').click();
+    let economy = await page.evaluate(() => window.__BRIAR_GLENDebug.getEconomyState());
+    if (!economy.gear.vest || economy.maxHp !== 125 || economy.coins !== 320) {
+      throw new Error(`${vp.name}: Copperguard Vest purchase failed: ${JSON.stringify(economy)}`);
+    }
+
+    await page.locator('#buy-charm-btn').click();
+    economy = await page.evaluate(() => window.__BRIAR_GLENDebug.getEconomyState());
+    if (!economy.gear.charm || economy.coins !== 180) {
+      throw new Error(`${vp.name}: Rootstep Charm purchase failed: ${JSON.stringify(economy)}`);
+    }
+
+    const tonicBefore = economy.tonic;
+    await page.locator('#buy-tonic-btn').click();
+    economy = await page.evaluate(() => window.__BRIAR_GLENDebug.getEconomyState());
+    if (economy.coins !== 140 || economy.tonic !== tonicBefore + 1) {
+      throw new Error(`${vp.name}: trader tonic purchase failed: ${JSON.stringify(economy)}`);
+    }
+
+    await page.locator('#sell-hide-btn').click();
+    economy = await page.evaluate(() => window.__BRIAR_GLENDebug.getEconomyState());
+    if (economy.coins !== 162 || economy.hide !== 1) {
+      throw new Error(`${vp.name}: Beast Hide sale failed: ${JSON.stringify(economy)}`);
+    }
+    await page.locator('#trade-close').click();
+
+    // Charm must alter the actual dash cooldown.
+    await page.evaluate(() => {
+      const d = window.__BRIAR_GLENDebug;
+      d.setPlayer({ dashCd: 0, dashTimer: 0 });
+      d.dash();
+    });
+    economy = await page.evaluate(() => window.__BRIAR_GLENDebug.getEconomyState());
+    if (Math.abs(economy.dashCd - 0.82) > 0.02) {
+      throw new Error(`${vp.name}: Rootstep Charm did not alter dodge cooldown: ${economy.dashCd}`);
+    }
+
+    // Purchases are permanent: reload and verify equipment reapplies from the shared save state.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => Boolean(window.__BRIAR_GLENDebug?.getEconomyState), { timeout: 6000 });
+    economy = await page.evaluate(() => window.__BRIAR_GLENDebug.getEconomyState());
+    if (!economy.gear.vest || !economy.gear.charm || economy.maxHp !== 125) {
+      throw new Error(`${vp.name}: permanent gear did not survive reload: ${JSON.stringify(economy)}`);
+    }
+
+    if (runtimeErrors.length) throw new Error(`${vp.name}: runtime errors after economy tests:\n${runtimeErrors.join('\n')}`);
+    console.log(`PASS ${vp.name}: ${result.canvasWidth}x${result.canvasHeight}, ${result.distinctCanvasColors} canvas colors, Build 4 economy + equipment active`);
     await context.close();
   }
 } finally {
