@@ -328,7 +328,6 @@
         ? 'USE • Review active Warden contract'
         : 'USE • Browse Warden contracts';
     }
-    if (board.open) renderBoard();
     syncJournalBoardWork();
   };
 
