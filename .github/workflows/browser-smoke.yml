@@ -14,7 +14,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
       - name: Install Chromium test runtime
         run: |
           npm install --no-save playwright@1.55.0
@@ -35,6 +37,7 @@ jobs:
           node tests/map-journal-smoke.mjs http://127.0.0.1:4173/
           node tests/fen-smoke.mjs http://127.0.0.1:4173/
           node tests/contracts-smoke.mjs http://127.0.0.1:4173/
+          node tests/stability-smoke.mjs http://127.0.0.1:4173/
       - name: Test deployed GitHub Pages build in browser
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -47,3 +50,4 @@ jobs:
           node tests/map-journal-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/fen-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/contracts-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/stability-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
