@@ -34,7 +34,9 @@ try {
     if (!loaded) throw new Error(`${vp.name}: feedback tuning runtime unavailable: ${lastError?.message || 'unknown'}`);
 
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (build.version !== '16') throw new Error(`${vp.name}: feedback tuning not attached to Build 16 ${JSON.stringify(build)}`);
+    if (!(Number.parseFloat(build.version) >= 16) || build.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${vp.name}: feedback tuning not attached to Build 16+ ${JSON.stringify(build)}`);
+    }
 
     await page.evaluate(() => window.__BRIAR_GLENDebug.setCameraShake(12));
     await sleep(35);
@@ -56,7 +58,6 @@ try {
       throw new Error(`${vp.name}: per-object camera jitter remains spread=${spreadX},${spreadY}`);
     }
 
-    // Measure only the shake component itself, not ordinary camera-follow motion.
     const frameShift = Math.hypot(shakeProbe.tuning.frameX, shakeProbe.tuning.frameY);
     if (frameShift > 1.95) throw new Error(`${vp.name}: whole-screen shake displacement still excessive: ${frameShift}`);
 

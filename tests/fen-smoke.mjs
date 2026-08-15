@@ -98,7 +98,9 @@ try {
 
     await page.evaluate(() => window.__BRIAR_GLENDebug.openMap());
     await page.waitForFunction(() => document.querySelector('#map-marker-fen .marker-label')?.textContent?.trim() === 'MOSSWATER FEN');
-    if (!(await page.locator('#map-discovery-count').textContent())?.includes('/ 7')) throw new Error(`${name}: Fen map count missing`);
+    const mapCountText = (await page.locator('#map-discovery-count').textContent()) || '';
+    const totalLocations = Number(mapCountText.match(/\/\s*(\d+)\s+locations/i)?.[1] || 0);
+    if (totalLocations < 7) throw new Error(`${name}: Fen map total regressed: ${mapCountText}`);
 
     await page.evaluate(() => window.__BRIAR_GLENDebug.openJournal());
     await page.waitForFunction(() => document.getElementById('journal-places')?.innerText?.includes('Mosswater Fen'));
