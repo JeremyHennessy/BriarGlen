@@ -1,0 +1,20 @@
+/* Mobile controls hotfix: keep the game surface out of Safari page gestures. */
+html,
+body,
+#game-shell,
+#game,
+#hud,
+#touch-controls,
+.touch-pad,
+.action-cluster,
+.touch-btn,
+#inventory-strip,
+#reset-btn {
+  touch-action: none;
+}
+
+html,
+body {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
