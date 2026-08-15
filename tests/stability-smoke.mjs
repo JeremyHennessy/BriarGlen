@@ -29,7 +29,11 @@ try {
       try {
         const sep = target.includes('?') ? '&' : '?';
         await page.goto(`${target}${sep}stability=${Date.now()}-${attempt}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-        await page.waitForFunction(() => Boolean(window.__BRIAR_GLENDebug?.getBuildInfo && window.__BRIAR_GLENDebug?.getBoardState), { timeout: 7000 });
+        await page.waitForFunction(() => {
+          if (!window.__BRIAR_GLENDebug?.getBuildInfo || !window.__BRIAR_GLENDebug?.getBoardState) return false;
+          const info = window.__BRIAR_GLENDebug.getBuildInfo();
+          return Boolean(info?.version && document.documentElement.dataset.briarGlenBuild === info.version);
+        }, { timeout: 7000 });
         loaded = true;
         break;
       } catch (error) {
@@ -37,7 +41,7 @@ try {
         if (live && attempt < 48) await sleep(5000);
       }
     }
-    if (!loaded) throw new Error(`${name}: Build 12.1 runtime unavailable: ${lastError?.message || 'unknown'}`);
+    if (!loaded) throw new Error(`${name}: release runtime unavailable: ${lastError?.message || 'unknown'}`);
 
     const state = await page.evaluate(() => {
       const info = window.__BRIAR_GLENDebug.getBuildInfo();
@@ -47,23 +51,26 @@ try {
         info,
         dataBuild: document.documentElement.dataset.briarGlenBuild,
         hasContractRuntime: Boolean(window.__BRIAR_GLENDebug.getBoardState),
-        releaseScriptCount: scriptSources.filter(src => src?.includes('17-release-info.js')).length,
+        releaseScriptCount: scriptSources.filter(src => /release-info\.js(?:[?#].*)?$/i.test(src || '')).length,
+        baseReleaseScriptCount: scriptSources.filter(src => src?.includes('17-release-info.js')).length,
         contractScriptCount: scriptSources.filter(src => src?.includes('16-contract-board.js')).length,
         hasV12Style: styleHrefs.some(href => href.includes('styles-v12.css')),
       };
     });
 
-    if (state.info.version !== '12.1' || state.info.label !== 'Stability Pass' || state.info.saveKey !== 'briar-glen-vslice-v1') {
-      throw new Error(`${name}: incorrect build metadata ${JSON.stringify(state.info)}`);
+    if (!state.info.version || state.info.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${name}: invalid build metadata ${JSON.stringify(state.info)}`);
     }
-    if (state.dataBuild !== '12.1') throw new Error(`${name}: document build marker missing`);
+    if (state.dataBuild !== state.info.version) throw new Error(`${name}: document build marker does not match release metadata`);
     if (!state.hasContractRuntime || state.contractScriptCount !== 1 || !state.hasV12Style) {
       throw new Error(`${name}: dynamic V12 runtime/style did not load exactly once: ${JSON.stringify(state)}`);
     }
-    if (state.releaseScriptCount !== 1) throw new Error(`${name}: release metadata loaded ${state.releaseScriptCount} times`);
+    if (state.baseReleaseScriptCount !== 1 || state.releaseScriptCount < 1) {
+      throw new Error(`${name}: release metadata chain invalid: ${JSON.stringify(state)}`);
+    }
     if (errors.length) throw new Error(`${name}: runtime/resource errors:\n${errors.join('\n')}`);
 
-    console.log(`PASS ${name}: Build 12.1 release metadata + runtime integrity active`);
+    console.log(`PASS ${name}: release ${state.info.version} metadata + runtime integrity active`);
     await context.close();
   }
 } finally {

@@ -1,0 +1,41 @@
+#sound-btn {
+  position: absolute;
+  z-index: 13;
+  right: max(52px, calc(env(safe-area-inset-right) + 52px));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(239, 211, 155, .22);
+  background: linear-gradient(180deg, rgba(34, 49, 37, .82), rgba(13, 22, 16, .78));
+  color: #f4e5c5;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, .24), inset 0 1px rgba(255, 255, 255, .06);
+  font: 15px/1 system-ui, sans-serif;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+#sound-btn:active {
+  transform: scale(.93);
+  filter: brightness(1.12);
+}
+
+#sound-btn[data-muted="true"] {
+  opacity: .72;
+  border-color: rgba(255, 255, 255, .13);
+}
+
+@media (pointer: coarse), (max-width: 900px) {
+  #sound-btn {
+    top: max(90px, calc(env(safe-area-inset-top) + 82px));
+    right: max(43px, calc(env(safe-area-inset-right) + 43px));
+    bottom: auto;
+    width: 27px;
+    height: 27px;
+    font-size: 12px;
+  }
+}

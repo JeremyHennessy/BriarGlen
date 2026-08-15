@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = process.cwd();
 const failures = [];
+let releaseRefs = [];
 
 const rel = file => path.relative(root, file).replaceAll(path.sep, '/');
 const isLocalRef = value => value && !/^(?:https?:|data:|#|\/\/)/i.test(value);
@@ -40,15 +41,13 @@ if (!fs.existsSync(indexPath) || fs.statSync(indexPath).size === 0) {
   failures.push('index.html is missing or empty');
 } else {
   const html = fs.readFileSync(indexPath, 'utf8');
-  const refs = [
-    ...[...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)].map(match => match[1]),
-    ...[...html.matchAll(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi)].map(match => match[1]),
-  ].filter(isLocalRef);
+  const scriptRefs = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)].map(match => match[1]);
+  const styleRefs = [...html.matchAll(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi)].map(match => match[1]);
+  const refs = [...scriptRefs, ...styleRefs].filter(isLocalRef);
   for (const ref of refs) requireFile(ref, 'index.html');
 
-  if (!html.includes('src/v12/17-release-info.js')) {
-    failures.push('index.html does not activate src/v12/17-release-info.js');
-  }
+  releaseRefs = scriptRefs.filter(ref => /release-info\.js(?:[?#].*)?$/i.test(ref));
+  if (!releaseRefs.length) failures.push('index.html does not activate a release-info runtime');
   if (!html.includes('viewport-fit=cover') || !html.includes('user-scalable=no')) {
     failures.push('index.html lost the mobile viewport/zoom guard');
   }
@@ -78,11 +77,15 @@ for (const file of runtimeFiles) {
   for (const ref of dynamicRefs) requireFile(ref, rel(file));
 }
 
-const releasePath = path.join(root, 'src/v12/17-release-info.js');
-if (fs.existsSync(releasePath)) {
-  const release = fs.readFileSync(releasePath, 'utf8');
-  if (!release.includes("version: '12.1'")) failures.push('release metadata is not Build 12.1');
-  if (!release.includes('getBuildInfo')) failures.push('release metadata does not expose getBuildInfo');
+if (releaseRefs.length) {
+  const latestReleaseRef = releaseRefs[releaseRefs.length - 1].split(/[?#]/, 1)[0];
+  const releasePath = path.resolve(root, latestReleaseRef);
+  if (fs.existsSync(releasePath)) {
+    const release = fs.readFileSync(releasePath, 'utf8');
+    if (!/version:\s*['"][^'"]+['"]/.test(release)) failures.push(`${latestReleaseRef} has no release version`);
+    if (!release.includes('getBuildInfo')) failures.push(`${latestReleaseRef} does not expose getBuildInfo`);
+    if (!release.includes('__BRIAR_GLEN_BUILD')) failures.push(`${latestReleaseRef} does not expose __BRIAR_GLEN_BUILD`);
+  }
 }
 
 if (failures.length) {
@@ -91,4 +94,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`PASS static sanity: ${runtimeFiles.length} runtime JS + ${testFiles.length} test JS syntax-clean; local runtime references resolve`);
+console.log(`PASS static sanity: ${runtimeFiles.length} runtime JS + ${testFiles.length} test JS syntax-clean; local runtime references resolve; ${releaseRefs.length} release marker(s)`);
