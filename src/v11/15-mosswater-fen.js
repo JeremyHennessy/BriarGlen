@@ -1,258 +1,56 @@
 (() => {
-  'use strict';
-
-  // Build 11: Mosswater Fen expansion.
-  // Additive layer: Builds 2–10 remain intact underneath.
-  const FEN_ZONE = { name: 'MOSSWATER FEN', tint: '#334b42' };
-  const FEN_MIN_Y = 690;
-  const FEN_MIN_X = 690;
-  const FEN_MAX_X = 1540;
-  const MASTERWORK_RESIST = 0.4;
-  const fenProjectiles = [];
-  const mirePools = [];
-  const fenEnemies = [];
-  let mireTimer = 0;
-  let lastHazardAt = 0;
-
-  if (typeof progress.fenCrossingUnlocked !== 'boolean') progress.fenCrossingUnlocked = false;
-  if (typeof progress.fenDiscovered !== 'boolean') progress.fenDiscovered = false;
-  if (typeof progress.fenWardenDefeated !== 'boolean') progress.fenWardenDefeated = false;
-  if (typeof progress.fenwardSigilOwned !== 'boolean') progress.fenwardSigilOwned = false;
-  if (!Number.isFinite(player.inventory.bogAmber)) player.inventory.bogAmber = 0;
-  progress.mapDiscoveries = progress.mapDiscoveries || {};
-  if (typeof progress.mapDiscoveries.fen !== 'boolean') progress.mapDiscoveries.fen = !!progress.fenDiscovered;
-
-  WORLD.maxY = 1280;
-
-  const fenGate = addObject('fenGate', 1080, 585, { label: 'Old Warden Crossing' });
-  const fenShrine = addObject('fenShrine', 1115, 1150, { label: 'Mosswater Warden Stone' });
-
-  [
-    [835, 760], [920, 905], [1320, 840], [1420, 1060], [780, 1115],
-    [1210, 1015], [1470, 745], [1020, 1240]
-  ].forEach(([x, y]) => addObject('fenReed', x, y, { s: .8 + Math.random() * .45 }));
-  [
-    [845, 850, 78], [1240, 760, 68], [1385, 980, 86], [930, 1090, 72]
-  ].forEach(([x, y, r]) => addObject('fenWater', x, y, { r }));
-
-  const bogAmberNodes = [
-    addResource('bogAmber', 820, 910),
-    addResource('bogAmber', 1280, 885),
-    addResource('bogAmber', 1435, 1110),
-  ];
-
-  function addFenEnemy(type, x, y, opts = {}) {
-    const e = addEnemy(type, x, y, opts);
-    fenEnemies.push(e);
-    return e;
-  }
-
-  addFenEnemy('mireling', 855, 785, {
-    name: 'Mireling', hp: 78, maxHp: 78, speed: 112, damage: 10,
-    aggro: 330, attackRange: 48, scale: .95, radius: 25, color: '#526653',
-    homeX: 855, homeY: 785,
-  });
-  addFenEnemy('mireling', 1325, 1035, {
-    name: 'Mireling', hp: 78, maxHp: 78, speed: 112, damage: 10,
-    aggro: 330, attackRange: 48, scale: .95, radius: 25, color: '#526653',
-    homeX: 1325, homeY: 1035,
-  });
-  addFenEnemy('spitter', 1060, 835, {
-    name: 'Reed Spitter', hp: 64, maxHp: 64, speed: 82, damage: 11,
-    aggro: 440, attackRange: 290, scale: .9, radius: 24, color: '#64755b',
-    homeX: 1060, homeY: 835, spitCd: 1.0, spitWindup: 0,
-  });
-  addFenEnemy('spitter', 1440, 820, {
-    name: 'Reed Spitter', hp: 64, maxHp: 64, speed: 82, damage: 11,
-    aggro: 440, attackRange: 290, scale: .9, radius: 24, color: '#64755b',
-    homeX: 1440, homeY: 820, spitCd: 1.4, spitWindup: 0,
-  });
-
-  const fenWarden = addFenEnemy('fenwarden', 1115, 1060, {
-    name: 'Fen Warden', hp: 280, maxHp: 280, speed: 92, damage: 18,
-    aggro: 610, attackRange: 72, scale: 1.48, radius: 40, color: '#405a49',
-    homeX: 1115, homeY: 1060, specialCd: 1.6, fenWindup: 0, fenRushTimer: 0,
-  });
-  if (progress.fenWardenDefeated) {
-    fenWarden.dead = true;
-    fenWarden.hp = 0;
-    fenWarden.respawn = 99999;
-  }
-
-  function anyMasterwork() {
-    return !!(progress.temperedSword || progress.briarstringBow || progress.moonrootStaff);
-  }
-
-  function selectedMasterwork() {
-    if (player.weaponType === 'sword') return !!progress.temperedSword;
-    if (player.weaponType === 'bow') return !!progress.briarstringBow;
-    if (player.weaponType === 'staff') return !!progress.moonrootStaff;
-    return false;
-  }
-
-  function inFen(p = player) {
-    return p.y >= FEN_MIN_Y && p.x >= FEN_MIN_X && p.x <= FEN_MAX_X;
-  }
-
-  function bookOrModalOpen() {
-    return Boolean(
-      (document.getElementById('warden-overlay') && !document.getElementById('warden-overlay').hidden) ||
-      (ui.inventoryPanel && !ui.inventoryPanel.hidden) ||
-      (ui.tradePanel && !ui.tradePanel.hidden) ||
-      (ui.craftPanel && !ui.craftPanel.hidden)
-    );
-  }
-
-  function mireMoveFactor() {
-    const boots = !!(progress.wardenBootsOwned && progress.wardenBootsEquipped);
-    if (mireTimer > 0) return boots ? .88 : .62;
-    if (inFen()) return boots ? .94 : .72;
-    return 1;
-  }
-
-  const build10CollideMove = collideMove;
-  collideMove = function build11CollideMove(entity, dx, dy) {
-    if (entity === player) {
-      if (!progress.fenCrossingUnlocked && entity.y < FEN_MIN_Y && entity.y + dy >= FEN_MIN_Y) {
-        dy = Math.min(dy, FEN_MIN_Y - 3 - entity.y);
-      }
-      if (progress.fenCrossingUnlocked && entity.y + dy >= FEN_MIN_Y) {
-        const targetX = clamp(entity.x + dx, FEN_MIN_X + 8, FEN_MAX_X - 8);
-        dx = targetX - entity.x;
-      }
-      const factor = mireMoveFactor();
-      dx *= factor;
-      dy *= factor;
-    }
-    return build10CollideMove(entity, dx, dy);
-  };
-
-  const build10ZoneFor = zoneFor;
-  zoneFor = function build11ZoneFor(x, y = player.y) {
-    if (y >= FEN_MIN_Y && x >= FEN_MIN_X && x <= FEN_MAX_X) return FEN_ZONE;
-    return build10ZoneFor(x, y);
-  };
-
-  function launchFenSpit(source, targetX = player.x, targetY = player.y, damage = 12) {
-    const dx = targetX - source.x;
-    const dy = targetY - source.y;
-    const d = Math.hypot(dx, dy) || 1;
-    const speed = source.type === 'fenwarden' ? 300 : 245;
-    fenProjectiles.push({
-      x: source.x, y: source.y, vx: dx / d * speed, vy: dy / d * speed,
-      life: Math.max(.24, d / speed), radius: source.type === 'fenwarden' ? 12 : 9,
-      damage, sourceType: source.type, dead: false,
-    });
-  }
-
-  function addMirePool(x, y, radius = 58, life = 4.2) {
-    mirePools.push({ x, y, radius, life, maxLife: life, tick: .12 });
-  }
-
-  function updateFenProjectiles(dt) {
-    for (const p of fenProjectiles) {
-      if (p.dead) continue;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.life -= dt;
-      if (Math.hypot(player.x - p.x, player.y - p.y) <= player.radius + p.radius) {
-        p.dead = true;
-        const hpBefore = player.hp;
-        damagePlayer(p.damage, { x: p.x, y: p.y, type: 'fenSpit', fenHazard: true });
-        if (player.hp < hpBefore) mireTimer = Math.max(mireTimer, 1.7);
-        addMirePool(p.x, p.y, p.sourceType === 'fenwarden' ? 76 : 55, p.sourceType === 'fenwarden' ? 5.2 : 4.0);
-        continue;
-      }
-      if (p.life <= 0) {
-        p.dead = true;
-        addMirePool(p.x, p.y, p.sourceType === 'fenwarden' ? 76 : 55, p.sourceType === 'fenwarden' ? 5.2 : 4.0);
-      }
-    }
-    for (let i = fenProjectiles.length - 1; i >= 0; i--) if (fenProjectiles[i].dead) fenProjectiles.splice(i, 1);
-
-    for (const pool of mirePools) {
-      pool.life -= dt;
-      pool.tick -= dt;
-      if (Math.hypot(player.x - pool.x, player.y - pool.y) <= pool.radius + player.radius * .35) {
-        mireTimer = Math.max(mireTimer, progress.wardenBootsEquipped ? .35 : .9);
-        if (pool.tick <= 0) {
-          pool.tick = 1.05;
-          damagePlayer(6, { x: pool.x, y: pool.y, type: 'mirePool', fenHazard: true });
-        }
-      }
-    }
-    for (let i = mirePools.length - 1; i >= 0; i--) if (mirePools[i].life <= 0) mirePools.splice(i, 1);
-  }
-
-  function updateSpitter(e, dt) {
-    if (e.dead) return build10UpdateEnemy(e, dt);
-    e.attackCd = Math.max(0, e.attackCd - dt);
-    e.spitCd = Math.max(0, (e.spitCd || 0) - dt);
-    e.hurt = Math.max(0, e.hurt - dt);
-    if (e.spitWindup > 0) {
-      e.spitWindup -= dt;
-      if (e.spitWindup <= 0) {
-        launchFenSpit(e, e.spitTargetX, e.spitTargetY, 12);
-      }
-      return;
-    }
-
-    const d = dist(e, player);
-    if (d < e.aggro && e.spitCd <= 0) {
-      e.spitWindup = .58;
-      e.spitTargetX = player.x;
-      e.spitTargetY = player.y;
-      e.spitCd = 2.35;
-      return;
-    }
-
-    let tx = e.homeX, ty = e.homeY;
-    if (d < e.aggro) {
-      if (d < 155) {
-        tx = e.x - (player.x - e.x);
-        ty = e.y - (player.y - e.y);
-      } else if (d > 315) {
-        tx = player.x; ty = player.y;
-      } else {
-        const side = Math.sin(performance.now() / 700 + e.homeX) > 0 ? 1 : -1;
-        const n = norm(player.x - e.x, player.y - e.y);
-        tx = e.x - n.y * side * 90;
-        ty = e.y + n.x * side * 90;
-      }
-    }
-
-    const td = Math.hypot(tx - e.x, ty - e.y);
-    if (td > 8) {
-      const n = norm(tx - e.x, ty - e.y);
-      e.facingX = n.x; e.facingY = n.y;
-      const slow = e.hurt > 0 ? .35 : 1;
-      collideMove(e, n.x * e.speed * slow * dt, n.y * e.speed * slow * dt);
-    }
-  }
-
-  function beginFenWardenAction(e, action) {
-    e.fenAction = action;
-    e.fenWindup = action === 'rush' ? .62 : .82;
-    e.fenWindupMax = e.fenWindup;
-    e.fenTargetX = player.x;
-    e.fenTargetY = player.y;
-  }
-
-  function resolveFenWardenAction(e) {
-    if (e.fenAction === 'rush') {
-      const n = norm(e.fenTargetX - e.x, e.fenTargetY - e.y);
-      e.fenRushX = n.x; e.fenRushY = n.y;
-      e.fenRushTimer = .55;
-      e.fenRushHit = false;
-    } else {
-      const offsets = [[0,0],[92,0,],[-92,0],[0,92],[0,-92]];
-      for (const [ox, oy] of offsets) launchFenSpit(e, e.fenTargetX + ox, e.fenTargetY + oy, 14);
-      spawnParticles(e.x, e.y, '#7ea77f', 22, 1.05);
-    }
-    e.fenAction = null;
-  }
-
-  function updateFenWarden(e, dt) {
-    if (e.dead) return;
-    e.attackCd = Math.max(0, e.attackCd - dt);
-    e.specialCd = Math.max(0, e.specialCM�
+'use strict';
+const FEN={name:'MOSSWATER FEN',tint:'#334b42'}, MINY=690, MINX=690, MAXX=1540, RESIST=.4;
+const shots=[], pools=[], fenEnemies=[]; let mire=0;
+for(const [k,v] of [['fenCrossingUnlocked',false],['fenDiscovered',false],['fenWardenDefeated',false],['fenwardSigilOwned',false]]) if(typeof progress[k]!=='boolean') progress[k]=v;
+if(!Number.isFinite(player.inventory.bogAmber)) player.inventory.bogAmber=0;
+progress.mapDiscoveries=progress.mapDiscoveries||{}; if(typeof progress.mapDiscoveries.fen!=='boolean') progress.mapDiscoveries.fen=!!progress.fenDiscovered;
+WORLD.maxY=1280;
+const gate=addObject('fenGate',1080,585,{label:'Old Warden Crossing'}), shrine=addObject('fenShrine',1115,1150,{label:'Mosswater Warden Stone'});
+[[835,760],[920,905],[1320,840],[1422,1060],[780,1115],[1210,1015],[1470,745],[1020,1240]].forEach(([x,y])=>addObject('fenReed',x,y));
+[[845,850,78],[1240,760,68],[1385,980,86],[930,1090,72]].forEach(([x,y,r])=>addObject('fenWater',x,y,{r}));
+const amber=[addResource('bogAmber',820,910),addResource('bogAmber',1280,885),addResource('bogAmber',1435,1110)];
+function addFen(type,x,y,o){const e=addEnemy(type,x,y,o);fenEnemies.push(e);return e}
+addFen('mireling',855,785,{name:'Mireling',hp:78,maxHp:78,speed:112,damage:10,aggro:330,attackRange:48,radius:25,color:'#526653',homeX:855,homeY:785});
+addFen('mireling',1325,1035,{name:'Mireling',hp:78,maxHp:78,speed:112,damage:10,aggro:330,attackRange:48,radius:25,color:'#526653',homeX:1325,homeY:1035});
+addFen('spitter',1000,835,{name:'Reed Spitter',hp:64,maxHp:64,speed:82,damage:11,aggro:440,attackRange:290,radius:24,color:'#64755b',homeX:1000,homeY:835,spitCd:1,spitWindup:0});
+addFen('spitter',1440,820,{name:'Reed Spitter',hp:64,maxHp:64,speed:82,damage:11,aggro:440,attackRange:290,radius:24,color:'#64755b',homeX:1440,homeY:820,spitCd:1.4,spitWindup:0});
+const warden=addFen('fenwarden',1115,1060,{name:'Fen Warden',hp:280,maxHp:280,speed:92,damage:18,aggro:610,attackRange:72,radius:40,scale:1.48,color:'#405a49',homeX:1115,homeY:1060,specialCd:1.6,fenWindup:0,fenRushTimer:0});
+if(progress.fenWardenDefeated){warden.dead=true;warden.hp=0;warden.respawn=99999}
+const inFen=(p=player)=>p.y>=MINY&&p.x>=MINX&&p.x<=MAXX;
+const anyMasterwork=()=>!!(progress.temperedSword||progress.briarstringBow||progress.moonrootStaff);
+const selectedMasterwork=()=>player.weaponType==='sword'?!!progress.temperedSword:player.weaponType==='bow'?!!progress.briarstringBow:player.weaponType==='staff'?!!progress.moonrootStaff:false;
+const boots=()=>!!(progress.wardenBootsOwned&&progress.wardenBootsEquipped);
+const moveFactor=()=>mire>0?(boots()?.88:.62):(inFen()?boots()?.94:.72:1);
+const modalOpen=()=>!!((document.getElementById('warden-overlay')&&!document.getElementById('warden-overlay').hidden)||(ui.inventoryPanel&&!ui.inventoryPanel.hidden)||(ui.tradePanel&&!ui.tradePanel.hidden)||(ui.craftPanel&&!ui.craftPanel.hidden));
+const oldMove=collideMove; collideMove=function(e,dx,dy){if(e===player){if(!progress.fenCrossingUnlocked&&e.y<MINY&&e.y+dy>=MINY)dy=Math.min(dy,MINY-3-e.y);if(progress.fenCrossingUnlocked&&e.y+dy>=MINY){const tx=clamp(e.x+dx,MINX+8,MAXX-8);dx=tx-e.x}const f=moveFactor();dx*=f;dy*=f}return oldMove(e,dx,dy)};
+const oldZone=zoneFor; zoneFor=function(x,y=player.y){return y>=MINY&&x>=MINX&&x<=MAXX?FEN:oldZone(x,y)};
+function launch(source,tx=player.x,ty=player.y,damage=12){const dx=tx-source.x,dy=ty-source.y,d=Math.hypot(dx,dy)||1,s=source.type==='fenwarden'?300:245;shots.push({x:source.x,y:source.y,vx:dx/d*s,vy:dy/d*s,life:Math.max(.24,d/s),r:source.type==='fenwarden'?12:9,damage,source:source.type})}
+function addPool(x,y,r=55,life=4){pools.push({x,y,r,life,max:life,tick:.12})}
+function updateEffects(dt){for(const p of shots){if(p.dead)continue;p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(Math.hypot(player.x-p.x,player.y-p.y)<=player.radius+p.r){p.dead=true;const hp=player.hp;damagePlayer(p.damage,{x:p.x,y:p.y,type:'fenSpit',fenHazard:true});if(player.hp<hp)mire=Math.max(mire,1.7);addPool(p.x,p.y,p.source==='fenwarden'?76:55,p.source==='fenwarden'?5.2:4)}else if(p.life<=0){p.dead=true;addPool(p.x,p.y,p.source==='fenwarden'?76:55,p.source==='fenwarden'?5.2:4)}}for(let i=shots.length-1;i>=0;i--)if(shots[i].dead)shots.splice(i,1);for(const p of pools){p.life-=dt;p.tick-=dt;if(Math.hypot(player.x-p.x,player.y-p.y)<=p.r+player.radius*.3){mire=Math.max(mire,boots()?.35:.9);if(p.tick<=0){p.tick=1.05;damagePlayer(6,{x:p.x,y:p.y,type:'mirePool',fenHazard:true})}}}for(let i=pools.length-1;i>=0;i--)if(pools[i].life<=0)pools.splice(i,1)}
+const oldEnemy=updateEnemy;
+function updateSpitter(e,dt){if(e.dead)return oldEnemy(e,dt);e.spitCd=Math.max(0,(e.spitCd||0)-dt);e.hurt=Math.max(0,e.hurt-dt);if(e.spitWindup>0){e.spitWindup-=dt;if(e.spitWindup<=0)launch(e,e.spitTargetX,e.spitTargetY,12);return}const d=dist(e,player);if(d<e.aggro&&e.spitCd<=0){e.spitWindup=.58;e.spitTargetX=player.x;e.spitTargetY=player.y;e.spitCd=2.35;return}let tx=e.homeX,ty=e.homeY;if(d<e.aggro){if(d<155){tx=e.x-(player.x-e.x);ty=e.y-(player.y-e.y)}else if(d>315){tx=player.x;ty=player.y}else{const side=Math.sin(performance.now()/700+e.homeX)>0?1:-1,n=norm(player.x-e.x,player.y-e.y);tx=e.x-n.y*side*90;ty=e.y+n.x*side*90}}const td=Math.hypot(tx-e.x,ty-e.y);if(td>8){const n=norm(tx-e.x,ty-e.y);e.facingX=n.x;e.facingY=n.y;oldMove(e,n.x*e.speed*(e.hurt>0?.35:1)*dt,n.y*e.speed*(e.hurt>0?.35:1)*dt)}}
+function startWarden(e,a){e.fenAction=a;e.fenWindup=a==='rush'?.62:.82;e.fenWindupMax=e.fenWindup;e.fenTargetX=player.x;e.fenTargetY=player.y}
+function updateWarden(e,dt){if(e.dead)return;e.specialCd=Math.max(0,e.specialCd-dt);e.attackCd=Math.max(0,e.attackCd-dt);e.hurt=Math.max(0,e.hurt-dt);if(e.fenRushTimer>0){e.fenRushTimer-=dt;oldMove(e,e.fenRushX*440*dt,e.fenRushY*440*dt);if(!e.fenRushHit&&dist(e,player)<e.radius+player.radius+12){e.fenRushHit=true;damagePlayer(23,{x:e.x,y:e.y,type:'fenwarden',fenHazard:true})}return}if(e.fenWindup>0){e.fenWindup-=dt;if(e.fenWindup<=0){if(e.fenAction==='rush'){const n=norm(e.fenTargetX-e.x,e.fenTargetY-e.y);e.fenRushX=n.x;e.fenRushY=n.y;e.fenRushTimer=.55;e.fenRushHit=false}else{for(const [ox,oy] of [[0,0],[92,0],[-92,0],[0,92],[0,-92]])launch(e,e.fenTargetX+ox,e.fenTargetY+oy,14);spawnParticles(e.x,e.y,'#7ea77f',22,1.05)}e.fenAction=null}return}const d=dist(e,player);if(d<e.aggro&&e.specialCd<=0){startWarden(e,d>145?'rush':'burst');e.specialCd=2.7;return}if(d<e.attackRange+player.radius&&e.attackCd<=0){e.attackCd=1.05;damagePlayer(18,{x:e.x,y:e.y,type:'fenwarden',fenHazard:true});return}if(d<e.aggro&&d>e.attackRange*.9){const n=norm(player.x-e.x,player.y-e.y);e.facingX=n.x;e.facingY=n.y;oldMove(e,n.x*e.speed*(e.hurt>0?.3:1)*dt,n.y*e.speed*(e.hurt>0?.3:1)*dt)}}
+updateEnemy=function(e,dt){if(e.type==='spitter')return updateSpitter(e,dt);if(e.type==='fenwarden')return updateWarden(e,dt);return oldEnemy(e,dt)};
+const oldDamageEnemy=damageEnemy; damageEnemy=function(e,amount,opts={}){if(e?.type==='fenwarden'&&!selectedMasterwork()){amount=Math.max(1,Math.round(amount*RESIST));const now=performance.now();if(!e.masterworkToastAt||now-e.masterworkToastAt>900){e.masterworkToastAt=now;addFloater(e.x,e.y-46,'MASTERWORK NEEDED','#d9c88d');toast('The Fen Warden resists ordinary weapons')}}return oldDamageEnemy(e,amount,opts)};
+const oldDamagePlayer=damagePlayer; damagePlayer=function(amount,source){const hazard=!!source&&(source.fenHazard||['mireling','spitter','fenwarden','fenSpit','mirePool'].includes(source.type)),n=hazard&&progress.fenwardSigilOwned?Math.max(1,Math.round(amount*.7)):amount,hp=player.hp,r=oldDamagePlayer(n,source);if(hazard&&player.hp<hp&&source?.type==='mireling'){mire=Math.max(mire,boots()?.45:1.8);toast(boots()?'Trail Boots resist the mire':'Mired — movement slowed')}return r};
+const oldKill=killEnemy; killEnemy=function(e){if(!e||e.dead)return;if(e.type!=='fenwarden')return oldKill(e);e.dead=true;e.hp=0;e.respawn=99999;progress.fenWardenDefeated=true;player.coins+=110;spawnParticles(e.x,e.y,'#88aa79',34,1.45);addFloater(e.x,e.y-58,'FEN WARDEN DEFEATED • +110 c','#d8d49c');toast('Fen Warden defeated — search the Warden Stone');camera.shake=13;saveGame()};
+const oldNear=nearestInteractable; nearestInteractable=function(){const base=oldNear(),c=[{kind:'fenGate',obj:gate,d:dist(player,gate)},{kind:'fenShrine',obj:shrine,d:dist(player,shrine)}].filter(x=>x.d<=110).sort((a,b)=>a.d-b.d);return c[0]&&(!base||c[0].d<base.d)?c[0]:base};
+const oldInteract=interact; interact=function(){const n=nearestInteractable();if(n?.kind==='fenGate'){if(progress.fenCrossingUnlocked){toast('Old Warden Crossing • Mosswater Fen lies south');return}if(!progress.reinforcedPickaxe){toast('The crossing needs a Reinforced Pickaxe');return}progress.fenCrossingUnlocked=true;spawnParticles(gate.x,gate.y,'#9e8d6c',22,1);addFloater(gate.x,gate.y-24,'CROSSING CLEARED','#dbc58f');toast('Old Warden Crossing opened');saveGame();return}if(n?.kind==='fenShrine'){if(!progress.fenWardenDefeated){toast('The Warden Stone is dormant while the Fen Warden remains');return}if(progress.fenwardSigilOwned){toast('Fenward Sigil • mire-hardened');return}if((player.inventory.bogAmber||0)<3){toast(`The Warden Stone needs 3 Bog Amber • ${player.inventory.bogAmber||0}/3`);return}player.inventory.bogAmber-=3;progress.fenwardSigilOwned=true;spawnParticles(shrine.x,shrine.y,'#d9c878',30,1.2);addFloater(shrine.x,shrine.y-42,'FENWARD SIGIL','#f0dc9d');toast('Fenward Sigil restored — fen hazard damage reduced');saveGame();return}if(n?.kind==='resource'&&n.obj.type==='bogAmber'){if(!progress.reinforcedPickaxe){toast('Bog Amber needs a Reinforced Pickaxe');return}n.obj.active=false;n.obj.cooldown=36;player.inventory.bogAmber++;spawnParticles(n.obj.x,n.obj.y,'#b99051',14,.8);addFloater(n.obj.x,n.obj.y-12,'BOG AMBER +1','#e7c984');toast('Bog Amber recovered');saveGame();return}return oldInteract()};
+const oldObj=objectiveText, oldProg=objectiveProgress; objectiveText=function(){if(!progress.groveCacheClaimed||!progress.reinforcedPickaxe||!anyMasterwork())return oldObj();if(!progress.fenCrossingUnlocked)return 'Alden marks an old Warden Crossing south of Copper Hollow. Clear it with the Reinforced Pickaxe.';if(!progress.fenDiscovered)return 'Follow the restored Warden Crossing south into the uncharted marsh.';if(!progress.fenWardenDefeated)return 'Explore Mosswater Fen and defeat the creature guarding the old Warden Stone.';if(!progress.fenwardSigilOwned)return `Recover 3 Bog Amber and restore the Warden Stone. ${player.inventory.bogAmber||0}/3`;return 'Mosswater Fen charted. The Fenward Sigil protects you from the marsh.'}; objectiveProgress=function(){if(!progress.groveCacheClaimed||!progress.reinforcedPickaxe||!anyMasterwork())return oldProg();if(!progress.fenCrossingUnlocked)return 'OLD WARDEN CROSSING • SOUTH OF COPPER HOLLOW';if(!progress.fenDiscovered)return 'UNCHARTED ROUTE • SOUTH';if(!progress.fenWardenDefeated)return 'MOSSWATER FEN • FEN WARDEN';if(!progress.fenwardSigilOwned)return `${player.inventory.bogAmber||0} / 3 BOG AMBER • WARDEN STONE`;return 'FENWARD SIGIL RESTORED'};
+const oldUpdate=update; update=function(dt){oldUpdate(dt);if(modalOpen())return;mire=Math.max(0,mire-dt);updateEffects(dt);if(inFen()&&!progress.fenDiscovered){progress.fenDiscovered=true;progress.mapDiscoveries.fen=true;toast('Mosswater Fen discovered');saveGame()}else if(progress.fenDiscovered&&!progress.mapDiscoveries.fen){progress.mapDiscoveries.fen=true;saveGame()}};
+function row(id,key,label,done,unknown){const c=document.getElementById(id);if(!c||c.querySelector(`[data-build11="${key}"]`))return;const r=document.createElement('div');r.className=`journal-row ${done?'done':'locked'}`;r.dataset.build11=key;r.innerHTML=`<span>${done?'✓':'•'}</span><b>${done?label:unknown}</b>`;c.appendChild(r)}
+function ensureMap(){const svg=document.getElementById('warden-map-svg');if(!svg||document.getElementById('map-marker-fen'))return;const ns='http://www.w3.org/2000/svg',before=document.getElementById('map-player-marker'),path=document.createElementNS(ns,'path');path.id='fen-map-path';path.setAttribute('d','M555 350 C575 400 600 447 642 478 C680 505 720 518 755 518');path.setAttribute('fill','none');path.setAttribute('stroke','#5b4a32');path.setAttribute('stroke-width','5');path.setAttribute('stroke-dasharray','10 12');path.setAttribute('opacity','.16');svg.insertBefore(path,before);const wet=document.createElementNS(ns,'path');wet.setAttribute('d','M635 445 C690 420 785 430 835 486 C805 548 700 565 625 520 C606 494 610 466 635 445Z');wet.setAttribute('fill','#536b62');wet.setAttribute('opacity','.34');svg.insertBefore(wet,before);const m=document.createElementNS(ns,'g');m.id='map-marker-fen';m.setAttribute('class','map-marker unknown');m.setAttribute('transform','translate(748 505)');m.innerHTML='<circle r="24"></circle><text y="5">≋</text><text class="marker-label" y="50">UNKNOWN</text>';svg.insertBefore(m,before)}
+function updateBook(){ensureMap();const found=!!progress.mapDiscoveries.fen,m=document.getElementById('map-marker-fen');if(m){m.classList.toggle('unknown',!found);m.classList.toggle('discovered',found);const l=m.querySelector('.marker-label');if(l)l.textContent=found?'MOSSWATER FEN':'UNKNOWN'}const path=document.getElementById('fen-map-path');if(path)path.style.opacity=found?'.68':'.16';const count=document.getElementById('map-discovery-count');if(count){const ks=['briar','meadow','hollow','den','grove','rootway','fen'];count.textContent=`${ks.filter(k=>progress.mapDiscoveries?.[k]).length} / ${ks.length} locations charted`}if(inFen()){const t=clamp((player.y-MINY)/(WORLD.maxY-MINY),0,1),x=600+clamp((player.x-MINX)/(MAXX-MINX),0,1)*180;document.getElementById('map-player-marker')?.setAttribute('transform',`translate(${x.toFixed(1)} ${(420+t*110).toFixed(1)})`)}row('journal-places','fen-place','Mosswater Fen',!!progress.fenDiscovered,'Uncharted wetland');row('journal-milestones','fen-cross','Old Warden Crossing restored',!!progress.fenCrossingUnlocked,'Not completed');row('journal-milestones','fen-warden','Fen Warden defeated',!!progress.fenWardenDefeated,'Not completed');row('journal-milestones','fen-sigil','Fenward Sigil restored',!!progress.fenwardSigilOwned,'Not completed');row('journal-recipes','fen-sigil-recipe','Fenward Sigil • 3 Bog Amber',!!progress.fenWardenDefeated||!!progress.fenwardSigilOwned,'Unknown recipe');row('journal-gear','fen-sigil-gear','Fenward Sigil',!!progress.fenwardSigilOwned,'Not acquired')}
+const invGrid=document.querySelector('#inventory-panel .inventory-grid');if(invGrid&&!document.getElementById('panel-bog-amber-count')){const e=document.createElement('div');e.className='inventory-item';e.innerHTML='<span class="item-icon">◇</span><span><strong>Bog Amber</strong><small>Mosswater relic mineral</small></span><b id="panel-bog-amber-count">0</b>';invGrid.appendChild(e)}const slots=document.querySelector('#inventory-panel .gear-slots');if(slots&&!document.getElementById('gear-fenward-status')){const e=document.createElement('div');e.className='gear-slot';e.innerHTML='<b>Fenward Sigil</b><small id="gear-fenward-status">Not restored</small>';slots.appendChild(e)}const pill=document.createElement('div');pill.id='fen-status-pill';pill.hidden=true;document.getElementById('game-shell')?.appendChild(pill);
+const oldUI=updateUI; updateUI=function(){oldUI();updateBook();const a=document.getElementById('panel-bog-amber-count');if(a)a.textContent=player.inventory.bogAmber||0;const s=document.getElementById('gear-fenward-status');if(s)s.textContent=progress.fenwardSigilOwned?'RESTORED • -30% FEN HAZARD DAMAGE':'Defeat the Fen Warden';if(ui.questTitle&&progress.groveCacheClaimed&&progress.reinforcedPickaxe&&anyMasterwork())ui.questTitle.textContent=progress.fenwardSigilOwned?'Mosswater Charted':'The Old Warden Crossing';pill.hidden=!inFen()&&mire<=0;if(!pill.hidden)pill.textContent=mire>0?`MIRED${boots()?' • BOOTS RESIST':''}`:`MOSSWATER${boots()?' • TRAIL BOOTS':''}${progress.fenwardSigilOwned?' • SIGIL':''}`;const n=nearestInteractable();if(n?.kind==='fenGate'){ui.context.hidden=false;ui.context.textContent=progress.fenCrossingUnlocked?'USE • Old Warden Crossing':'USE • Clear Old Warden Crossing'}else if(n?.kind==='fenShrine'){ui.context.hidden=false;ui.context.textContent=progress.fenwardSigilOwned?'USE • Fenward Sigil restored':'USE • Mosswater Warden Stone'}else if(n?.kind==='resource'&&n.obj.type==='bogAmber'){ui.context.hidden=false;ui.context.textContent=progress.reinforcedPickaxe?'USE • Recover Bog Amber':'Bog Amber • Reinforced Pickaxe required'}};
+const oldGround=drawGround; drawGround=function(z){oldGround(z);const p=[[650,665],[1560,665],[1560,1300],[650,1300]].map(([x,y])=>worldToScreen(x,y));ctx.save();ctx.fillStyle='rgba(42,75,65,.58)';ctx.beginPath();p.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.closePath();ctx.fill();ctx.restore()};
+const oldRoute=drawRoute; drawRoute=function(){oldRoute();const p=[[1080,540],[1080,680],[1025,790],[1090,900],[1160,1015],[1115,1150]].map(([x,y])=>worldToScreen(x,y));ctx.save();ctx.strokeStyle='rgba(77,68,48,.46)';ctx.lineWidth=30*camera.zoom;ctx.lineCap='round';ctx.beginPath();p.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();ctx.strokeStyle='rgba(184,161,112,.34)';ctx.lineWidth=18*camera.zoom;ctx.setLineDash([12*camera.zoom,9*camera.zoom]);ctx.beginPath();p.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();ctx.restore()};
+const oldRes=drawResource; drawResource=function(r){if(r.type!=='bogAmber')return oldRes(r);const p=worldToScreen(r.x,r.y),z=camera.zoom;shadow(r.x,r.y,18,9,.2);ctx.fillStyle=r.active?'#6a593f':'#4a463a';ctx.beginPath();ctx.moveTo(p.x-15*z,p.y);ctx.lineTo(p.x-8*z,p.y-20*z);ctx.lineTo(p.x+8*z,p.y-22*z);ctx.lineTo(p.x+16*z,p.y-4*z);ctx.lineTo(p.x+10*z,p.y);ctx.closePath();ctx.fill();if(r.active)circle(p.x+2*z,p.y-15*z,4*z,'#d5a35a')};
+const oldObjDraw=drawObject; drawObject=function(o){if(!['fenGate','fenShrine','fenReed','fenWater'].includes(o.type))return oldObjDraw(o);const p=worldToScreen(o.x,o.y),z=camera.zoom;ctx.save();if(o.type==='fenGate'){ctx.strokeStyle=progress.fenCrossingUnlocked?'#7c6b4b':'#5b5444';ctx.lineWidth=7*z;for(const dx of [-30,-10,10,30]){ctx.beginPath();ctx.moveTo(p.x+dx*z,p.y);ctx.lineTo(p.x+dx*z,p.y-34*z);ctx.stroke()}labelAt(p.x,p.y-48*z,'OLD WARDEN CROSSING')}else if(o.type==='fenShrine'){ctx.fillStyle='#58645c';ctx.fillRect(p.x-18*z,p.y-55*z,36*z,55*z);circle(p.x,p.y-58*z,9*z,progress.fenwardSigilOwned?'#d5c77a':'#718174');labelAt(p.x,p.y-80*z,'WARDEN STONE')}else if(o.type==='fenReed'){ctx.strokeStyle='#71815a';ctx.lineWidth=3*z;for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(p.x+i*5*z,p.y);ctx.lineTo(p.x+(i*5+3)*z,p.y-(25+Math.abs(i)*4)*z);ctx.stroke()}}else{ctx.fillStyle='rgba(55,89,80,.38)';ctx.beginPath();ctx.ellipse(p.x,p.y,o.r*1.05*z,o.r*.46*z,0,0,TAU);ctx.fill()}ctx.restore()};
+const oldEnemyDraw=drawEnemy; drawEnemy=function(e){oldEnemyDraw(e);if(!e||e.dead||!['mireling','spitter','fenwarden'].includes(e.type))return;const p=worldToScreen(e.x,e.y),z=camera.zoom;ctx.save();if(e.type==='spitter'){circle(p.x+13*z,p.y-38*z,5*z,'#9fbd77');if(e.spitWindup>0){const t=worldToScreen(e.spitTargetX,e.spitTargetY);ctx.strokeStyle='rgba(157,202,120,.65)';ctx.setLineDash([6*z,5*z]);ctx.beginPath();ctx.moveTo(p.x,p.y-22*z);ctx.lineTo(t.x,t.y);ctx.stroke()}}if(e.type==='fenwarden'){const w=118*z,y=p.y-98*z;ctx.fillStyle='rgba(0,0,0,.52)';roundRect(p.x-w/2,y,w,8*z,4*z);ctx.fill();ctx.fillStyle='#6f8b5f';roundRect(p.x-w/2,y,w*(e.hp/e.maxHp),8*z,4*z);ctx.fill();labelAt(p.x,y-10*z,'FEN WARDEN')}ctx.restore()};
+function drawFx(){for(const p of pools){const s=worldToScreen(p.x,p.y),z=camera.zoom;ctx.save();ctx.globalAlpha=Math.min(.58,p.life/p.max);ctx.fillStyle='#405e50';ctx.beginPath();ctx.ellipse(s.x,s.y,p.r*z,p.r*.48*z,0,0,TAU);ctx.fill();ctx.restore()}for(const p of shots){const s=worldToScreen(p.x,p.y),z=camera.zoom;circle(s.x,s.y-17*z,4*z,'#a9c879')}}const oldFloat=drawFloaters; drawFloaters=function(){drawFx();oldFloat()};
+ensureMap();updateBook();updateUI();
+if(window.__BRIAR_GLENDebug){const d=window.__BRIAR_GLENDebug;d.interact=()=>interact();d.getFenState=()=>({crossingUnlocked:progress.fenCrossingUnlocked,discovered:progress.fenDiscovered,wardenDefeated:progress.fenWardenDefeated,sigil:progress.fenwardSigilOwned,bogAmber:player.inventory.bogAmber||0,mireTimer:mire,mireFactor:moveFactor(),inFen:inFen(),zone:zoneFor(player.x,player.y).name,projectiles:shots.length,pools:pools.length,enemies:fenEnemies.map(e=>({type:e.type,name:e.name,hp:e.hp,maxHp:e.maxHp,dead:e.dead,x:e.x,y:e.y})),selectedMasterwork:selectedMasterwork(),mapDiscovered:!!progress.mapDiscoveries.fen});d.movePlayerDelta=(dx,dy)=>{const before={x:player.x,y:player.y};collideMove(player,dx,dy);return{before,after:{x:player.x,y:player.y},factor:moveFactor()}};d.damageFenWarden=a=>damageEnemy(warden,a,{knock:0});d.resetFenWarden=hp=>{warden.dead=false;warden.hp=Number.isFinite(hp)?hp:warden.maxHp;warden.respawn=0;progress.fenWardenDefeated=false};d.forceFenSpit=()=>{const s=fenEnemies.find(e=>e.type==='spitter'&&!e.dead);if(!s)return false;launch(s,player.x,player.y,12);return true};d.hitWithMireling=()=>{const e=fenEnemies.find(x=>x.type==='mireling'&&!x.dead);if(!e)return false;player.invuln=0;damagePlayer(10,e);return true};d.takeFenHazard=a=>{player.invuln=0;const hp=player.hp;damagePlayer(a,{x:player.x-20,y:player.y,type:'mirePool',fenHazard:true});return hp-player.hp}}
+})();
