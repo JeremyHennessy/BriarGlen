@@ -1,0 +1,94 @@
+:root {
+  --ink: #f5ecd8;
+  --muted: #c7bda7;
+  --panel: rgba(18, 27, 20, 0.86);
+  --panel-edge: rgba(242, 211, 151, 0.28);
+  --gold: #e3b86b;
+  --green: #6fa85e;
+  --danger: #b75842;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101a14; }
+body { font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", system-ui, sans-serif; color: var(--ink); user-select: none; overscroll-behavior: none; }
+button, canvas { touch-action: none; }
+
+#game-shell { position: fixed; inset: 0; min-width: 280px; background: #101a14; }
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#hud { position: absolute; inset: 0; pointer-events: none; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.panel { background: linear-gradient(180deg, rgba(28,42,31,.92), rgba(13,22,16,.9)); border: 1px solid var(--panel-edge); box-shadow: 0 10px 30px rgba(0,0,0,.26), inset 0 1px rgba(255,255,255,.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.status-panel, .quest-panel { border-radius: 14px; padding: 10px 12px; width: min(310px, 40vw); }
+.quest-panel { width: min(350px, 43vw); text-align: right; }
+.eyebrow { color: var(--gold); font-size: 10px; font-weight: 900; letter-spacing: .15em; margin-bottom: 3px; }
+.status-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.status-line span { color: var(--muted); font-size: 11px; align-self: center; }
+.bar { overflow: hidden; border-radius: 20px; height: 8px; background: rgba(255,255,255,.09); margin-top: 7px; }
+.bar span { display: block; height: 100%; border-radius: inherit; transition: width .18s ease; }
+.health-bar span { width: 100%; background: linear-gradient(90deg, #8a3d32, #c9644b); }
+.bar-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; margin-top: 3px; }
+.quest-panel strong { display: block; font-size: 14px; }
+#quest-text { color: var(--muted); font-size: 12px; margin-top: 3px; line-height: 1.25; }
+.quest-progress { color: var(--gold); font-size: 11px; font-weight: 800; margin-top: 5px; min-height: 13px; }
+
+.inventory-strip { position: absolute; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 5px; padding: 6px; border-radius: 14px; }
+.inventory-strip > div { display: grid; grid-template-columns: 18px 18px; grid-template-rows: 17px 10px; column-gap: 2px; min-width: 72px; padding: 4px 7px; border-radius: 9px; background: rgba(255,255,255,.04); }
+.inventory-strip b { font-size: 13px; align-self: center; }
+.inventory-strip small { grid-column: 1 / 3; color: var(--muted); font-size: 8px; white-space: nowrap; }
+.item-dot { width: 13px; height: 13px; border-radius: 50%; align-self: center; box-shadow: inset 0 1px rgba(255,255,255,.35); }
+.item-dot.herb { background: #7cb85f; }
+.item-dot.ore { background: #b66c46; }
+.item-dot.tusk { background: #e9d7af; clip-path: polygon(0 50%, 100% 0, 72% 100%); border-radius: 0; }
+
+.bottom-row { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: max(12px, env(safe-area-inset-bottom)); }
+.hint-panel { display: flex; gap: 10px; padding: 7px 10px; border-radius: 12px; color: var(--muted); font-size: 10px; }
+kbd { border: 1px solid rgba(255,255,255,.16); border-bottom-width: 2px; border-radius: 5px; color: var(--ink); padding: 2px 4px; background: rgba(255,255,255,.06); font: inherit; font-weight: 900; }
+
+#toast-stack { position: absolute; top: 27%; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; width: min(440px, 86vw); }
+.toast { justify-self: center; padding: 8px 12px; border-radius: 11px; background: rgba(12,18,14,.9); border: 1px solid rgba(235,204,142,.3); color: var(--ink); font-size: 12px; font-weight: 750; animation: toast-in .25s ease, toast-out .3s ease 2.2s forwards; }
+@keyframes toast-in { from { opacity:0; transform: translateY(10px) scale(.97); } }
+@keyframes toast-out { to { opacity:0; transform: translateY(-8px) scale(.98); } }
+
+#context-prompt { position: absolute; left: 50%; bottom: 88px; transform: translateX(-50%); border-radius: 11px; padding: 7px 11px; color: var(--ink); font-size: 11px; font-weight: 800; pointer-events: none; white-space: nowrap; }
+#rotate-note { display: none; position: absolute; left: 50%; top: max(74px, calc(env(safe-area-inset-top) + 64px)); transform: translateX(-50%); z-index: 5; width: min(82vw, 390px); padding: 5px 9px; border-radius: 12px; background: rgba(9,16,12,.7); color: #d9cfba; font-size: 9px; text-align: center; pointer-events: none; }
+#reset-btn { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.14); background: rgba(13,22,16,.55); color: rgba(255,255,255,.55); font-size: 17px; cursor: pointer; }
+
+#touch-controls { display: none; position: absolute; inset: 0; pointer-events: none; padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.touch-pad { position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); width: 118px; height: 118px; border: 1px solid rgba(255,255,255,.16); border-radius: 50%; background: rgba(12,18,14,.27); box-shadow: inset 0 0 30px rgba(0,0,0,.16); pointer-events: auto; }
+#move-stick { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; transform: translate(-50%,-50%); border-radius: 50%; background: rgba(231,218,190,.28); border: 1px solid rgba(255,255,255,.22); box-shadow: 0 8px 20px rgba(0,0,0,.2); }
+.action-cluster { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom)); width: 174px; height: 136px; pointer-events: auto; }
+.touch-btn { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,.18); color: #fff5df; font: 800 9px/1 system-ui, sans-serif; letter-spacing: .03em; box-shadow: 0 8px 22px rgba(0,0,0,.25), inset 0 1px rgba(255,255,255,.16); }
+.touch-btn.primary { right: 0; bottom: 0; width: 74px; height: 74px; background: rgba(142,67,49,.76); }
+.touch-btn.secondary { right: 78px; bottom: 5px; width: 58px; height: 58px; background: rgba(60,82,66,.72); }
+.touch-btn.utility { right: 12px; bottom: 78px; width: 53px; height: 53px; background: rgba(159,121,61,.72); }
+.touch-btn:active { transform: scale(.94); filter: brightness(1.12); }
+
+@media (pointer: coarse), (max-width: 900px) {
+  #touch-controls { display: block; }
+  .desktop-hints { display: none; }
+  .inventory-strip { bottom: max(7px, env(safe-area-inset-bottom)); transform: translateX(-50%) scale(.88); transform-origin: bottom center; }
+  #context-prompt { bottom: 78px; }
+  #reset-btn { top: max(90px, calc(env(safe-area-inset-top) + 82px)); right: max(9px, env(safe-area-inset-right)); bottom: auto; width: 27px; height: 27px; font-size: 14px; }
+}
+
+@media (max-width: 680px) {
+  .status-panel, .quest-panel { padding: 7px 8px; border-radius: 11px; width: 45vw; }
+  .quest-panel { width: 48vw; }
+  .status-line { font-size: 11px; }
+  .status-line span, #quest-text { font-size: 9px; }
+  .quest-panel strong { font-size: 11px; }
+  .eyebrow, .bar-label, .quest-progress { font-size: 8px; }
+  .bar { height: 6px; margin-top: 4px; }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+  #rotate-note { display: block; }
+  .top-row { gap: 6px; }
+  .status-panel { width: 44vw; }
+  .quest-panel { width: 50vw; }
+  #touch-controls .touch-pad { width: 108px; height: 108px; left: max(14px, env(safe-area-inset-left)); bottom: max(25px, env(safe-area-inset-bottom)); }
+  .action-cluster { right: max(10px, env(safe-area-inset-right)); bottom: max(23px, env(safe-area-inset-bottom)); transform: scale(.9); transform-origin: bottom right; }
+  .inventory-strip { bottom: 134px; }
+  #context-prompt { bottom: 190px; }
+}
