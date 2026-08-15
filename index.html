@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="styles-v2.css" />
   <link rel="stylesheet" href="styles-v3.css" />
+  <link rel="stylesheet" href="styles-v4.css" />
 </head>
 <body>
   <main id="game-shell" aria-label="Briar Glen game">
@@ -93,12 +94,58 @@
         <div class="inventory-item"><span class="item-icon">◢</span><span><strong>Ember Tusk</strong><small>Boss trophy</small></span><b id="panel-tusk-count">0</b></div>
         <div class="inventory-item"><span class="item-icon">✚</span><span><strong>Healing Tonic</strong><small>Restores 45 health</small></span><b id="panel-tonic-count">0</b></div>
       </div>
+      <div class="gear-card">
+        <strong>EQUIPMENT</strong>
+        <div class="gear-slots">
+          <div class="gear-slot"><b>Copperguard Vest</b><small id="gear-vest-status">Not owned</small></div>
+          <div class="gear-slot"><b>Rootstep Charm</b><small id="gear-charm-status">Not owned</small></div>
+        </div>
+      </div>
       <div class="recipe-card">
         <strong>Mira's Healing Tonic</strong>
         <div id="recipe-status">Mira needs 1 Briarleaf + 1 Mooncap.</div>
       </div>
       <div class="inventory-actions">
         <button id="use-tonic-btn">Use Healing Tonic (+45)</button>
+      </div>
+    </section>
+
+    <div id="trade-backdrop" hidden></div>
+    <section id="trade-panel" class="trade-panel panel" hidden aria-label="Rowan trader">
+      <div class="trade-header">
+        <div>
+          <div class="eyebrow">BRIAR GLEN MARKET</div>
+          <h2>Rowan's Travelling Stock</h2>
+          <p>Permanent equipment, field supplies and hide trading.</p>
+          <div class="trade-balance" id="trade-coins">0 coins</div>
+        </div>
+        <button id="trade-close" class="trade-close" aria-label="Close trader">×</button>
+      </div>
+      <div class="trade-grid">
+        <div class="trade-item">
+          <span class="trade-icon">◈</span>
+          <strong>Copperguard Vest</strong>
+          <p>Permanent armor upgrade. Raises maximum health from 100 to 125.</p>
+          <button id="buy-vest-btn">Buy • 180 c</button>
+        </div>
+        <div class="trade-item">
+          <span class="trade-icon">✦</span>
+          <strong>Rootstep Charm</strong>
+          <p>Permanent utility upgrade. Shortens dodge recovery to 0.82 seconds.</p>
+          <button id="buy-charm-btn">Buy • 140 c</button>
+        </div>
+        <div class="trade-item">
+          <span class="trade-icon">✚</span>
+          <strong>Healing Tonic</strong>
+          <p>A ready-made field tonic. Restores 45 health when used.</p>
+          <button id="buy-tonic-btn">Buy • 40 c</button>
+        </div>
+        <div class="trade-item sell">
+          <span class="trade-icon">▱</span>
+          <strong>Sell Beast Hide</strong>
+          <p>Rowan buys clean Beast Hides, turning field loot into spendable coins.</p>
+          <button id="sell-hide-btn">No Beast Hides to sell</button>
+        </div>
       </div>
     </section>
   </main>
@@ -110,5 +157,6 @@
   <script src="src/v2/05.js"></script>
   <script src="src/v2/06.js"></script>
   <script src="src/v3/07-rpg.js"></script>
+  <script src="src/v4/08-economy.js"></script>
 </body>
 </html>
