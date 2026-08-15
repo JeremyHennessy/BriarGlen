@@ -1,0 +1,45 @@
+/* Build 11 — Mosswater Fen */
+#fen-status-pill {
+  position: absolute;
+  left: 50%;
+  top: max(72px, calc(env(safe-area-inset-top) + 62px));
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(178, 201, 143, .28);
+  background: rgba(30, 53, 44, .84);
+  color: #d9e4bf;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  box-shadow: 0 8px 20px rgba(0,0,0,.2);
+  pointer-events: none;
+}
+
+#map-marker-fen circle { fill: #425e54; stroke: #30463f; stroke-width: 3; }
+#map-marker-fen text:first-of-type { fill: #e7dec4; font-size: 21px; font-weight: 900; text-anchor: middle; }
+#map-marker-fen.unknown circle { fill: #756d5c; opacity: .55; }
+#map-marker-fen.unknown .marker-label { fill: #756d5c; }
+#map-marker-fen.discovered circle { fill: #425e54; }
+#map-marker-fen.discovered .marker-label { fill: #413b30; }
+
+#gear-fenward-status {
+  color: #bfcfa8;
+}
+
+@media (pointer: coarse), (max-width: 900px) {
+  #fen-status-pill {
+    top: max(68px, calc(env(safe-area-inset-top) + 58px));
+    font-size: 8px;
+    padding: 5px 8px;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+  #fen-status-pill {
+    top: max(118px, calc(env(safe-area-inset-top) + 106px));
+    max-width: 74vw;
+    white-space: nowrap;
+  }
+}
