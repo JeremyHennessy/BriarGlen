@@ -1,0 +1,17 @@
+/* Build 8: sixth touch combat control for weapon skills. */
+.touch-btn.skill {
+  right: 138px;
+  bottom: 5px;
+  width: 58px;
+  height: 58px;
+  background: rgba(84, 72, 101, .82);
+  font-size: 8px;
+}
+.touch-btn.skill[data-weapon="sword"] { background: rgba(118, 83, 55, .82); }
+.touch-btn.skill[data-weapon="bow"] { background: rgba(94, 83, 53, .84); }
+.touch-btn.skill[data-weapon="staff"] { background: rgba(52, 105, 81, .84); }
+.touch-btn.skill:disabled { opacity: .58; filter: saturate(.65); }
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .touch-btn.skill { right: 138px; bottom: 5px; }
+}
