@@ -107,7 +107,7 @@ try {
     const defeated = await page.evaluate(() => window.__BRIAR_GLENDebug.defeatFenWarden());
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getFenState());
     const afterBossCoins = await page.evaluate(() => window.__BRIAR_GLENDebug.getState().player.coins);
-    if (!defeated || !state.wardenDefeated || afterBossCoins !== beforeBossCoins + 70) {
+    if (!defeated || !state.wardenDefeated || afterBossCoins !== beforeBossCoins + 76) {
       throw new Error(`${vp.name}: Drowned Warden reward failed`);
     }
 
