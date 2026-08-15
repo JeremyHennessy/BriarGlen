@@ -45,7 +45,7 @@ try {
         });
         await page.waitForFunction(() => {
           const canvas = document.querySelector('#game');
-          return Boolean(window.__BRIAR_GLENDebug && canvas && canvas.width > 0 && canvas.height > 0);
+          return Boolean(window.__BRIAR_GLENDebug?.getRPGState && canvas && canvas.width > 0 && canvas.height > 0);
         }, { timeout: 6000 });
         loaded = true;
         break;
@@ -98,6 +98,7 @@ try {
       throw new Error(`${vp.name}: invalid initial game state: ${JSON.stringify(result.state)}`);
     }
 
+    // Build 2 input regression.
     if (vp.touch) {
       const before = result.state.player.weaponType;
       await page.locator('#weapon-btn').click();
@@ -109,7 +110,72 @@ try {
       if (weapon !== 'bow') throw new Error(`${vp.name}: desktop weapon hotkey failed (${weapon})`);
     }
 
-    console.log(`PASS ${vp.name}: ${result.canvasWidth}x${result.canvasHeight}, ${result.distinctCanvasColors} canvas colors, runtime active`);
+    // Build 3 satchel interaction.
+    await page.locator('#inventory-strip').click();
+    if (!(await page.locator('#inventory-panel').isVisible())) throw new Error(`${vp.name}: satchel did not open`);
+    await page.locator('#inventory-close').click();
+    if (await page.locator('#inventory-panel').isVisible()) throw new Error(`${vp.name}: satchel did not close`);
+
+    // Gather a real Mooncap node.
+    await page.evaluate(() => {
+      const d = window.__BRIAR_GLENDebug;
+      d.setInventory({ herb: 0, mooncap: 0, tonic: 0, hide: 0 });
+      d.teleport(40, 270);
+      d.interact();
+    });
+    let state = await page.evaluate(() => window.__BRIAR_GLENDebug.getState());
+    if (state.player.inventory.mooncap !== 1) throw new Error(`${vp.name}: Mooncap gather failed: ${JSON.stringify(state.player.inventory)}`);
+
+    // Brew a Healing Tonic at Mira using Briarleaf + the gathered Mooncap.
+    await page.evaluate(() => {
+      const d = window.__BRIAR_GLENDebug;
+      d.setInventory({ herb: 1 });
+      d.teleport(-650, 260);
+      d.interact();
+    });
+    state = await page.evaluate(() => window.__BRIAR_GLENDebug.getState());
+    if (state.player.inventory.tonic !== 1 || state.player.inventory.herb !== 0 || state.player.inventory.mooncap !== 0) {
+      throw new Error(`${vp.name}: alchemy recipe failed: ${JSON.stringify(state.player.inventory)}`);
+    }
+
+    // Use the actual platform control for the tonic.
+    await page.evaluate(() => window.__BRIAR_GLENDebug.setPlayer({ hp: 40 }));
+    if (vp.touch) await page.locator('#potion-btn').click();
+    else await page.keyboard.press('KeyQ');
+    state = await page.evaluate(() => window.__BRIAR_GLENDebug.getState());
+    if (state.player.hp !== 85 || state.player.inventory.tonic !== 0) {
+      throw new Error(`${vp.name}: Healing Tonic control failed: hp=${state.player.hp}, tonic=${state.player.inventory.tonic}`);
+    }
+
+    // Verify a world loot drop is collected into the satchel.
+    await page.evaluate(() => window.__BRIAR_GLENDebug.spawnLoot('hide', 1));
+    await page.waitForTimeout(120);
+    state = await page.evaluate(() => window.__BRIAR_GLENDebug.getState());
+    if (state.player.inventory.hide < 1) throw new Error(`${vp.name}: Beast Hide loot pickup failed`);
+
+    // Exercise the second contract acceptance and turn-in state machine.
+    await page.evaluate(() => {
+      const d = window.__BRIAR_GLENDebug;
+      d.setProgress({ contractComplete: true, patrolActive: false, patrolComplete: false, patrolKills: 0 });
+      d.setInventory({ hide: 2 });
+      d.teleport(-615, -118);
+      d.interact();
+    });
+    let rpg = await page.evaluate(() => window.__BRIAR_GLENDebug.getRPGState());
+    if (!rpg.patrol.active || rpg.patrol.complete) throw new Error(`${vp.name}: Hollow Patrol was not accepted`);
+
+    await page.evaluate(() => {
+      const d = window.__BRIAR_GLENDebug;
+      d.setProgress({ patrolKills: 3 });
+      d.interact();
+    });
+    rpg = await page.evaluate(() => window.__BRIAR_GLENDebug.getRPGState());
+    state = await page.evaluate(() => window.__BRIAR_GLENDebug.getState());
+    if (!rpg.patrol.complete || rpg.patrol.active) throw new Error(`${vp.name}: Hollow Patrol did not complete`);
+    if (state.player.inventory.tonic < 1) throw new Error(`${vp.name}: Hollow Patrol reward tonic missing`);
+
+    if (runtimeErrors.length) throw new Error(`${vp.name}: runtime errors after RPG tests:\n${runtimeErrors.join('\n')}`);
+    console.log(`PASS ${vp.name}: ${result.canvasWidth}x${result.canvasHeight}, ${result.distinctCanvasColors} canvas colors, Build 3 RPG systems active`);
     await context.close();
   }
 } finally {

@@ -11,6 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="styles-v2.css" />
+  <link rel="stylesheet" href="styles-v3.css" />
 </head>
 <body>
   <main id="game-shell" aria-label="Briar Glen game">
@@ -46,13 +47,16 @@
           <span><kbd>Shift</kbd> Dodge</span>
           <span><kbd>E</kbd> Interact</span>
           <span><kbd>C</kbd> Craft</span>
+          <span><kbd>I</kbd> Satchel</span>
+          <span><kbd>Q</kbd> Tonic</span>
         </div>
       </div>
 
-      <div class="inventory-strip panel" id="inventory-strip">
+      <div class="inventory-strip panel" id="inventory-strip" role="button" tabindex="0" aria-label="Open satchel">
         <div><span class="item-dot herb"></span><b id="herb-count">0</b><small>Briarleaf</small></div>
         <div><span class="item-dot ore"></span><b id="ore-count">0</b><small>Copper</small></div>
         <div><span class="item-dot tusk"></span><b id="tusk-count">0</b><small>Ember Tusk</small></div>
+        <div class="bag-slot"><span class="item-dot bag"></span><b>▦</b><small>Satchel</small></div>
       </div>
     </section>
 
@@ -61,6 +65,7 @@
       <div class="action-cluster">
         <button id="interact-btn" class="touch-btn utility" aria-label="Interact">USE</button>
         <button id="weapon-btn" class="touch-btn weapon" data-weapon="sword" aria-label="Cycle weapon">SWORD</button>
+        <button id="potion-btn" class="touch-btn potion" data-empty="true" aria-label="Use Healing Tonic">TONIC 0</button>
         <button id="dash-btn" class="touch-btn secondary" aria-label="Dodge">DODGE</button>
         <button id="attack-btn" class="touch-btn primary" aria-label="Attack">ATTACK</button>
       </div>
@@ -69,6 +74,33 @@
     <div id="context-prompt" class="panel" hidden></div>
     <div id="rotate-note">Landscape is recommended on phone, but portrait remains playable.</div>
     <button id="reset-btn" title="Reset save">↻</button>
+
+    <div id="inventory-backdrop" hidden></div>
+    <section id="inventory-panel" class="inventory-panel panel" hidden aria-label="Satchel inventory">
+      <div class="inventory-header">
+        <div>
+          <div class="eyebrow">BRIAR WARDEN</div>
+          <h2>Satchel</h2>
+          <p>Supplies, field loot and alchemy ingredients.</p>
+        </div>
+        <button id="inventory-close" class="inventory-close" aria-label="Close satchel">×</button>
+      </div>
+      <div class="inventory-grid">
+        <div class="inventory-item"><span class="item-icon">🌿</span><span><strong>Briarleaf</strong><small>Medicinal herb</small></span><b id="panel-herb-count">0</b></div>
+        <div class="inventory-item"><span class="item-icon">◉</span><span><strong>Mooncap</strong><small>Alchemy mushroom</small></span><b id="panel-mooncap-count">0</b></div>
+        <div class="inventory-item"><span class="item-icon">◆</span><span><strong>Copper</strong><small>Forging ore</small></span><b id="panel-ore-count">0</b></div>
+        <div class="inventory-item"><span class="item-icon">▱</span><span><strong>Beast Hide</strong><small>Field loot</small></span><b id="panel-hide-count">0</b></div>
+        <div class="inventory-item"><span class="item-icon">◢</span><span><strong>Ember Tusk</strong><small>Boss trophy</small></span><b id="panel-tusk-count">0</b></div>
+        <div class="inventory-item"><span class="item-icon">✚</span><span><strong>Healing Tonic</strong><small>Restores 45 health</small></span><b id="panel-tonic-count">0</b></div>
+      </div>
+      <div class="recipe-card">
+        <strong>Mira's Healing Tonic</strong>
+        <div id="recipe-status">Mira needs 1 Briarleaf + 1 Mooncap.</div>
+      </div>
+      <div class="inventory-actions">
+        <button id="use-tonic-btn">Use Healing Tonic (+45)</button>
+      </div>
+    </section>
   </main>
 
   <script src="src/v2/01.js"></script>
@@ -77,5 +109,6 @@
   <script src="src/v2/04.js"></script>
   <script src="src/v2/05.js"></script>
   <script src="src/v2/06.js"></script>
+  <script src="src/v3/07-rpg.js"></script>
 </body>
 </html>
