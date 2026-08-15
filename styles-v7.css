@@ -1,0 +1,45 @@
+/* Build 7: named gear controls and desktop aiming affordance. */
+@media (pointer: fine) {
+  #game { cursor: crosshair; }
+}
+
+.gear-slot.gear-slot-action {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "name action"
+    "status action";
+  column-gap: 8px;
+  align-items: center;
+}
+.gear-slot.gear-slot-action b { grid-area: name; }
+.gear-slot.gear-slot-action small { grid-area: status; }
+.gear-slot.gear-slot-action button {
+  grid-area: action;
+  min-width: 66px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.13);
+  background: rgba(76, 105, 74, .72);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.gear-slot.gear-slot-action button[aria-pressed="true"] {
+  border-color: rgba(169,214,164,.32);
+  background: rgba(62, 94, 65, .8);
+}
+.gear-slot.gear-slot-action button[hidden] { display: none; }
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .gear-slot.gear-slot-action {
+    grid-template-columns: 1fr auto;
+  }
+  .gear-slot.gear-slot-action button {
+    min-width: 58px;
+    min-height: 30px;
+    font-size: 8px;
+  }
+}
