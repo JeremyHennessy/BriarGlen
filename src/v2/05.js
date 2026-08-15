@@ -39,10 +39,13 @@
     }
     ctx.save();ctx.translate(p.x,p.y);
     if(e.hurt>0) ctx.globalAlpha=.72;
+    // Body
     ctx.fillStyle=e.hurt>0?'#e9c7a6':e.color;
     ctx.beginPath();ctx.ellipse(0,-17*z,28*z,18*z,0,0,TAU);ctx.fill();
+    // Head faces roughly toward motion/player.
     const fx=e.facingX*10*z, fy=e.facingY*4*z;
     circle(fx+17*z, -25*z+fy, 14*z, e.hurt>0?'#efd0ad':e.color);
+    // Legs
     ctx.strokeStyle=e.color;ctx.lineWidth=6*z;ctx.lineCap='round';
     for(const lx of [-14,11]){ctx.beginPath();ctx.moveTo(lx*z,-7*z);ctx.lineTo((lx-2)*z,6*z);ctx.stroke();}
     if(e.type==='boss'){
@@ -66,6 +69,7 @@
     shadow(player.x,player.y,22,13,.32);
     const blink=player.invuln>0 && Math.floor(player.invuln*18)%2===0;
     ctx.save();ctx.translate(p.x,p.y);ctx.globalAlpha=blink?.55:1;
+    // Cloak/body.
     ctx.fillStyle='#3f604a';ctx.beginPath();ctx.moveTo(-16*z,0);ctx.lineTo(-12*z,-37*z);ctx.lineTo(0,-48*z);ctx.lineTo(14*z,-37*z);ctx.lineTo(18*z,2*z);ctx.closePath();ctx.fill();
     ctx.fillStyle='#c6a47f';circle(0,-48*z,11*z,'#c6a47f');
     ctx.fillStyle='#2c362f';ctx.beginPath();ctx.arc(0,-50*z,12*z,Math.PI,TAU);ctx.fill();
