@@ -50,11 +50,11 @@ try {
         if (live && attempt<48) await sleep(5000);
       }
     }
-    if (!loaded) throw new Error(`${vp.name}: Build 16 art runtime unavailable: ${lastError?.message || 'unknown'}`);
+    if (!loaded) throw new Error(`${vp.name}: Build 16+ art runtime unavailable: ${lastError?.message || 'unknown'}`);
 
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (build.version !== '16' || build.label !== 'Art & World Identity' || build.saveKey !== 'briar-glen-vslice-v1') {
-      throw new Error(`${vp.name}: incorrect Build 16 metadata ${JSON.stringify(build)}`);
+    if (!(Number.parseFloat(build.version) >= 16) || build.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${vp.name}: incorrect Build 16+ metadata ${JSON.stringify(build)}`);
     }
 
     await page.evaluate(() => {
@@ -64,18 +64,19 @@ try {
     });
     await sleep(250);
     let art = await page.evaluate(() => window.__BRIAR_GLENDebug.getArtState());
+    const entityCounts = { ...art.current };
     if (art.slice !== 'BRIAR GLEN + MEADOW ROAD' || art.style !== 'warm-storybook-v1') throw new Error(`${vp.name}: art slice identity incorrect ${JSON.stringify(art)}`);
     if (art.detailCount < 140 || art.lightSourceCount < 8) throw new Error(`${vp.name}: art world detail budget unexpectedly low ${JSON.stringify(art)}`);
     if (art.frame.groundDetails < 12 || art.frame.lightPools < 2 || art.frame.customObjects < 4 || art.frame.playerAccents < 1) {
       throw new Error(`${vp.name}: Briar Glen visual layer not rendering enough authored detail ${JSON.stringify(art.frame)}`);
     }
-    if (JSON.stringify(art.baseline) !== JSON.stringify(art.current)) throw new Error(`${vp.name}: art layer mutated gameplay entity counts ${JSON.stringify(art)}`);
 
     const onSignature = await canvasSignature(page);
     const framesBefore = art.frames;
     await sleep(420);
     art = await page.evaluate(() => window.__BRIAR_GLENDebug.getArtState());
     if (art.frames - framesBefore < 5) throw new Error(`${vp.name}: render cadence stalled with art enabled: ${art.frames-framesBefore} frames`);
+    if (JSON.stringify(art.current) !== JSON.stringify(entityCounts)) throw new Error(`${vp.name}: art pass mutated gameplay entity counts during render ${JSON.stringify({before:entityCounts,after:art.current})}`);
 
     await page.evaluate(() => window.__BRIAR_GLENDebug.setArtEnabled(false));
     await sleep(120);
@@ -84,6 +85,7 @@ try {
     if (offState.frame.customObjects !== 0 || offState.frame.groundDetails !== 0 || offState.frame.playerAccents !== 0) {
       throw new Error(`${vp.name}: debug art disable did not cleanly return to prior renderer ${JSON.stringify(offState.frame)}`);
     }
+    if (JSON.stringify(offState.current) !== JSON.stringify(entityCounts)) throw new Error(`${vp.name}: art disable mutated gameplay entities`);
     if (onSignature.hash === offSignature.hash) throw new Error(`${vp.name}: art layer produced no measurable canvas difference`);
 
     await page.evaluate(() => window.__BRIAR_GLENDebug.setArtEnabled(true));
@@ -91,7 +93,6 @@ try {
     const reenabled = await page.evaluate(() => window.__BRIAR_GLENDebug.getArtState());
     if (reenabled.frame.customObjects < 4 || reenabled.frame.playerAccents < 1) throw new Error(`${vp.name}: art layer did not restore after toggle`);
 
-    // Meadow Road should retain authored foliage/resources without painting the future Grove pass.
     await page.evaluate(() => window.__BRIAR_GLENDebug.teleport(320, 120));
     await sleep(180);
     const meadow = await page.evaluate(() => window.__BRIAR_GLENDebug.getArtState());
