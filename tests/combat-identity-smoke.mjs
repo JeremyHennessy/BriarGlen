@@ -52,7 +52,6 @@ try {
       if (!roleMap[type]) throw new Error(`${vp.name}: missing combat role for ${type}`);
     }
 
-    // Sword: ordinary committed windups can be interrupted without changing baseline damage.
     const sword = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.setThreat('boar', { hp: 70, dead: false, hurt: 0 });
@@ -66,7 +65,6 @@ try {
       throw new Error(`${vp.name}: sword interrupt identity incorrect ${JSON.stringify(sword)}`);
     }
 
-    // Bow: a shot into an active committed charge is a deterministic 25% countershot.
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.setThreat('boar', { hp: 70, dead: false, hurt: 0, x: 950, y: 235 });
@@ -87,7 +85,6 @@ try {
       throw new Error(`${vp.name}: bow countershot identity incorrect ${JSON.stringify(bow)}`);
     }
 
-    // Staff: extends an enemy windup and registers control without changing the requested hit amount.
     const staff = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.setThreat('bogstalker', { hp: 118, dead: false, hurt: 0 });
@@ -103,9 +100,9 @@ try {
       throw new Error(`${vp.name}: staff control identity incorrect ${JSON.stringify(staff)}`);
     }
 
-    // Mireling bind: marked ground resolves through the real player damage path and applies a movement root.
     const mireSetup = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
+      d.setProgress({ fenCrossingOpened: true, fenDiscovered: true });
       d.setPlayer({ hp: 100, maxHp: 100, invuln: 0 });
       d.setThreat('mireling', { hp: 78, dead: false, x: 1240, y: -1480 });
       d.teleport(1340, -1480);
@@ -122,7 +119,6 @@ try {
       throw new Error(`${vp.name}: Mireling bind/root did not resolve ${JSON.stringify(mire)}`);
     }
 
-    // Root must materially reduce movement while preserving the existing screen-aligned input path.
     const rootedStart = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.teleport(-100, 300);
@@ -150,7 +146,6 @@ try {
       throw new Error(`${vp.name}: combat root did not materially slow movement rooted=${rootedDistance} free=${freeDistance}`);
     }
 
-    // Boss identities: Grovekeeper creates a multi-eruption pattern; phase-two Warden can surge.
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.teleport(520, -700);
@@ -176,7 +171,6 @@ try {
       throw new Error(`${vp.name}: Drowned Warden phase-two surge missing ${JSON.stringify(warden)}`);
     }
 
-    // Field tactics must be legible inside the existing journal on every viewport.
     await page.evaluate(() => window.__BRIAR_GLENDebug.openJournal());
     await page.waitForFunction(() => document.getElementById('journal-threat-notes')?.innerText?.includes('Briar Wolf'));
     const cardBox = await page.locator('#journal-threat-notes').boundingBox();
