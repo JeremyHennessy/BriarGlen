@@ -36,12 +36,10 @@ try {
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
     if (build.version !== '16') throw new Error(`${vp.name}: feedback tuning not attached to Build 16 ${JSON.stringify(build)}`);
 
-    const baseline = await page.evaluate(() => {
-      const d = window.__BRIAR_GLENDebug;
-      d.setCameraShake(0);
-      return d.projectPoint(-620, 35);
-    });
-    await sleep(40);
+    // Clear the source and allow a rendered frame to commit a true zero-offset baseline.
+    await page.evaluate(() => window.__BRIAR_GLENDebug.setCameraShake(0));
+    await sleep(50);
+    const baseline = await page.evaluate(() => window.__BRIAR_GLENDebug.projectPoint(-620, 35));
 
     await page.evaluate(() => window.__BRIAR_GLENDebug.setCameraShake(12));
     await sleep(35);
@@ -56,7 +54,6 @@ try {
       throw new Error(`${vp.name}: tuned shake amplitude still too high ${JSON.stringify(shakeProbe.tuning)}`);
     }
 
-    // Every object in the same frame should share one coherent offset; no per-object random rattling.
     const xs = shakeProbe.samples.map(p => p.x), ys = shakeProbe.samples.map(p => p.y);
     const spreadX = Math.max(...xs) - Math.min(...xs);
     const spreadY = Math.max(...ys) - Math.min(...ys);
@@ -68,7 +65,6 @@ try {
     const shift = Math.hypot(displaced.x - baseline.x, displaced.y - baseline.y);
     if (shift > 2.2) throw new Error(`${vp.name}: whole-screen shake displacement still excessive: ${shift}`);
 
-    // Physical phone haptics are softened too; a former 35ms hurt pulse is capped to 18ms.
     const haptic = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       const before = d.getFeedbackTuningState().hapticCalls;
