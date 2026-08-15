@@ -1,8 +1,9 @@
 (() => {
   'use strict';
 
-  // Build 11 journal state sync. The Fen layer creates these rows; this keeps
-  // their visible status aligned with persistent progress after state changes.
+  // Build 11 journal state sync. Build 10 rebuilds journal lists whenever the
+  // field book opens or changes tabs, so observe those list rebuilds and then
+  // restore the Fen rows from the persistent Build 11 state.
   const syncFenJournalRows = () => {
     const rows = [
       ['fen-cross', 'Old Warden Crossing restored', !!progress.fenCrossingUnlocked, 'Not completed'],
@@ -28,6 +29,16 @@
     build11UpdateUI();
     syncFenJournalRows();
   };
+
+  for (const id of ['journal-milestones', 'journal-recipes', 'journal-gear']) {
+    const list = document.getElementById(id);
+    if (!list) continue;
+    new MutationObserver(() => {
+      // Build 10 just replaced the direct children; Build 11's normal UI pass
+      // will recreate its rows, then this microtask refreshes their completion.
+      queueMicrotask(syncFenJournalRows);
+    }).observe(list, { childList: true });
+  }
 
   syncFenJournalRows();
 })();
