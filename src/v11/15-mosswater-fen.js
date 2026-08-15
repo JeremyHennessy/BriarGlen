@@ -1,0 +1,572 @@
+(() => {
+  'use strict';
+
+  // Build 11: Mosswater Fen / Old Warden Crossing.
+  // Additive world layer; Builds 2–10 remain intact underneath.
+  const fenZone = { name: 'MOSSWATER FEN', tint: '#334f47' };
+  const fenState = {
+    crossingX: 1050,
+    crossingY: -1200,
+    bossX: 1450,
+    bossY: -1760,
+  };
+
+  if (typeof progress.fenDiscovered !== 'boolean') progress.fenDiscovered = false;
+  if (typeof progress.fenCrossingOpened !== 'boolean') progress.fenCrossingOpened = false;
+  if (typeof progress.fenWardenDefeated !== 'boolean') progress.fenWardenDefeated = false;
+  if (typeof progress.fenCacheClaimed !== 'boolean') progress.fenCacheClaimed = false;
+  if (!progress.mapDiscoveries) progress.mapDiscoveries = {};
+  if (typeof progress.mapDiscoveries.fen !== 'boolean') {
+    progress.mapDiscoveries.fen = !!progress.fenDiscovered;
+  }
+  if (!Number.isFinite(player.inventory.mossglass)) player.inventory.mossglass = 0;
+
+  WORLD.maxX = Math.max(WORLD.maxX, 2360);
+  WORLD.minY = Math.min(WORLD.minY, -2100);
+
+  addObject('fenSign', 900, -1035, { label: 'Old Warden Crossing' });
+  addObject('fenGate', fenState.crossingX, fenState.crossingY, { label: 'Old Warden Crossing' });
+  addObject('fenCache', 1515, -1830, { label: 'Sunken Warden Reliquary' });
+  addObject('fenRuin', 1360, -1660, { piece: 0 });
+  addObject('fenRuin', 1530, -1695, { piece: 1 });
+  addObject('fenRuin', 1615, -1815, { piece: 2 });
+
+  [[1010,-1330],[1190,-1435],[1350,-1515],[1580,-1550],[1780,-1690],[1910,-1860]]
+    .forEach(([x,y]) => addObject('fenTree', x, y));
+  [[1110,-1500],[1290,-1650],[1690,-1770],[1840,-1510],[1980,-1930]]
+    .forEach(([x,y]) => addObject('fenPool', x, y));
+  [[1210,-1370],[1430,-1450],[1650,-1610],[1870,-1780]]
+    .forEach(([x,y]) => addResource('mossglass', x, y));
+
+  addEnemy('mireling', 1240, -1480, {
+    name: 'Mireling', hp: 78, maxHp: 78, speed: 108, damage: 12,
+    aggro: 320, attackRange: 50, radius: 25, color: '#58766b',
+    homeX: 1240, homeY: -1480, specialCd: 1.1,
+  });
+  addEnemy('mireling', 1710, -1590, {
+    name: 'Mireling', hp: 78, maxHp: 78, speed: 108, damage: 12,
+    aggro: 320, attackRange: 50, radius: 25, color: '#58766b',
+    homeX: 1710, homeY: -1590, specialCd: 1.5,
+  });
+  addEnemy('bogstalker', 1830, -1840, {
+    name: 'Bog Stalker', hp: 118, maxHp: 118, speed: 92, damage: 17,
+    aggro: 370, attackRange: 60, radius: 30, color: '#526158',
+    homeX: 1830, homeY: -1840, specialCd: 1.8,
+  });
+  const fenWarden = addEnemy('fenwarden', fenState.bossX, fenState.bossY, {
+    name: 'Drowned Warden', hp: 260, maxHp: 260, speed: 96, damage: 20,
+    aggro: 480, attackRange: 67, radius: 38, scale: 1.45, color: '#476b67',
+    homeX: fenState.bossX, homeY: fenState.bossY, specialCd: 1.7,
+  });
+  if (progress.fenWardenDefeated) {
+    fenWarden.dead = true;
+    fenWarden.hp = 0;
+    fenWarden.respawn = 99999;
+  }
+
+  const build10ZoneFor = zoneFor;
+  zoneFor = function build11ZoneFor(x, y = player.y) {
+    if (y <= -1180 && x >= 880 && x <= 2200) return fenZone;
+    return build10ZoneFor(x, y);
+  };
+
+  function fenReady() {
+    return !!(
+      progress.reinforcedPickaxe &&
+      (progress.temperedSword || progress.briarstringBow || progress.moonrootStaff)
+    );
+  }
+
+  const build10NearestInteractable = nearestInteractable;
+  nearestInteractable = function build11NearestInteractable() {
+    const base = build10NearestInteractable();
+    const extras = worldObjects
+      .filter(o => ['fenSign', 'fenGate', 'fenCache'].includes(o.type))
+      .map(o => ({ kind: o.type, obj: o, d: dist(player, o) }))
+      .filter(c => c.d <= (c.kind === 'fenGate' ? 115 : 100));
+
+    for (const r of resources) {
+      if (r.active && r.type === 'mossglass') {
+        const d = dist(player, r);
+        if (d <= 90) extras.push({ kind: 'resource', obj: r, d });
+      }
+    }
+
+    extras.sort((a, b) => a.d - b.d);
+    if (extras[0] && (!base || extras[0].d < base.d)) return extras[0];
+    return base;
+  };
+
+  const build10Interact = interact;
+  interact = function build11Interact() {
+    const near = nearestInteractable();
+
+    if (near?.kind === 'fenSign') {
+      toast(
+        fenReady()
+          ? 'Old Warden Crossing • masterwork expedition route'
+          : 'Old Warden Crossing • Reinforced Pickaxe + masterwork weapon required'
+      );
+      return;
+    }
+
+    if (near?.kind === 'fenGate') {
+      if (!fenReady()) {
+        toast('The flooded crossing needs a Reinforced Pickaxe and a masterwork weapon');
+        return;
+      }
+      if (!progress.fenCrossingOpened) {
+        progress.fenCrossingOpened = true;
+        progress.fenDiscovered = true;
+        progress.mapDiscoveries.fen = true;
+        spawnParticles(near.obj.x, near.obj.y, '#8aa39a', 22, .9);
+        addFloater(near.obj.x, near.obj.y - 24, 'MOSSWATER FEN CHARTED', '#c3ddd3');
+        toast('Old Warden Crossing opened — Mosswater Fen charted');
+        saveGame();
+      } else {
+        toast('Old Warden Crossing is open');
+      }
+      return;
+    }
+
+    if (near?.kind === 'resource' && near.obj.type === 'mossglass') {
+      if (!progress.fenCrossingOpened) {
+        toast('The fen route is still sealed');
+        return;
+      }
+      near.obj.active = false;
+      near.obj.cooldown = 42;
+      player.inventory.mossglass += 1;
+      spawnParticles(near.obj.x, near.obj.y, '#8bb4a7', 14, .7);
+      addFloater(near.obj.x, near.obj.y - 14, 'MOSSGLASS +1', '#b9ddd2');
+      toast('Mossglass recovered');
+      saveGame();
+      return;
+    }
+
+    if (near?.kind === 'fenCache') {
+      if (!progress.fenWardenDefeated) {
+        toast('The reliquary is bound to the Drowned Warden');
+        return;
+      }
+      if (progress.fenCacheClaimed) {
+        toast('The Sunken Warden Reliquary is empty');
+        return;
+      }
+      progress.fenCacheClaimed = true;
+      player.coins += 160;
+      player.inventory.oil = (player.inventory.oil || 0) + 2;
+      player.inventory.mossglass += 2;
+      spawnParticles(near.obj.x, near.obj.y, '#b9d5c8', 28, 1.1);
+      addFloater(near.obj.x, near.obj.y - 28, '+160 c • 2 OIL • 2 MOSSGLASS', '#d9eadf');
+      toast('Sunken Warden Reliquary recovered');
+      saveGame();
+      return;
+    }
+
+    return build10Interact();
+  };
+
+  const build10KillEnemy = killEnemy;
+  killEnemy = function build11KillEnemy(e) {
+    if (!e || e.dead) return;
+    const boss = e.type === 'fenwarden';
+    build10KillEnemy(e);
+    if (boss && e.dead && !progress.fenWardenDefeated) {
+      progress.fenWardenDefeated = true;
+      e.respawn = 99999;
+      player.coins += 70;
+      addFloater(e.x, e.y - 45, 'DROWNED WARDEN • +70 c', '#b9d5c8');
+      toast('The Drowned Warden falls — search the sunken reliquary');
+      saveGame();
+    }
+  };
+
+  // Fen enemies have distinct threat patterns without rewriting the verified base AI.
+  const build10UpdateEnemy = updateEnemy;
+  updateEnemy = function build11UpdateEnemy(e, dt) {
+    if (!e.dead && e.type === 'bogstalker' && e.windup <= 0 && e.chargeTimer <= 0) {
+      const d = dist(e, player);
+      if (d < e.aggro && d > 105 && e.specialCd <= 0) {
+        beginEnemyAttack(e, 'charge', .58);
+        e.specialCd = 3.4;
+      }
+    }
+
+    if (!e.dead && e.type === 'fenwarden') {
+      e.phase = e.hp / e.maxHp <= .42 ? 2 : 1;
+      const d = dist(e, player);
+      if (e.windup <= 0 && e.chargeTimer <= 0 && d < e.aggro && e.specialCd <= 0) {
+        const charge = d > 145 || (e.phase === 2 && Math.random() < .48);
+        beginEnemyAttack(e, charge ? 'charge' : 'slam', charge ? .58 : .72);
+        e.specialCd = e.phase === 2 ? 2.35 : 3.0;
+      }
+    }
+
+    build10UpdateEnemy(e, dt);
+  };
+
+  const build10ObjectiveText = objectiveText;
+  objectiveText = function build11ObjectiveText() {
+    const arsenalComplete =
+      progress.temperedSword && progress.briarstringBow && progress.moonrootStaff;
+    if (!arsenalComplete) return build10ObjectiveText();
+    if (!progress.fenCrossingOpened) {
+      return 'Alden marks an old expedition route beyond Mooncap Grove: Old Warden Crossing.';
+    }
+    if (!progress.fenWardenDefeated) {
+      return 'Explore Mosswater Fen and find what guards the drowned Warden ruins.';
+    }
+    if (!progress.fenCacheClaimed) {
+      return 'The Drowned Warden is defeated. Recover the Sunken Warden Reliquary.';
+    }
+    return 'Mosswater Fen secured. The old Warden route is open again.';
+  };
+
+  const build10ObjectiveProgress = objectiveProgress;
+  objectiveProgress = function build11ObjectiveProgress() {
+    const arsenalComplete =
+      progress.temperedSword && progress.briarstringBow && progress.moonrootStaff;
+    if (!arsenalComplete) return build10ObjectiveProgress();
+    if (!progress.fenCrossingOpened) return 'OLD WARDEN CROSSING • BEYOND MOONCAP GROVE';
+    if (!progress.fenWardenDefeated) {
+      return `${player.inventory.mossglass || 0} MOSSGLASS • DROWNED RUINS AHEAD`;
+    }
+    if (!progress.fenCacheClaimed) return 'SUNKEN RELIQUARY • SEARCH THE RUINS';
+    return `FEN SECURED • ${player.inventory.mossglass || 0} MOSSGLASS`;
+  };
+
+  const build10Update = update;
+  update = function build11Update(dt) {
+    // The crossing is the only route into the new northern region.
+    if (!progress.fenCrossingOpened && player.y < -1165 && player.x >= 700 && player.x <= 2200) {
+      player.y = -1165;
+    }
+
+    build10Update(dt);
+
+    if (
+      progress.fenCrossingOpened &&
+      !progress.fenDiscovered &&
+      zoneFor(player.x, player.y).name === fenZone.name
+    ) {
+      progress.fenDiscovered = true;
+      progress.mapDiscoveries.fen = true;
+      toast('Mosswater Fen discovered');
+      saveGame();
+    }
+  };
+
+  function ensureFenMapMarker() {
+    const svg = document.getElementById('warden-map-svg');
+    if (!svg || document.getElementById('map-marker-fen')) return;
+    const ns = 'http://www.w3.org/2000/svg';
+    const marker = document.createElementNS(ns, 'g');
+    marker.id = 'map-marker-fen';
+    marker.setAttribute('class', 'map-marker unknown');
+    marker.setAttribute('transform', 'translate(800 112)');
+
+    const circleEl = document.createElementNS(ns, 'circle');
+    circleEl.setAttribute('r', '24');
+    marker.appendChild(circleEl);
+
+    const glyph = document.createElementNS(ns, 'text');
+    glyph.setAttribute('y', '5');
+    glyph.textContent = '≈';
+    marker.appendChild(glyph);
+
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('class', 'marker-label');
+    label.setAttribute('y', '50');
+    label.textContent = 'UNKNOWN';
+    marker.appendChild(label);
+
+    svg.appendChild(marker);
+  }
+
+  function appendJournalRow(target, label, done, key) {
+    if (!target || target.querySelector(`[data-build11="${key}"]`)) return;
+    const row = document.createElement('div');
+    row.className = `journal-row ${done ? 'done' : 'locked'}`;
+    row.dataset.build11 = key;
+    row.innerHTML = `<span>${done ? '✓' : '•'}</span><b>${done ? label : 'Undiscovered'}</b>`;
+    target.appendChild(row);
+  }
+
+  function syncFenBook() {
+    ensureFenMapMarker();
+    const found = !!progress.mapDiscoveries.fen;
+    const marker = document.getElementById('map-marker-fen');
+    if (marker) {
+      marker.classList.toggle('unknown', !found);
+      marker.classList.toggle('discovered', found);
+      const label = marker.querySelector('.marker-label');
+      if (label) label.textContent = found ? 'MOSSWATER FEN' : 'UNKNOWN';
+    }
+
+    const baseKeys = ['briar','meadow','hollow','den','grove','rootway'];
+    const count = baseKeys.filter(k => progress.mapDiscoveries[k]).length + (found ? 1 : 0);
+    const countEl = document.getElementById('map-discovery-count');
+    if (countEl) countEl.textContent = `${count} / 7 locations charted`;
+
+    appendJournalRow(
+      document.getElementById('journal-places'),
+      'Mosswater Fen',
+      found,
+      'place-fen'
+    );
+    appendJournalRow(
+      document.getElementById('journal-milestones'),
+      'Drowned Warden defeated',
+      !!progress.fenWardenDefeated,
+      'milestone-warden'
+    );
+    appendJournalRow(
+      document.getElementById('journal-milestones'),
+      'Sunken Warden Reliquary recovered',
+      !!progress.fenCacheClaimed,
+      'milestone-reliquary'
+    );
+
+    if (zoneFor(player.x, player.y).name === fenZone.name) {
+      const markerPlayer = document.getElementById('map-player-marker');
+      if (markerPlayer) {
+        const tx = Math.max(0, Math.min(1, (player.x - 900) / 1250));
+        const ty = Math.max(0, Math.min(1, (-player.y - 1180) / 900));
+        markerPlayer.setAttribute(
+          'transform',
+          `translate(${(690 + tx * 220).toFixed(1)} ${(180 - ty * 95).toFixed(1)})`
+        );
+      }
+    }
+  }
+
+  const build10UpdateUI = updateUI;
+  updateUI = function build11UpdateUI() {
+    build10UpdateUI();
+    const arsenalComplete =
+      progress.temperedSword && progress.briarstringBow && progress.moonrootStaff;
+    if (ui.questTitle && arsenalComplete) ui.questTitle.textContent = 'Old Warden Crossing';
+
+    const near = nearestInteractable();
+    if (near?.kind === 'fenSign') {
+      ui.context.textContent = 'USE • Read Old Warden Crossing marker';
+    } else if (near?.kind === 'fenGate') {
+      ui.context.textContent = progress.fenCrossingOpened
+        ? 'USE • Old Warden Crossing open'
+        : fenReady()
+          ? 'USE • Open Old Warden Crossing'
+          : 'Crossing • Masterwork gear required';
+    } else if (near?.kind === 'fenCache') {
+      ui.context.textContent = progress.fenCacheClaimed
+        ? 'USE • Empty reliquary'
+        : progress.fenWardenDefeated
+          ? 'USE • Recover reliquary'
+          : 'Sunken Reliquary • Bound';
+    } else if (near?.kind === 'resource' && near.obj.type === 'mossglass') {
+      ui.context.textContent = 'USE • Recover Mossglass';
+    }
+
+    syncFenBook();
+  };
+
+  const build10DrawGround = drawGround;
+  drawGround = function build11DrawGround(zone) {
+    build10DrawGround(zone);
+    const pts = [[860,-1120],[2200,-1120],[2200,-2070],[860,-2070]]
+      .map(([x,y]) => worldToScreen(x,y));
+    ctx.save();
+    ctx.fillStyle = 'rgba(34,76,68,.68)';
+    ctx.beginPath();
+    pts.forEach((p,i) => i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y));
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
+  const build10DrawRoute = drawRoute;
+  drawRoute = function build11DrawRoute() {
+    build10DrawRoute();
+    const points = [
+      [650,-850],[780,-1010],[930,-1130],[1060,-1250],[1210,-1400],
+      [1390,-1560],[1530,-1730],[1780,-1840],[2010,-1940],
+    ];
+    const s = points.map(([x,y]) => worldToScreen(x,y));
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(145,130,94,.34)';
+    ctx.lineWidth = 29 * camera.zoom;
+    ctx.beginPath();
+    s.forEach((p,i) => i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y));
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(71,72,54,.5)';
+    ctx.lineWidth = 4 * camera.zoom;
+    ctx.setLineDash([10 * camera.zoom, 12 * camera.zoom]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  };
+
+  const build10DrawObject = drawObject;
+  drawObject = function build11DrawObject(o) {
+    if (!['fenSign','fenGate','fenCache','fenRuin','fenTree','fenPool'].includes(o.type)) {
+      return build10DrawObject(o);
+    }
+
+    const p = worldToScreen(o.x, o.y);
+    const z = camera.zoom;
+
+    if (o.type === 'fenPool') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(70,113,105,.48)';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, 48*z, 20*z, 0, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(169,205,191,.25)';
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    if (o.type === 'fenTree') {
+      shadow(o.x, o.y, 30, 14, .22);
+      ctx.fillStyle = '#3d4d45';
+      ctx.fillRect(p.x - 4*z, p.y - 42*z, 8*z, 42*z);
+      circle(p.x, p.y - 53*z, 25*z, '#47665a');
+      circle(p.x - 15*z, p.y - 44*z, 18*z, '#526f61');
+      return;
+    }
+
+    if (o.type === 'fenSign') {
+      ctx.fillStyle = '#67543c';
+      ctx.fillRect(p.x - 3*z, p.y - 38*z, 6*z, 38*z);
+      ctx.fillStyle = '#8a7450';
+      ctx.fillRect(p.x - 29*z, p.y - 48*z, 58*z, 18*z);
+      labelAt(p.x, p.y - 61*z, 'OLD WARDEN CROSSING');
+      return;
+    }
+
+    if (o.type === 'fenGate') {
+      ctx.strokeStyle = progress.fenCrossingOpened ? '#6f7566' : '#8b7652';
+      ctx.lineWidth = 7*z;
+      ctx.beginPath();
+      ctx.moveTo(p.x - 45*z, p.y);
+      ctx.lineTo(p.x - 32*z, p.y - 52*z);
+      ctx.moveTo(p.x + 45*z, p.y);
+      ctx.lineTo(p.x + 32*z, p.y - 52*z);
+      if (!progress.fenCrossingOpened) {
+        ctx.moveTo(p.x - 32*z, p.y - 34*z);
+        ctx.lineTo(p.x + 32*z, p.y - 34*z);
+      }
+      ctx.stroke();
+      return;
+    }
+
+    if (o.type === 'fenRuin') {
+      ctx.fillStyle = '#69726a';
+      ctx.fillRect(p.x - 24*z, p.y - 20*z, 48*z, 20*z);
+      ctx.fillStyle = '#556059';
+      ctx.fillRect(p.x - 18*z, p.y - 42*z, 13*z, 24*z);
+      return;
+    }
+
+    if (o.type === 'fenCache') {
+      ctx.fillStyle = progress.fenCacheClaimed ? '#4e5a52' : '#789080';
+      ctx.fillRect(p.x - 24*z, p.y - 18*z, 48*z, 18*z);
+      ctx.strokeStyle = '#b7c9b7';
+      ctx.strokeRect(p.x - 24*z, p.y - 18*z, 48*z, 18*z);
+      labelAt(p.x, p.y - 32*z, 'SUNKEN RELIQUARY');
+    }
+  };
+
+  const build10DrawResource = drawResource;
+  drawResource = function build11DrawResource(r) {
+    if (r.type !== 'mossglass') return build10DrawResource(r);
+
+    const p = worldToScreen(r.x, r.y);
+    const z = camera.zoom;
+    shadow(r.x, r.y, 18, 9, .17);
+    ctx.save();
+    ctx.globalAlpha = r.active ? 1 : .35;
+    ctx.fillStyle = '#86b3a4';
+    for (const [dx,dy,h] of [[-10,0,24],[0,-2,31],[11,1,20]]) {
+      ctx.beginPath();
+      ctx.moveTo(p.x + dx*z, p.y);
+      ctx.lineTo(p.x + (dx-6)*z, p.y - h*.56*z);
+      ctx.lineTo(p.x + dx*z, p.y - h*z);
+      ctx.lineTo(p.x + (dx+6)*z, p.y - h*.56*z);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.strokeStyle = '#c9e7dc';
+    ctx.lineWidth = 1.5*z;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 26*z);
+    ctx.lineTo(p.x, p.y - 11*z);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const build10DrawEnemy = drawEnemy;
+  drawEnemy = function build11DrawEnemy(e) {
+    build10DrawEnemy(e);
+    if (e.dead) return;
+    const p = worldToScreen(e.x, e.y);
+    if (e.type === 'fenwarden') {
+      const w = 118 * camera.zoom;
+      const y = p.y - 92 * camera.zoom;
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      roundRect(p.x - w/2, y, w, 8*camera.zoom, 4*camera.zoom);
+      ctx.fill();
+      ctx.fillStyle = '#6c9d90';
+      roundRect(p.x - w/2, y, w * (e.hp / e.maxHp), 8*camera.zoom, 4*camera.zoom);
+      ctx.fill();
+      labelAt(p.x, y - 9*camera.zoom, 'DROWNED WARDEN');
+    } else if (e.type === 'bogstalker' && e.hp < e.maxHp) {
+      labelAt(p.x, p.y - 70*camera.zoom, 'BOG STALKER');
+    }
+  };
+
+  ensureFenMapMarker();
+  syncFenBook();
+
+  if (window.__BRIAR_GLENDebug) {
+    const baseJournalState = window.__BRIAR_GLENDebug.getJournalState;
+    window.__BRIAR_GLENDebug.interact = () => interact();
+    window.__BRIAR_GLENDebug.getFenState = () => ({
+      discovered: !!progress.fenDiscovered,
+      crossingOpened: !!progress.fenCrossingOpened,
+      wardenDefeated: !!progress.fenWardenDefeated,
+      cacheClaimed: !!progress.fenCacheClaimed,
+      mossglass: player.inventory.mossglass || 0,
+      mapDiscovered: !!progress.mapDiscoveries.fen,
+      ready: fenReady(),
+      zone: zoneFor(player.x, player.y).name,
+      enemies: enemies
+        .filter(e => ['mireling','bogstalker','fenwarden'].includes(e.type))
+        .map(e => ({ type:e.type, hp:e.hp, maxHp:e.maxHp, dead:e.dead, x:e.x, y:e.y })),
+    });
+    window.__BRIAR_GLENDebug.defeatFenWarden = () => {
+      if (fenWarden.dead) return false;
+      damageEnemy(fenWarden, fenWarden.hp + 9999, { bypassShield: true });
+      return !!progress.fenWardenDefeated;
+    };
+    window.__BRIAR_GLENDebug.getMapState = () => {
+      const state = baseJournalState ? baseJournalState() : { discoveries: { ...progress.mapDiscoveries } };
+      return {
+        ...state,
+        discoveries: { ...(state.discoveries || progress.mapDiscoveries), fen: !!progress.mapDiscoveries.fen },
+        discoveredCount:
+          ['briar','meadow','hollow','den','grove','rootway','fen']
+            .filter(k => progress.mapDiscoveries[k]).length,
+      };
+    };
+    window.__BRIAR_GLENDebug.closeMap = () => {
+      if (window.__BRIAR_GLENDebug.closeWardenBook) {
+        window.__BRIAR_GLENDebug.closeWardenBook();
+      }
+    };
+  }
+
+  updateUI();
+})();
