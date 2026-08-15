@@ -1,0 +1,59 @@
+/* Build 14: Rowan Economy 2.0 */
+.trade-panel { width: min(760px, calc(100vw - 28px)); }
+#rowan-market-ledger { margin-top: 14px; padding-top: 13px; border-top: 1px solid rgba(227,184,107,.18); }
+.market14-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.market14-heading h3 { margin: 0; font-size: 16px; }
+.market14-heading p { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+.market14-ledger { text-align: right; flex: 0 0 auto; }
+.market14-ledger b { display: block; color: var(--gold); font-size: 11px; }
+.market14-ledger small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; }
+.market14-section-title { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin: 12px 1px 6px; }
+.market14-section-title span { color: var(--gold); font-size: 9px; font-weight: 900; letter-spacing: .1em; }
+.market14-section-title small { color: var(--muted); font-size: 8px; text-align: right; }
+.market14-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
+.market14-grid.services { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.market14-card { display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 5px; min-height: 162px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.038); border: 1px solid rgba(255,255,255,.075); }
+.market14-card.sold { opacity: .62; }
+.market14-card.locked { opacity: .62; }
+.market14-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.market14-card-top span { font-size: 21px; line-height: 1; }
+.market14-card-top small { color: #b7aa8e; font-size: 7px; font-weight: 850; letter-spacing: .08em; }
+.market14-card strong { font-size: 11px; }
+.market14-card p { margin: 0; color: var(--muted); font-size: 8.5px; line-height: 1.35; }
+.market14-cost, .market14-yield { font-size: 8px; font-weight: 800; line-height: 1.3; }
+.market14-cost { color: #d1b177; }
+.market14-yield { color: #a9d6a4; }
+.market14-card button, .market14-commission button { min-height: 35px; border-radius: 9px; border: 1px solid rgba(255,255,255,.13); background: rgba(105,83,51,.75); color: var(--ink); font-size: 9px; font-weight: 850; cursor: pointer; }
+.market14-card.service button { background: rgba(66,95,70,.78); }
+.market14-card button:disabled, .market14-commission button:disabled { opacity: .42; cursor: default; }
+.market14-commission { display: grid; grid-template-columns: 42px minmax(0,1fr) 148px; align-items: center; gap: 10px; padding: 11px; border-radius: 13px; background: rgba(216,184,111,.055); border: 1px solid rgba(216,184,111,.16); }
+.market14-commission.complete { opacity: .68; }
+.market14-commission-icon { font-size: 27px; text-align: center; }
+.market14-commission strong { display: block; font-size: 12px; }
+.market14-commission p { margin: 3px 0 5px; color: var(--muted); font-size: 8.5px; line-height: 1.35; }
+.market14-commission small { display: block; color: #cfc3aa; font-size: 8px; line-height: 1.35; }
+.market14-commission small:last-child { color: #a9d6a4; margin-top: 2px; }
+.market-specialty-item .item-icon { color: #dfbd79; font-size: 20px; }
+
+@media (pointer: coarse), (max-width: 900px) {
+  .trade-panel { width: min(720px, calc(100vw - 18px)); }
+  .market14-card { min-height: 145px; padding: 8px; }
+  .market14-card p { font-size: 8px; }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .trade-panel { width: calc(100vw - 14px); }
+  .market14-heading { position: sticky; top: -14px; z-index: 2; margin: -2px -4px 8px; padding: 7px 4px; background: linear-gradient(180deg, rgba(18,27,20,.98), rgba(18,27,20,.9)); }
+  .market14-grid, .market14-grid.services { grid-template-columns: 1fr; }
+  .market14-card { min-height: 118px; grid-template-columns: 1fr; }
+  .market14-commission { grid-template-columns: 34px minmax(0,1fr); }
+  .market14-commission button { grid-column: 1 / -1; width: 100%; }
+  .market14-section-title { align-items: flex-end; }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .trade-panel { top: 5px; transform: translateX(-50%); max-height: calc(100vh - 10px); }
+  .market14-card { min-height: 136px; }
+  .market14-heading { margin-bottom: 6px; }
+  .market14-section-title { margin-top: 9px; }
+}
