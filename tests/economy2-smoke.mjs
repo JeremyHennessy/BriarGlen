@@ -75,14 +75,12 @@ try {
     }
 
     let state = await page.evaluate(() => window.__BRIAR_GLENDebug.getMarketState());
-    if (window === undefined) {}
     if (state.cycle !== 'road' || state.epoch !== 0 || JSON.stringify(state.offers) !== JSON.stringify(['briarleaf_parcel','mooncap_pouch','warden_binding'])) {
       throw new Error(`${vp.name}: road rotation incorrect: ${JSON.stringify(state)}`);
     }
     if (await page.locator('#market14-stock .market14-card').count() !== 3) throw new Error(`${vp.name}: expected three rotating stock cards`);
     if (await page.locator('#market14-services .market14-card').count() !== 4) throw new Error(`${vp.name}: expected four market services`);
 
-    // Road cycle: spend coins on finite stock and use the specialty binding in expedition assembly.
     await page.locator('[data-market-buy="briarleaf_parcel"]').click();
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getMarketState());
     if (state.coins !== 940 || state.inventory.herb !== 3 || state.coinsSpent !== 60 || !state.purchases.briarleaf_parcel) {
@@ -101,7 +99,6 @@ try {
       throw new Error(`${vp.name}: Expedition Pack Assembly incorrect: ${JSON.stringify(state)}`);
     }
 
-    // Road commission consumes materials and pays mixed coin + resource reward.
     await page.evaluate(() => window.__BRIAR_GLENDebug.setInventory({ herb: 3, tonic: 1 }));
     await page.locator('[data-market-commission]').click();
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getMarketState());
@@ -109,7 +106,6 @@ try {
       throw new Error(`${vp.name}: Roadwarden commission incorrect: ${JSON.stringify(state)}`);
     }
 
-    // One completed Board job rotates Rowan to Hollow stock and fully restocks the finite market.
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.setProgress({ boardContractsCompleted: 1 });
@@ -136,7 +132,6 @@ try {
       throw new Error(`${vp.name}: Hollow Repair commission incorrect: ${JSON.stringify(state)}`);
     }
 
-    // Second completed Board job rotates to Fen stock.
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.setProgress({ boardContractsCompleted: 2 });
@@ -153,7 +148,6 @@ try {
     if (state.coins !== 590 || state.inventory.mossglass !== 2 || state.inventory.oil !== 3 || state.coinsSpent !== 535) {
       throw new Error(`${vp.name}: Fen stock purchases incorrect: ${JSON.stringify(state)}`);
     }
-    // Existing two oils came from expedition assembly; commission consumes exactly one.
     await page.locator('[data-market-commission]').click();
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getMarketState());
     if (state.ordersCompleted !== 3 || state.coins !== 685 || state.inventory.mossglass !== 0 || state.inventory.oil !== 2 || state.inventory.iron !== 2 || !state.commissionDone) {
@@ -164,7 +158,6 @@ try {
     await page.waitForFunction(() => document.getElementById('journal-milestones')?.innerText?.includes('Rowan market: 535 c spent • 3 commissions'));
     await page.evaluate(() => window.__BRIAR_GLENDebug.closeWardenBook());
 
-    // Market ledger, finite purchases and commission state must survive reload.
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Boolean(window.__BRIAR_GLENDebug?.getMarketState));
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getMarketState());
