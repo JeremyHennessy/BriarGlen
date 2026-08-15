@@ -20,7 +20,7 @@ jobs:
       - name: Install Chromium test runtime
         run: |
           npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
       - name: Start local game server
         run: |
           python3 -m http.server 4173 > /tmp/briarglen-http.log 2>&1 &
@@ -39,6 +39,7 @@ jobs:
           node tests/contracts-smoke.mjs http://127.0.0.1:4173/
           node tests/stability-smoke.mjs http://127.0.0.1:4173/
           node tests/game-feel-smoke.mjs http://127.0.0.1:4173/
+          node tests/economy2-smoke.mjs http://127.0.0.1:4173/
       - name: Test deployed GitHub Pages build in browser
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -53,3 +54,4 @@ jobs:
           node tests/contracts-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/stability-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/game-feel-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/economy2-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
