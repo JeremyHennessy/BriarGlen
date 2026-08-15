@@ -10,6 +10,7 @@
   <title>Briar Glen — Vertical Slice</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles-v2.css" />
 </head>
 <body>
   <main id="game-shell" aria-label="Briar Glen game">
@@ -41,6 +42,7 @@
         <div class="panel hint-panel">
           <span><kbd>WASD</kbd> Move</span>
           <span><kbd>Space</kbd> Attack</span>
+          <span><kbd>1–3</kbd> Weapon</span>
           <span><kbd>Shift</kbd> Dodge</span>
           <span><kbd>E</kbd> Interact</span>
           <span><kbd>C</kbd> Craft</span>
@@ -58,6 +60,7 @@
       <div id="move-pad" class="touch-pad" aria-label="Movement joystick"><div id="move-stick"></div></div>
       <div class="action-cluster">
         <button id="interact-btn" class="touch-btn utility" aria-label="Interact">USE</button>
+        <button id="weapon-btn" class="touch-btn weapon" data-weapon="sword" aria-label="Cycle weapon">SWORD</button>
         <button id="dash-btn" class="touch-btn secondary" aria-label="Dodge">DODGE</button>
         <button id="attack-btn" class="touch-btn primary" aria-label="Attack">ATTACK</button>
       </div>
@@ -68,6 +71,11 @@
     <button id="reset-btn" title="Reset save">↻</button>
   </main>
 
-  <script src="src/game.js"></script>
+  <script src="src/v2/01.js"></script>
+  <script src="src/v2/02.js"></script>
+  <script src="src/v2/03.js"></script>
+  <script src="src/v2/04.js"></script>
+  <script src="src/v2/05.js"></script>
+  <script src="src/v2/06.js"></script>
 </body>
 </html>
