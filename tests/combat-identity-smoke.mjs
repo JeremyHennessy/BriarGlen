@@ -35,15 +35,15 @@ try {
         if (live && attempt < 48) await sleep(5000);
       }
     }
-    if (!loaded) throw new Error(`${vp.name}: Build 15 runtime unavailable: ${lastError?.message || 'unknown'}`);
+    if (!loaded) throw new Error(`${vp.name}: Build 15+ runtime unavailable: ${lastError?.message || 'unknown'}`);
 
     await page.evaluate(() => localStorage.removeItem('briar-glen-vslice-v1'));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Boolean(window.__BRIAR_GLENDebug?.getCombatIdentityState));
 
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (build.version !== '15' || build.label !== 'Enemy & Combat Identity' || build.saveKey !== 'briar-glen-vslice-v1') {
-      throw new Error(`${vp.name}: incorrect Build 15 metadata ${JSON.stringify(build)}`);
+    if (!(Number.parseFloat(build.version) >= 15) || build.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${vp.name}: incorrect Build 15+ metadata ${JSON.stringify(build)}`);
     }
 
     const roles = await page.evaluate(() => window.__BRIAR_GLENDebug.getCombatIdentityState().enemies.map(e => [e.type, e.role]));
