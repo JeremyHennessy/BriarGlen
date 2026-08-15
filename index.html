@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#15281d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Briar Glen" />
+  <title>Briar Glen — Vertical Slice</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main id="game-shell" aria-label="Briar Glen game">
+    <canvas id="game" aria-label="Briar Glen game world"></canvas>
+
+    <section id="hud" aria-live="polite">
+      <div class="top-row">
+        <div class="panel status-panel">
+          <div class="eyebrow" id="zone-name">BRIAR GLEN</div>
+          <div class="status-line">
+            <strong>Briar Warden</strong>
+            <span id="weapon-label">Worn Sword</span>
+          </div>
+          <div class="bar health-bar"><span id="health-fill"></span></div>
+          <div class="bar-label"><span id="health-label">100 / 100</span><span id="coins-label">100 c</span></div>
+        </div>
+
+        <div class="panel quest-panel">
+          <div class="eyebrow">CONTRACT</div>
+          <strong id="quest-title">Smoke in the Hollow</strong>
+          <div id="quest-text">Gather 3 Briarleaf along Meadow Road.</div>
+          <div class="quest-progress" id="quest-progress"></div>
+        </div>
+      </div>
+
+      <div id="toast-stack" aria-live="assertive"></div>
+
+      <div class="bottom-row desktop-hints">
+        <div class="panel hint-panel">
+          <span><kbd>WASD</kbd> Move</span>
+          <span><kbd>Space</kbd> Attack</span>
+          <span><kbd>Shift</kbd> Dodge</span>
+          <span><kbd>E</kbd> Interact</span>
+          <span><kbd>C</kbd> Craft</span>
+        </div>
+      </div>
+
+      <div class="inventory-strip panel" id="inventory-strip">
+        <div><span class="item-dot herb"></span><b id="herb-count">0</b><small>Briarleaf</small></div>
+        <div><span class="item-dot ore"></span><b id="ore-count">0</b><small>Copper</small></div>
+        <div><span class="item-dot tusk"></span><b id="tusk-count">0</b><small>Ember Tusk</small></div>
+      </div>
+    </section>
+
+    <section id="touch-controls" aria-label="Touch controls">
+      <div id="move-pad" class="touch-pad" aria-label="Movement joystick"><div id="move-stick"></div></div>
+      <div class="action-cluster">
+        <button id="interact-btn" class="touch-btn utility" aria-label="Interact">USE</button>
+        <button id="dash-btn" class="touch-btn secondary" aria-label="Dodge">DODGE</button>
+        <button id="attack-btn" class="touch-btn primary" aria-label="Attack">ATTACK</button>
+      </div>
+    </section>
+
+    <div id="context-prompt" class="panel" hidden></div>
+    <div id="rotate-note">Landscape is recommended on phone, but portrait remains playable.</div>
+    <button id="reset-btn" title="Reset save">↻</button>
+  </main>
+
+  <script src="src/game.js"></script>
+</body>
+</html>
