@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="styles-v5-controls.css" />
   <link rel="stylesheet" href="styles-v7.css" />
   <link rel="stylesheet" href="styles-v8.css" />
+  <link rel="stylesheet" href="styles-v9.css" />
 </head>
 <body>
   <main id="game-shell" aria-label="Briar Glen game">
@@ -95,9 +96,11 @@
         <div class="inventory-item"><span class="item-icon">🌿</span><span><strong>Briarleaf</strong><small>Medicinal herb</small></span><b id="panel-herb-count">0</b></div>
         <div class="inventory-item"><span class="item-icon">◉</span><span><strong>Mooncap</strong><small>Alchemy mushroom</small></span><b id="panel-mooncap-count">0</b></div>
         <div class="inventory-item"><span class="item-icon">◆</span><span><strong>Copper</strong><small>Forging ore</small></span><b id="panel-ore-count">0</b></div>
+        <div class="inventory-item"><span class="item-icon">⬡</span><span><strong>Deepvein Iron</strong><small>Masterwork ore</small></span><b id="panel-iron-count">0</b></div>
         <div class="inventory-item"><span class="item-icon">▱</span><span><strong>Beast Hide</strong><small>Field loot</small></span><b id="panel-hide-count">0</b></div>
         <div class="inventory-item"><span class="item-icon">◢</span><span><strong>Ember Tusk</strong><small>Boss trophy</small></span><b id="panel-tusk-count">0</b></div>
         <div class="inventory-item"><span class="item-icon">✚</span><span><strong>Healing Tonic</strong><small>Restores 45 health</small></span><b id="panel-tonic-count">0</b></div>
+        <div class="inventory-item"><span class="item-icon">◈</span><span><strong>Warden Oil</strong><small>+15% damage for 45 seconds</small></span><b id="panel-oil-count">0</b></div>
       </div>
       <div class="gear-card">
         <strong>EQUIPMENT</strong>
@@ -116,12 +119,22 @@
           </div>
         </div>
       </div>
+      <div class="crafting-status">
+        <strong>MASTERWORK PROGRESSION</strong>
+        <div class="crafting-status-grid">
+          <div><b>Reinforced Pickaxe</b><small id="pickaxe-status">Not crafted</small></div>
+          <div><b>Sword</b><small id="sword-upgrade-status">Reinforced Sword</small></div>
+          <div><b>Bow</b><small id="bow-upgrade-status">Briar Bow</small></div>
+          <div><b>Staff</b><small id="staff-upgrade-status">Glen Staff</small></div>
+        </div>
+      </div>
       <div class="recipe-card">
         <strong>Mira's Healing Tonic</strong>
         <div id="recipe-status">Mira needs 1 Briarleaf + 1 Mooncap.</div>
       </div>
       <div class="inventory-actions">
         <button id="use-tonic-btn">Use Healing Tonic (+45)</button>
+        <button id="use-oil-btn">Use Warden Oil (+15% damage • 45s)</button>
       </div>
     </section>
 
@@ -163,6 +176,51 @@
         </div>
       </div>
     </section>
+
+    <div id="craft-backdrop" hidden></div>
+    <section id="craft-panel" class="craft-panel panel" hidden aria-label="Alden masterwork forge">
+      <div class="craft-header">
+        <div>
+          <div class="eyebrow">ALDEN • MASTERWORK FORGE</div>
+          <h2>Masterwork Ledger</h2>
+          <p>Build better tools, refine each weapon path and prepare field coatings.</p>
+        </div>
+        <button id="craft-close" class="craft-close" aria-label="Close masterwork forge">×</button>
+      </div>
+      <div id="craft-materials" class="craft-materials">Materials</div>
+      <div class="craft-grid">
+        <div class="craft-item">
+          <span class="craft-icon">⛏</span>
+          <strong>Reinforced Pickaxe</strong>
+          <p>Required to break Deepvein Iron deposits hidden through Copper Hollow.</p>
+          <button id="craft-pickaxe-btn">Craft • 3 Copper • 2 Hides</button>
+        </div>
+        <div class="craft-item masterwork">
+          <span class="craft-icon">⚔</span>
+          <strong>Tempered Sword</strong>
+          <p>Uses the Ember Tusk as a tempering catalyst. Increases sword and Cleave damage by 18%.</p>
+          <button id="craft-sword-upgrade-btn">Craft • 2 Iron • 2 Copper • 1 Ember Tusk</button>
+        </div>
+        <div class="craft-item masterwork">
+          <span class="craft-icon">➶</span>
+          <strong>Briarstring Bow</strong>
+          <p>Deepvein fittings and layered hide reinforce the bow. Increases bow and Pierce damage by 18%.</p>
+          <button id="craft-bow-upgrade-btn">Craft • 2 Iron • 2 Hides • 1 Briarleaf</button>
+        </div>
+        <div class="craft-item masterwork">
+          <span class="craft-icon">✦</span>
+          <strong>Moonroot Staff</strong>
+          <p>Mooncap resin binds Deepvein to the staff. Increases staff and Root damage by 18%.</p>
+          <button id="craft-staff-upgrade-btn">Craft • 2 Iron • 2 Mooncap • 1 Briarleaf</button>
+        </div>
+        <div class="craft-item consumable">
+          <span class="craft-icon">◈</span>
+          <strong>Warden Oil</strong>
+          <p>Alden and Mira's shared field recipe. Coat any weapon for +15% damage for 45 seconds.</p>
+          <button id="craft-oil-btn">Craft • 1 Copper • 1 Mooncap • 1 Briarleaf</button>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script src="src/v2/01.js"></script>
@@ -177,5 +235,6 @@
   <script src="src/v5/10-controls-fix.js"></script>
   <script src="src/v7/11-aiming-gear.js"></script>
   <script src="src/v8/12-weapon-skills.js"></script>
+  <script src="src/v9/13-crafting-progression.js"></script>
 </body>
 </html>

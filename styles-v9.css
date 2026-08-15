@@ -1,0 +1,83 @@
+/* Build 9: masterwork crafting and progression. */
+#craft-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  background: rgba(5, 9, 7, .6);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  pointer-events: auto;
+}
+
+.craft-panel {
+  position: absolute;
+  z-index: 25;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(650px, calc(100vw - 28px));
+  max-height: min(690px, calc(100vh - 30px));
+  overflow: auto;
+  padding: 14px;
+  border-radius: 18px;
+  pointer-events: auto;
+}
+.craft-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.craft-header h2 { margin: 0; font-size: 19px; }
+.craft-header p { margin: 3px 0 0; color: var(--muted); font-size: 9px; }
+.craft-close {
+  width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06);
+  color: var(--ink); font-size: 20px; cursor: pointer;
+}
+.craft-materials {
+  margin: 10px 0; padding: 8px 10px; border-radius: 10px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+  color: var(--gold); font-size: 9px; font-weight: 800; line-height: 1.4;
+}
+.craft-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.craft-item {
+  min-height: 145px; padding: 11px; border-radius: 13px;
+  background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.07);
+  display: grid; grid-template-rows: auto auto 1fr auto; gap: 5px;
+}
+.craft-item.masterwork { border-color: rgba(225,184,107,.17); background: rgba(225,184,107,.055); }
+.craft-item.consumable { grid-column: 1 / -1; min-height: 115px; }
+.craft-icon { font-size: 25px; line-height: 1; }
+.craft-item strong { font-size: 12px; }
+.craft-item p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.35; }
+.craft-item button {
+  min-height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,.13);
+  background: rgba(106,83,52,.72); color: var(--ink); font-size: 9px; font-weight: 850; cursor: pointer;
+}
+.craft-item button:disabled { opacity: .42; cursor: default; }
+
+.crafting-status {
+  margin-top: 9px; padding: 9px 10px; border-radius: 12px;
+  background: rgba(102,96,74,.12); border: 1px solid rgba(210,196,148,.12);
+}
+.crafting-status > strong { display: block; color: var(--gold); font-size: 10px; margin-bottom: 6px; }
+.crafting-status-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px; }
+.crafting-status-grid div { padding: 7px; border-radius: 9px; background: rgba(255,255,255,.035); }
+.crafting-status-grid b { display: block; font-size: 9px; }
+.crafting-status-grid small { display: block; margin-top: 2px; color: var(--muted); font-size: 8px; }
+#use-oil-btn { background: rgba(126, 92, 47, .75); }
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .craft-panel {
+    top: max(12px, env(safe-area-inset-top));
+    transform: translateX(-50%);
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+    padding: 11px;
+  }
+  .craft-grid { gap: 6px; }
+  .craft-item { min-height: 132px; padding: 9px; }
+  .craft-item.consumable { min-height: 105px; }
+  .craft-icon { font-size: 21px; }
+}
+
+@media (max-width: 390px) {
+  .craft-grid, .crafting-status-grid { grid-template-columns: 1fr; }
+  .craft-item.consumable { grid-column: auto; }
+}

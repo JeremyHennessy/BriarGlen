@@ -31,6 +31,7 @@ jobs:
           node tests/controls-smoke.mjs http://127.0.0.1:4173/
           node tests/aiming-gear-smoke.mjs http://127.0.0.1:4173/
           node tests/skills-smoke.mjs http://127.0.0.1:4173/
+          node tests/crafting-smoke.mjs http://127.0.0.1:4173/
       - name: Test deployed GitHub Pages build in browser
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -39,3 +40,4 @@ jobs:
           node tests/controls-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/aiming-gear-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/skills-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/crafting-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
