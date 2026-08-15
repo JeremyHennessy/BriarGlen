@@ -34,6 +34,7 @@ jobs:
           node tests/crafting-smoke.mjs http://127.0.0.1:4173/
           node tests/map-journal-smoke.mjs http://127.0.0.1:4173/
           node tests/fen-smoke.mjs http://127.0.0.1:4173/
+          node tests/contracts-smoke.mjs http://127.0.0.1:4173/
       - name: Test deployed GitHub Pages build in browser
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -45,3 +46,4 @@ jobs:
           node tests/crafting-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/map-journal-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/fen-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/contracts-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
