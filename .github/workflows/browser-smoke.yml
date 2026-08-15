@@ -42,6 +42,7 @@ jobs:
           node tests/economy2-smoke.mjs http://127.0.0.1:4173/
           node tests/combat-identity-smoke.mjs http://127.0.0.1:4173/
           node tests/art-direction-smoke.mjs http://127.0.0.1:4173/
+          node tests/feedback-tuning-smoke.mjs http://127.0.0.1:4173/
       - name: Test deployed GitHub Pages build in browser
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -59,3 +60,4 @@ jobs:
           node tests/economy2-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/combat-identity-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/art-direction-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/feedback-tuning-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
