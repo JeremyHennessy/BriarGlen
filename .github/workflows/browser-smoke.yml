@@ -44,6 +44,7 @@ jobs:
           node tests/art-direction-smoke.mjs http://127.0.0.1:4173/
           node tests/feedback-tuning-smoke.mjs http://127.0.0.1:4173/
           node tests/stonepine-smoke.mjs http://127.0.0.1:4173/
+          node tests/stonepine-integration-smoke.mjs http://127.0.0.1:4173/
       - name: Test deployed GitHub Pages build in browser
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -63,3 +64,4 @@ jobs:
           node tests/art-direction-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/feedback-tuning-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/stonepine-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/stonepine-integration-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
