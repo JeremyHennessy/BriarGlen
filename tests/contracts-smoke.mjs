@@ -88,7 +88,6 @@ try {
     const afterPos = await page.evaluate(() => window.__BRIAR_GLENDebug.getState().player);
     if (Math.hypot(afterPos.x - beforePos.x, afterPos.y - beforePos.y) > 2) throw new Error(`${vp.name}: movement leaked through Contract Board`);
 
-    // Copper delivery: accept through real UI, then reload to prove active work persists.
     await page.locator('[data-contract-id="copper_order"] .board2-accept').click();
     await page.locator('#board2-close').click();
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -109,12 +108,10 @@ try {
       throw new Error(`${vp.name}: Copper Order turn-in incorrect: ${JSON.stringify(state)}`);
     }
 
-    // Rotation after one completion should surface Field Medicine while retaining Hunt and Fen survey.
     if (!state.offers.includes('field_medicine') || !state.offers.includes('briar_cull') || !state.offers.includes('mosswater_survey')) {
       throw new Error(`${vp.name}: rotated offers incorrect: ${JSON.stringify(state.offers)}`);
     }
 
-    // Hunt: actual enemy death path increments the board contract.
     await page.locator('[data-contract-id="briar_cull"] .board2-accept').click();
     await page.locator('#board2-close').click();
     for (let i = 0; i < 3; i++) {
@@ -134,7 +131,6 @@ try {
       throw new Error(`${vp.name}: hunt reward incorrect: ${JSON.stringify(state)}`);
     }
 
-    // Fen survey: exact material consumption + mixed reward.
     await page.evaluate(() => window.__BRIAR_GLENDebug.setInventory({ mossglass: 2 }));
     await page.locator('[data-contract-id="mosswater_survey"] .board2-accept').click();
     const fenBefore = await page.evaluate(() => window.__BRIAR_GLENDebug.getBoardState());
@@ -144,11 +140,11 @@ try {
       throw new Error(`${vp.name}: Mosswater Survey reward incorrect: ${JSON.stringify(state)}`);
     }
 
-    // Odd rotation exposes Field Medicine; accept it and verify Journal/current objective integration.
     await page.locator('[data-contract-id="field_medicine"] .board2-accept').click();
     await page.locator('#board2-close').click();
     await page.evaluate(() => window.__BRIAR_GLENDebug.openJournal());
     await page.waitForFunction(() => document.getElementById('journal-objective-title')?.textContent?.includes('Field Medicine'));
+    await page.waitForFunction(() => document.getElementById('journal-milestones')?.innerText?.includes('Warden Board jobs completed: 3'));
     const milestoneText = await page.locator('#journal-milestones').innerText();
     if (!milestoneText.includes('Warden Board jobs completed: 3')) throw new Error(`${vp.name}: board completion record missing from Journal`);
     await page.evaluate(() => window.__BRIAR_GLENDebug.closeWardenBook());
