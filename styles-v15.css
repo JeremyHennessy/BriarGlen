@@ -1,0 +1,17 @@
+/* Build 15 — Enemy & Combat Identity */
+#journal-threat-notes { border-color: rgba(196, 145, 84, .22); }
+#journal-threat-notes .journal-row b { display: grid; gap: 2px; }
+#journal-threat-notes .journal-row small { color: #b8ad98; font-weight: 600; line-height: 1.25; }
+#journal-threat-notes .journal-row span { color: #d9ad69; }
+
+#quest-progress[data-combat-rooted="true"]::after {
+  content: " • ROOTED";
+  color: #9fc69f;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+@media (pointer: coarse), (max-width: 900px) {
+  #journal-threat-notes .journal-row { align-items: start; }
+  #journal-threat-notes .journal-row small { font-size: 8px; }
+}
