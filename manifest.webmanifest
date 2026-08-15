@@ -1,0 +1,10 @@
+{
+  "name": "Briar Glen",
+  "short_name": "Briar Glen",
+  "description": "A mobile-first isometric action RPG vertical slice.",
+  "start_url": "./",
+  "display": "fullscreen",
+  "background_color": "#101a14",
+  "theme_color": "#15281d",
+  "orientation": "any"
+}
