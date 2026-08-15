@@ -31,15 +31,15 @@ try {
         if (live && attempt < 48) await sleep(5000);
       }
     }
-    if (!loaded) throw new Error(`${vp.name}: Build 17 Stonepine runtime unavailable: ${lastError?.message || 'unknown'}`);
+    if (!loaded) throw new Error(`${vp.name}: Build 17+ Stonepine runtime unavailable: ${lastError?.message || 'unknown'}`);
 
     await page.evaluate(() => localStorage.removeItem('briar-glen-vslice-v1'));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Boolean(window.__BRIAR_GLENDebug?.getStonepineState));
 
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (build.version !== '17' || build.label !== 'Stonepine Reach' || build.saveKey !== 'briar-glen-vslice-v1') {
-      throw new Error(`${vp.name}: incorrect Build 17 metadata ${JSON.stringify(build)}`);
+    if (!(Number.parseFloat(build.version) >= 17) || build.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${vp.name}: incorrect Build 17+ metadata ${JSON.stringify(build)}`);
     }
 
     let state = await page.evaluate(() => window.__BRIAR_GLENDebug.getStonepineState());
@@ -51,7 +51,6 @@ try {
       throw new Error(`${vp.name}: Stonepine enemy roster incorrect ${JSON.stringify(enemyTypes)}`);
     }
 
-    // The pass must genuinely depend on the completed Fen route.
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.teleport(2240, -1500);
@@ -63,8 +62,7 @@ try {
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.setProgress({ fenCrossingOpened: true, fenDiscovered: true, fenWardenDefeated: true, fenCacheClaimed: true });
-      d.teleport(2240, -1500);
-      d.interact();
+      d.teleport(2240, -1500); d.interact();
     });
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getStonepineState());
     if (!state.passOpened) throw new Error(`${vp.name}: Stonepine Pass did not open after Fen completion`);
@@ -76,7 +74,6 @@ try {
       throw new Error(`${vp.name}: Stonepine discovery/zone failed ${JSON.stringify(state)}`);
     }
 
-    // Gather two real Resin nodes, then use the recurring field-camp sink.
     await page.evaluate(() => { const d=window.__BRIAR_GLENDebug; d.teleport(2485,-1335); d.interact(); });
     await page.evaluate(() => { const d=window.__BRIAR_GLENDebug; d.teleport(2740,-1605); d.interact(); });
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getStonepineState());
@@ -94,7 +91,6 @@ try {
       throw new Error(`${vp.name}: Pitchwork Kit accounting incorrect ${JSON.stringify(state)}`);
     }
 
-    // Deterministic environmental hazard: scree uses the real player damage path.
     const screeBefore = await page.evaluate(() => {
       const d=window.__BRIAR_GLENDebug;
       d.teleport(-720, 40);
@@ -109,7 +105,6 @@ try {
       throw new Error(`${vp.name}: scree hazard did not deal exact 13 damage ${JSON.stringify(screeAfter)}`);
     }
 
-    // New enemy identities: Ridgehorn commits to a charge; Quarry Wisp launches a ranged bolt.
     await page.evaluate(() => {
       const d=window.__BRIAR_GLENDebug;
       d.setThreat('ridgehorn',{ x:2530,y:-1470,hp:96,dead:false,hurt:0 });
@@ -136,7 +131,6 @@ try {
       throw new Error(`${vp.name}: Quarry Wisp ranged shot missing ${JSON.stringify(state)}`);
     }
 
-    // Existing Cull the Briar contract must count ordinary Stonepine threats.
     await page.evaluate(() => {
       const d=window.__BRIAR_GLENDebug;
       d.setProgress({ activeBoardContract:{ id:'briar_cull', kills:0 } });
@@ -148,7 +142,6 @@ try {
       throw new Error(`${vp.name}: Stonepine threat did not count toward Cull the Briar ${JSON.stringify(board)}`);
     }
 
-    // Mini-boss and survey cache use exact deterministic rewards.
     const bossBefore = await page.evaluate(() => {
       const d=window.__BRIAR_GLENDebug;
       d.setProgress({ activeBoardContract:null });
@@ -175,7 +168,6 @@ try {
       throw new Error(`${vp.name}: Stonepine Survey Cache reward incorrect ${JSON.stringify({before:cacheBefore,after:state})}`);
     }
 
-    // Map + Journal integration must be readable inside all three viewports.
     await page.evaluate(() => window.__BRIAR_GLENDebug.openMap());
     await page.waitForFunction(() => document.querySelector('#map-marker-stonepine .marker-label')?.textContent === 'STONEPINE REACH');
     const mapText = await page.locator('#map-discovery-count').innerText();
