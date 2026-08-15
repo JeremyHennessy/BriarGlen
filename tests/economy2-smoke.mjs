@@ -37,7 +37,7 @@ try {
         if (live && attempt < 48) await sleep(5000);
       }
     }
-    if (!loaded) throw new Error(`${vp.name}: Build 14 economy runtime unavailable: ${lastError?.message || 'unknown'}`);
+    if (!loaded) throw new Error(`${vp.name}: Build 14+ economy runtime unavailable: ${lastError?.message || 'unknown'}`);
 
     await page.evaluate(() => localStorage.removeItem('briar-glen-vslice-v1'));
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -166,7 +166,9 @@ try {
     }
 
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (build.version !== '14' || build.label !== 'Economy 2.0') throw new Error(`${vp.name}: Build 14 release metadata incorrect: ${JSON.stringify(build)}`);
+    if (!(Number.parseFloat(build.version) >= 14) || build.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${vp.name}: Build 14+ release metadata incorrect: ${JSON.stringify(build)}`);
+    }
     if (errors.length) throw new Error(`${vp.name}: runtime errors:\n${errors.join('\n')}`);
 
     console.log(`PASS ${vp.name}: rotating Rowan stock + coin sinks + specialty binding + mixed-reward commissions persistent`);
