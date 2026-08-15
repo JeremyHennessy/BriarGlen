@@ -1,0 +1,31 @@
+name: Browser smoke test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-http.log 2>&1 &
+          echo $! > /tmp/briarglen-http.pid
+          sleep 2
+      - name: Test repository build in browser
+        run: node tests/smoke.mjs http://127.0.0.1:4173/
+      - name: Test deployed GitHub Pages build in browser
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: node tests/smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
