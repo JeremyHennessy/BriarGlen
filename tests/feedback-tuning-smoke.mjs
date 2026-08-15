@@ -36,11 +36,6 @@ try {
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
     if (build.version !== '16') throw new Error(`${vp.name}: feedback tuning not attached to Build 16 ${JSON.stringify(build)}`);
 
-    // Clear the source and allow a rendered frame to commit a true zero-offset baseline.
-    await page.evaluate(() => window.__BRIAR_GLENDebug.setCameraShake(0));
-    await sleep(50);
-    const baseline = await page.evaluate(() => window.__BRIAR_GLENDebug.projectPoint(-620, 35));
-
     await page.evaluate(() => window.__BRIAR_GLENDebug.setCameraShake(12));
     await sleep(35);
     const shakeProbe = await page.evaluate(() => {
@@ -61,9 +56,9 @@ try {
       throw new Error(`${vp.name}: per-object camera jitter remains spread=${spreadX},${spreadY}`);
     }
 
-    const displaced = shakeProbe.samples[0];
-    const shift = Math.hypot(displaced.x - baseline.x, displaced.y - baseline.y);
-    if (shift > 2.2) throw new Error(`${vp.name}: whole-screen shake displacement still excessive: ${shift}`);
+    // Measure only the shake component itself, not ordinary camera-follow motion.
+    const frameShift = Math.hypot(shakeProbe.tuning.frameX, shakeProbe.tuning.frameY);
+    if (frameShift > 1.95) throw new Error(`${vp.name}: whole-screen shake displacement still excessive: ${frameShift}`);
 
     const haptic = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
