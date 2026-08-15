@@ -1,0 +1,15 @@
+/* Build 2 additions: combat loadout control only. Base responsive layout remains in styles.css. */
+.touch-btn.weapon {
+  right: 78px;
+  bottom: 74px;
+  width: 54px;
+  height: 54px;
+  background: rgba(62, 76, 91, .76);
+  font-size: 8px;
+}
+.touch-btn.weapon[data-weapon="bow"] { background: rgba(111, 88, 54, .78); }
+.touch-btn.weapon[data-weapon="staff"] { background: rgba(54, 101, 84, .8); }
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .touch-btn.weapon { right: 78px; bottom: 74px; }
+}
