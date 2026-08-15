@@ -36,9 +36,8 @@ try {
         if (live && attempt < 48) await sleep(5000);
       }
     }
-    if (!loaded) throw new Error(`${vp.name}: Build 13 runtime unavailable: ${lastError?.message || 'unknown'}`);
+    if (!loaded) throw new Error(`${vp.name}: game-feel runtime unavailable: ${lastError?.message || 'unknown'}`);
 
-    // Start every viewport from a clean game/audio preference state.
     await page.evaluate(() => {
       localStorage.removeItem('briar-glen-vslice-v1');
       localStorage.removeItem('briar-glen-audio-muted');
@@ -47,8 +46,9 @@ try {
     await page.waitForFunction(() => Boolean(window.__BRIAR_GLENDebug?.getFeelState && window.__BRIAR_GLENDebug?.getBuildInfo));
 
     const info = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (info.version !== '13' || info.label !== 'Game Feel' || info.saveKey !== 'briar-glen-vslice-v1') {
-      throw new Error(`${vp.name}: incorrect Build 13 metadata ${JSON.stringify(info)}`);
+    const releaseNumber = Number.parseFloat(info.version);
+    if (!Number.isFinite(releaseNumber) || releaseNumber < 13 || info.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${vp.name}: Build 13+ game-feel baseline unavailable ${JSON.stringify(info)}`);
     }
 
     const sound = page.locator('#sound-btn');
@@ -61,7 +61,6 @@ try {
     let feel = await page.evaluate(() => window.__BRIAR_GLENDebug.getFeelState());
     if (feel.muted) throw new Error(`${vp.name}: fresh audio preference should be unmuted`);
 
-    // Mute preference uses a real UI click and must survive reload.
     await sound.click();
     feel = await page.evaluate(() => window.__BRIAR_GLENDebug.getFeelState());
     if (!feel.muted || await page.evaluate(() => localStorage.getItem('briar-glen-audio-muted')) !== '1') {
@@ -75,7 +74,6 @@ try {
     feel = await page.evaluate(() => window.__BRIAR_GLENDebug.getFeelState());
     if (feel.muted) throw new Error(`${vp.name}: sound control did not unmute`);
 
-    // Real sword attack path: preserve baseline 24 damage while producing presentation feedback.
     const attackResult = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       const state = d.getState();
@@ -88,13 +86,12 @@ try {
       return { before, after, feel: d.getFeelState() };
     });
     if (attackResult.before - attackResult.after !== 24) {
-      throw new Error(`${vp.name}: Build 13 changed baseline sword damage: ${attackResult.before - attackResult.after}`);
+      throw new Error(`${vp.name}: later release changed baseline sword damage: ${attackResult.before - attackResult.after}`);
     }
     if (attackResult.feel.impactsGenerated < 1 || attackResult.feel.hitStop <= 0 || !attackResult.feel.recentAudio.includes('sword') || !attackResult.feel.recentAudio.includes('hit')) {
       throw new Error(`${vp.name}: normal hit feedback missing ${JSON.stringify(attackResult.feel)}`);
     }
 
-    // Heavy direct damage still uses the real damageEnemy path and should upgrade feedback only.
     const heavyResult = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.teleport(900, 235);
@@ -119,7 +116,6 @@ try {
       throw new Error(`${vp.name}: death feedback missing ${JSON.stringify(deathResult)}`);
     }
 
-    // Dash must generate visual afterimages once the player actually moves.
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.teleport(0, 0);
@@ -134,7 +130,6 @@ try {
       throw new Error(`${vp.name}: dash afterimage/audio feedback missing ${JSON.stringify(feel)}`);
     }
 
-    // Ordinary movement should produce cadence events without changing movement controls.
     await sleep(230);
     const beforeSteps = await page.evaluate(() => window.__BRIAR_GLENDebug.getFeelState().stepEvents);
     await page.keyboard.down('KeyD');
@@ -145,7 +140,6 @@ try {
       throw new Error(`${vp.name}: movement cadence feedback missing ${JSON.stringify(afterMove.feel)}`);
     }
 
-    // Presentation effects must expire instead of leaking unbounded objects.
     await sleep(750);
     feel = await page.evaluate(() => window.__BRIAR_GLENDebug.getFeelState());
     if (feel.afterimages > 2 || feel.impacts > 2 || feel.deaths > 2) {
@@ -153,7 +147,7 @@ try {
     }
 
     if (errors.length) throw new Error(`${vp.name}: runtime errors:\n${errors.join('\n')}`);
-    console.log(`PASS ${vp.name}: Build 13 audio routing + hit-stop + recoil/death FX + dash trails + movement cadence active`);
+    console.log(`PASS ${vp.name}: Build 13+ audio routing + hit-stop + recoil/death FX + dash trails + movement cadence active`);
     await context.close();
   }
 } finally {
