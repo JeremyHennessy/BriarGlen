@@ -1,0 +1,146 @@
+/* Build 3 additions: satchel, alchemy and consumable controls. Build 2 layout remains intact. */
+[hidden] { display: none !important; }
+
+#inventory-strip {
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform .16s ease, border-color .16s ease, filter .16s ease;
+}
+#inventory-strip:hover { border-color: rgba(242, 211, 151, .42); }
+#inventory-strip.open { filter: brightness(1.08); }
+.inventory-strip .bag-slot { min-width: 58px; grid-template-columns: 18px 22px; }
+.item-dot.bag {
+  border-radius: 4px;
+  background: linear-gradient(145deg, #7a6246, #4e3b2b);
+  border: 1px solid rgba(237, 211, 168, .36);
+}
+
+#inventory-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  background: rgba(5, 9, 7, .56);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  pointer-events: auto;
+}
+
+.inventory-panel {
+  position: absolute;
+  z-index: 19;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(470px, calc(100vw - 28px));
+  max-height: min(620px, calc(100vh - 30px));
+  overflow: auto;
+  border-radius: 18px;
+  padding: 14px;
+  pointer-events: auto;
+}
+.inventory-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.inventory-header h2 { margin: 0; font-size: 18px; letter-spacing: .04em; }
+.inventory-header p { margin: 2px 0 0; color: var(--muted); font-size: 10px; }
+.inventory-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.06);
+  color: var(--ink);
+  font-size: 20px;
+  cursor: pointer;
+}
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.inventory-item {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.055);
+}
+.inventory-item .item-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 17px;
+  background: rgba(255,255,255,.06);
+}
+.inventory-item strong { display: block; font-size: 11px; }
+.inventory-item small { display: block; color: var(--muted); font-size: 8px; margin-top: 2px; }
+.inventory-item b { font-size: 18px; color: var(--gold); }
+
+.recipe-card {
+  margin-top: 9px;
+  padding: 10px 11px;
+  border-radius: 12px;
+  background: rgba(90, 70, 97, .18);
+  border: 1px solid rgba(174, 145, 192, .22);
+}
+.recipe-card strong { font-size: 11px; }
+#recipe-status { color: var(--muted); font-size: 9px; line-height: 1.35; margin-top: 3px; }
+.inventory-actions { display: flex; gap: 8px; margin-top: 10px; }
+.inventory-actions button {
+  flex: 1;
+  min-height: 42px;
+  border-radius: 11px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(71, 111, 82, .68);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 11px;
+  cursor: pointer;
+}
+.inventory-actions button:disabled { opacity: .4; cursor: default; }
+
+.touch-btn.potion {
+  right: 138px;
+  bottom: 70px;
+  width: 52px;
+  height: 52px;
+  background: rgba(72, 116, 91, .78);
+  font-size: 7px;
+}
+.touch-btn.potion[data-empty="true"] { opacity: .48; }
+.action-cluster { width: 196px; }
+
+@media (pointer: coarse), (max-width: 900px) {
+  .inventory-panel { width: min(460px, calc(100vw - 24px)); padding: 12px; }
+  .inventory-grid { gap: 6px; }
+  .inventory-item { min-height: 50px; padding: 7px 8px; }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .inventory-panel {
+    top: max(12px, env(safe-area-inset-top));
+    transform: translateX(-50%);
+    max-height: calc(100vh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+    width: calc(100vw - 20px);
+  }
+  .inventory-grid { grid-template-columns: 1fr 1fr; }
+  .inventory-item { grid-template-columns: 25px 1fr auto; gap: 5px; }
+  .inventory-item .item-icon { width: 24px; height: 24px; font-size: 14px; }
+  .inventory-item b { font-size: 15px; }
+  .inventory-header h2 { font-size: 16px; }
+  .touch-btn.potion { right: 138px; bottom: 70px; }
+}
+
+@media (max-width: 360px) {
+  .inventory-grid { grid-template-columns: 1fr; }
+}
