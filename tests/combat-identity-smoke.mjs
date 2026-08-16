@@ -152,7 +152,10 @@ try {
       d.setThreat('grovekeeper', { hp: 150, dead: false });
       d.forceEnemyTactic('grovekeeper', 'grove-root');
     });
-    await sleep(710);
+    await page.waitForFunction(() =>
+      window.__BRIAR_GLENDebug.getCombatIdentityState().hazards.filter(h => h.label === 'ROOT ERUPTION').length >= 3,
+      { timeout: 2200 }
+    );
     const grove = await page.evaluate(() => window.__BRIAR_GLENDebug.getCombatIdentityState());
     if (grove.hazards.filter(h => h.label === 'ROOT ERUPTION').length < 3) {
       throw new Error(`${vp.name}: Grovekeeper root pattern missing ${JSON.stringify(grove.hazards)}`);
