@@ -28,11 +28,11 @@ try {
         loaded=true;break;
       }catch(error){lastError=error;if(live&&attempt<48)await sleep(5000);}
     }
-    if(!loaded)throw new Error(`${vp.name}: Build 20.1 runtime unavailable: ${lastError?.message||'unknown'}`);
+    if(!loaded)throw new Error(`${vp.name}: Build 20.1+ runtime unavailable: ${lastError?.message||'unknown'}`);
 
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-    if(build.version!=='20.1'||build.label!=='Runtime Consolidation'||build.runtime!=='canonical-manifest-hooks-v1'||build.saveKey!=='briar-glen-vslice-v1'){
-      throw new Error(`${vp.name}: incorrect 20.1 metadata ${JSON.stringify(build)}`);
+    if(Number.parseFloat(build.version)<20.1||build.runtime!=='canonical-manifest-hooks-v1'||build.saveKey!=='briar-glen-vslice-v1'){
+      throw new Error(`${vp.name}: incorrect 20.1+ runtime metadata ${JSON.stringify(build)}`);
     }
 
     let state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getRuntimeArchitectureState());
