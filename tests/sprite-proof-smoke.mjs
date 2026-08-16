@@ -64,6 +64,12 @@ try {
       await sleep(500);
       state = await page.evaluate(() => window.__BRIAR_GLENDebug.getSpriteProofState());
       if (state.draws < 1 || state.replacements.cottage < 1) throw new Error(`${vp.name}: authored cottage sprite was not drawn in Briar Glen ${JSON.stringify(state)}`);
+      if ((state.replacements.tall_tree || 0) + (state.replacements.pine_tree || 0) < 1) throw new Error(`${vp.name}: hero-cluster tree sprite was not drawn ${JSON.stringify(state)}`);
+      const wardenSite = state.drawSites?.['cottage:-575,-365'];
+      if (!wardenSite || wardenSite.asset !== 'cottage' || wardenSite.draws < 1) throw new Error(`${vp.name}: Warden House authored draw site missing ${JSON.stringify(state.drawSites)}`);
+      if (wardenSite.screen.x < -30 || wardenSite.screen.x > vp.width + 30 || wardenSite.screen.y < -30 || wardenSite.screen.y > vp.height + 30) {
+        throw new Error(`${vp.name}: Warden House authored sprite anchored outside viewport ${JSON.stringify(wardenSite)}`);
+      }
       if (JSON.stringify(state.baseline) !== JSON.stringify(state.current)) throw new Error(`${vp.name}: sprite proof mutated gameplay entities ${JSON.stringify(state)}`);
 
       const offState = await page.evaluate(() => {
@@ -88,7 +94,7 @@ try {
       if (overflow.sw > overflow.iw + 1 || overflow.sh > overflow.ih + 1) throw new Error(`${vp.name}: sprite proof caused browser overflow ${JSON.stringify(overflow)}`);
       if (errors.length) throw new Error(`${vp.name}: proof runtime errors:\n${errors.join('\n')}`);
 
-      console.log(`PASS ${vp.name}: opt-in cottage/tree sprite proof active without gameplay mutation`);
+      console.log(`PASS ${vp.name}: Warden hero-cluster sprite proof active without gameplay mutation`);
       await context.close();
     }
   }
