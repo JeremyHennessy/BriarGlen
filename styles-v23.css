@@ -7,7 +7,7 @@
 .polish23-complete-seal{width:72px;height:72px;margin:0 auto 14px;display:grid;place-items:center;border:1px solid rgba(229,208,153,.45);border-radius:50%;font:700 30px/1 Georgia,serif;color:#dec88b;background:radial-gradient(circle,rgba(210,185,119,.18),transparent 72%)}
 .polish23-complete-card h2{margin:7px 0 8px;font:700 clamp(28px,6vw,42px)/1 Georgia,serif;color:#f5ead0}.polish23-complete-card p{max-width:430px;margin:0 auto 18px;color:#c7d0bf;font:600 13px/1.55 system-ui,sans-serif}.polish23-complete-card button{min-width:180px;min-height:46px;border:1px solid rgba(228,210,164,.35);border-radius:13px;background:linear-gradient(180deg,#708461,#51664f);color:#f5ebd1;font:800 12px/1 system-ui,sans-serif;letter-spacing:.06em;touch-action:manipulation}
 
-#inventory-panel:not([hidden]),#trade-panel:not([hidden]),#craft-panel:not([hidden]),#warden-overlay:not([hidden]),#board2-panel:not([hidden]){animation:polish23PanelIn .2s ease-out both;transform-origin:50% 55%;box-shadow:0 24px 70px rgba(0,0,0,.36)}
+#inventory-panel:not([hidden]),#trade-panel:not([hidden]),#craft-panel:not([hidden]),#warden-overlay:not([hidden]),#board2-panel:not([hidden]){animation:polish23PanelIn .2s ease-out both;box-shadow:0 24px 70px rgba(0,0,0,.36)}
 #inventory-backdrop:not([hidden]),#trade-backdrop:not([hidden]),#craft-backdrop:not([hidden]),#warden-overlay-backdrop:not([hidden]),#board2-backdrop:not([hidden]){animation:polish23FadeIn .18s ease-out both}
 #onboarding21-start:not([hidden]) .onboarding21-start-card{animation:polish23PanelIn .28s ease-out both}
 .inventory-item,.gear-slot,.trade-item,.craft-item,.market14-card,.board2-card{transition:border-color .16s ease,background-color .16s ease,transform .12s ease,box-shadow .16s ease}
@@ -20,7 +20,7 @@ html[data-polish-zone="mosswater-fen"] #context-prompt{border-color:rgba(161,202
 html[data-polish-zone="emberback-den"] #context-prompt{border-color:rgba(213,133,91,.34)}
 #game-shell.polish23-recovered #hud{animation:polish23Recover .68s ease-out both}
 
-@keyframes polish23PanelIn{from{opacity:0;transform:translateY(7px) scale(.992)}to{opacity:1;transform:none}}
+@keyframes polish23PanelIn{from{opacity:0;filter:brightness(.96)}to{opacity:1;filter:none}}
 @keyframes polish23FadeIn{from{opacity:0}to{opacity:1}}
 @keyframes polish23Area{0%{opacity:0;transform:translate(-50%,-8px)}12%,72%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-4px)}}
 @keyframes polish23Pickup{0%{opacity:0;transform:translate(-50%,8px)}14%,72%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-4px)}}
