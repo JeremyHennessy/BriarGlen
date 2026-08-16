@@ -26,6 +26,16 @@ jobs:
           python3 -m http.server 4173 > /tmp/briarglen-http.log 2>&1 &
           echo $! > /tmp/briarglen-http.pid
           sleep 2
+      - name: Test Build 24.1 opt-in sprite proof
+        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload Build 24.1 proof screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build24-1-sprite-proof-${{ github.sha }}
+          path: test-artifacts/build24-1/*.png
+          if-no-files-found: warn
+          retention-days: 14
       - name: Test repository build in browser
         run: |
           node tests/smoke.mjs http://127.0.0.1:4173/
