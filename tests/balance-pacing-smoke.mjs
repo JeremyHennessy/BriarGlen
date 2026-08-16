@@ -13,7 +13,11 @@ const browser = await chromium.launch({ headless:true });
 try {
   for (const vp of viewports) {
     const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,deviceScaleFactor:1});
-    await context.addInitScript(()=>localStorage.removeItem('briar-glen-run-metrics-v1'));
+    await context.addInitScript(()=>{
+      if(sessionStorage.getItem('briar-glen-balance-test-clean')==='1')return;
+      localStorage.removeItem('briar-glen-run-metrics-v1');
+      sessionStorage.setItem('briar-glen-balance-test-clean','1');
+    });
     const page=await context.newPage();
     const errors=[];
     page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));
