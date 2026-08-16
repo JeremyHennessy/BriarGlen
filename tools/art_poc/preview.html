@@ -49,20 +49,21 @@
     <div class="raw-card"><img id="raw-sheet" src="generated/asset_sheet.png?v=24" alt="Build 24 seven-target asset sheet" /><span>Procedural fallback comparison sheet</span></div>
   </section>
 
-  <footer>Optional authored files are read only from <code>tools/art_poc/source/</code>. This allows licensed/private source art to be evaluated without publishing restricted source files to the public repository.</footer>
+  <footer>Private/authored hero files are loaded only when this page is opened with <code>?source=authored</code>. In that mode they must exist under <code>tools/art_poc/source/</code>; the normal CI path never probes unpublished source files.</footer>
 </main>
 <script>
 (() => {
   const files=['cottage','tall_tree','pine_tree','rock_cluster','crate_barrel_set','copper_ore','fence_signpost'];
   const heroFiles=new Set(['cottage','tall_tree','pine_tree']);
+  const authoredRequested=new URLSearchParams(location.search).get('source')==='authored';
   const labels={cottage:'COTTAGE',tall_tree:'TALL TREE',pine_tree:'PINE',rock_cluster:'ROCK CLUSTER',crate_barrel_set:'CRATE / BARREL',copper_ore:'COPPER ORE',fence_signpost:'FENCE / SIGN'};
   const images={};
   const authored={};
 
   function loadGenerated(name){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{images[name]=img;resolve()};img.onerror=()=>reject(new Error(`Failed to load generated/${name}.png`));img.src=`generated/${name}.png?v=24`})}
-  function loadAuthored(name){return new Promise(resolve=>{const img=new Image();img.onload=()=>{authored[name]=img;resolve(true)};img.onerror=()=>resolve(false);img.src=`source/${name}_authored.png?v=24p3`})}
+  function loadAuthored(name){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{authored[name]=img;resolve()};img.onerror=()=>reject(new Error(`Authored source requested but missing: source/${name}_authored.png`));img.src=`source/${name}_authored.png?v=24p3`})}
   function activeImage(name){return authored[name]||images[name]}
-  function sourceMode(){const loaded=[...heroFiles].filter(name=>authored[name]);return loaded.length===heroFiles.size?'authored-hero':loaded.length?'mixed-authored':'procedural-fallback'}
+  function sourceMode(){return authoredRequested?'authored-hero':'procedural-fallback'}
 
   function diamond(ctx,cx,cy,rx,ry,fill,stroke){ctx.beginPath();ctx.moveTo(cx,cy-ry);ctx.lineTo(cx+rx,cy);ctx.lineTo(cx,cy+ry);ctx.lineTo(cx-rx,cy);ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
   function sprite(ctx,name,x,y,w,h,anchor=.86){const img=activeImage(name);ctx.drawImage(img,x-w/2,y-h*anchor,w,h)}
@@ -82,14 +83,15 @@
     const canvas=document.getElementById('comparison');const ctx=canvas.getContext('2d');ctx.fillStyle='#20251d';ctx.fillRect(0,0,canvas.width,canvas.height);
     const cells=[[0,0,'cottage'],[1,0,'tall_tree'],[2,0,'pine_tree'],[3,0,'rock_cluster'],[0,1,'crate_barrel_set'],[1,1,'copper_ore'],[2,1,'fence_signpost']];const cellW=300,cellH=270,gap=13,startX=22,startY=24;
     for(const [col,row,name] of cells){const x=startX+col*(cellW+gap),y=startY+row*(cellH+gap);ctx.fillStyle=row===0?'#4f6843':'#596449';ctx.fillRect(x,y,cellW,cellH);ctx.strokeStyle=authored[name]?'#c8a55e':'#7d8266';ctx.strokeRect(x+.5,y+.5,cellW-1,cellH-1);const large=heroFiles.has(name);const draw=large?220:165;ctx.drawImage(activeImage(name),x+(cellW-draw)/2,y+15,draw,draw);ctx.fillStyle='rgba(28,30,22,.84)';ctx.fillRect(x+12,y+cellH-43,cellW-24,28);ctx.fillStyle='#eadbb7';ctx.font='600 11px system-ui,sans-serif';ctx.fillText(`${labels[name]}${authored[name]?' • AUTHORED SOURCE':''}`,x+24,y+cellH-24)}
-    ctx.fillStyle='#b8ab8e';ctx.font='12px system-ui,sans-serif';ctx.fillText('Common anchor/scale family • gold outline identifies optional authored/private source',22,602);
+    ctx.fillStyle='#b8ab8e';ctx.font='12px system-ui,sans-serif';ctx.fillText('Common anchor/scale family • gold outline identifies explicit authored/private source mode',22,602);
   }
 
   function waitForImage(id){const img=document.getElementById(id);if(img.complete&&img.naturalWidth>0)return Promise.resolve();return new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error(`Failed to load ${id}`))})}
 
-  Promise.all([...files.map(loadGenerated),...heroFiles.values().map(loadAuthored),waitForImage('raw-scene'),waitForImage('raw-sheet')]).then(()=>{
+  const authoredLoads=authoredRequested?[...heroFiles].map(loadAuthored):[];
+  Promise.all([...files.map(loadGenerated),...authoredLoads,waitForImage('raw-scene'),waitForImage('raw-sheet')]).then(()=>{
     renderGameplay();renderComparison();
-    window.__BUILD24_ART_REPORT__={targetCount:files.length,targets:files.slice(),canvases:['scene','comparison'],sourceMode:sourceMode(),authoredTargets:Object.keys(authored),productionGameModified:false};
+    window.__BUILD24_ART_REPORT__={targetCount:files.length,targets:files.slice(),canvases:['scene','comparison'],sourceMode:sourceMode(),authoredRequested,authoredTargets:Object.keys(authored),productionGameModified:false};
     window.__BUILD24_ART_READY__=true;
   }).catch(error=>{console.error(error);window.__BUILD24_ART_ERROR__=String(error)});
 })();
