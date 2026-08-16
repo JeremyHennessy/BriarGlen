@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Briar Glen — Option B Art POC</title>
+  <style>
+    html, body { margin: 0; min-height: 100%; background: #171a16; color: #efe2c5; font-family: Georgia, serif; }
+    body { display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+    .frame { width: min(1120px, 100%); }
+    .meta { display: flex; justify-content: space-between; gap: 16px; align-items: end; margin: 0 4px 10px; }
+    h1 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: .02em; }
+    p { margin: 2px 0 0; font: 12px/1.4 system-ui, sans-serif; opacity: .72; }
+    .badge { border: 1px solid #665a40; border-radius: 999px; padding: 6px 10px; font: 11px system-ui, sans-serif; white-space: nowrap; }
+    canvas { width: 100%; height: auto; display: block; border: 1px solid #4e4635; border-radius: 14px; background: #243024; box-shadow: 0 18px 60px rgba(0,0,0,.38); }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <div class="meta">
+      <div>
+        <h1>Briar Glen — 3D → Canvas Sprite Proof</h1>
+        <p>Test-only branch. Procedural 3D source rendered headlessly to transparent PNG, then drawn by browser Canvas.</p>
+      </div>
+      <div class="badge">NO PRODUCTION DEPLOY</div>
+    </div>
+    <canvas id="scene" width="1100" height="690"></canvas>
+  </main>
+<script>
+(() => {
+  const canvas = document.getElementById('scene');
+  const ctx = canvas.getContext('2d');
+  const files = ['cottage', 'tree', 'crate', 'copper_ore'];
+  const images = {};
+
+  function load(name) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => { images[name] = img; resolve(); };
+      img.onerror = reject;
+      img.src = `generated/${name}.png?${Date.now()}`;
+    });
+  }
+
+  function diamond(cx, cy, rx, ry, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - ry);
+    ctx.lineTo(cx + rx, cy);
+    ctx.lineTo(cx, cy + ry);
+    ctx.lineTo(cx - rx, cy);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); }
+  }
+
+  function drawSprite(name, x, y, w, h) {
+    const img = images[name];
+    ctx.drawImage(img, x - w / 2, y - h * 0.82, w, h);
+  }
+
+  function render() {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, '#687d62');
+    g.addColorStop(.55, '#3e5740');
+    g.addColorStop(1, '#27372c');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // distant soft hills
+    ctx.globalAlpha = .20;
+    for (let i = 0; i < 9; i++) {
+      const x = 65 + i * 135;
+      ctx.beginPath();
+      ctx.arc(x, 150 + (i % 2) * 24, 120, Math.PI, Math.PI * 2);
+      ctx.fillStyle = i % 2 ? '#22382a' : '#2f4934';
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // isometric village clearing
+    diamond(550, 405, 455, 205, '#597a45', '#819267');
+    diamond(550, 440, 405, 118, '#7f704b', null);
+    diamond(550, 440, 385, 92, '#9b8658', null);
+
+    // approximate back-to-front world ordering
+    const sprites = [
+      ['tree', 240, 322, 205, 205],
+      ['tree', 836, 320, 214, 214],
+      ['cottage', 526, 370, 420, 420],
+      ['copper_ore', 235, 515, 112, 112],
+      ['crate', 705, 500, 100, 100],
+      ['crate', 775, 525, 88, 88],
+    ];
+    sprites.sort((a, b) => a[2] - b[2]);
+    for (const [name, x, y, w, h] of sprites) drawSprite(name, x, y, w, h);
+
+    // restrained atmosphere / vignette
+    const vignette = ctx.createRadialGradient(550, 345, 230, 550, 345, 650);
+    vignette.addColorStop(0, 'rgba(255,244,210,0.03)');
+    vignette.addColorStop(1, 'rgba(13,18,14,0.46)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = 'rgba(20,23,18,.78)';
+    ctx.fillRect(22, 612, 420, 50);
+    ctx.fillStyle = '#f2e2bd';
+    ctx.font = '600 15px system-ui, sans-serif';
+    ctx.fillText('Option B technical proof', 38, 635);
+    ctx.fillStyle = '#c7b996';
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillText('Headless 3D render → transparent PNG → native Canvas drawImage()', 38, 653);
+  }
+
+  Promise.all(files.map(load)).then(() => {
+    render();
+    window.__ART_POC_READY__ = true;
+  }).catch((error) => {
+    console.error(error);
+    window.__ART_POC_ERROR__ = String(error);
+  });
+})();
+</script>
+</body>
+</html>
