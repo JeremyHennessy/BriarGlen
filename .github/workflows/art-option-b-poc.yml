@@ -37,7 +37,7 @@ jobs:
           }
           changed = set(
               subprocess.check_output(
-                  ['git', 'diff', '--name-only', f'{base}...HEAD'],
+                  ['git', 'diff', '--name-only', base, 'HEAD'],
                   text=True,
               ).splitlines()
           )
