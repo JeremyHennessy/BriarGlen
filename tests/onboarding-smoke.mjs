@@ -17,6 +17,14 @@ function inside(box, vp) {
 try {
   for (const vp of viewports) {
     const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,deviceScaleFactor:1});
+    await context.addInitScript(() => {
+      if (sessionStorage.getItem('briar-glen-onboarding-test-clean') === '1') return;
+      localStorage.removeItem('briar-glen-vslice-v1');
+      localStorage.removeItem('briar-glen-onboarding-v1');
+      localStorage.removeItem('briar-glen-audio-muted');
+      sessionStorage.removeItem('briar-glen-start-intent');
+      sessionStorage.setItem('briar-glen-onboarding-test-clean','1');
+    });
     const page=await context.newPage();
     const errors=[];
     page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));
@@ -32,15 +40,6 @@ try {
       }catch(error){lastError=error;if(live&&attempt<48)await sleep(5000);}
     }
     if(!loaded)throw new Error(`${vp.name}: Build 21 onboarding runtime unavailable: ${lastError?.message||'unknown'}`);
-
-    await page.evaluate(()=>{
-      localStorage.removeItem('briar-glen-vslice-v1');
-      localStorage.removeItem('briar-glen-onboarding-v1');
-      localStorage.removeItem('briar-glen-audio-muted');
-      sessionStorage.removeItem('briar-glen-start-intent');
-    });
-    await page.reload({waitUntil:'domcontentloaded'});
-    await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getOnboardingState));
 
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
     if(build.version!=='21'||build.label!=='First Session'||build.runtime!=='canonical-manifest-hooks-v1')throw new Error(`${vp.name}: incorrect Build 21 metadata ${JSON.stringify(build)}`);
@@ -69,7 +68,7 @@ try {
     ]);
     await page.waitForFunction(()=>window.__BRIAR_GLENDebug?.getOnboardingState?.().guide?.active===true);
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getOnboardingState());
-    if(state.startOpen||state.guide.stage!=='move'||state.guide.complete)throw new Error(`${vp.name}: New Game did not enter move guide ${JSON.stringify(state)}`);
+    if(state.startOpen||state.hadSave||state.guide.stage!=='move'||state.guide.complete)throw new Error(`${vp.name}: New Game did not enter a fresh move guide ${JSON.stringify(state)}`);
     if((await page.locator('#attack-btn').evaluate(el=>getComputedStyle(el).visibility))!=='hidden')throw new Error(`${vp.name}: attack should be concealed during movement lesson`);
 
     await page.keyboard.down('KeyD'); await sleep(420); await page.keyboard.up('KeyD');
