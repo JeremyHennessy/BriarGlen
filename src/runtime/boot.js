@@ -1,8 +1,8 @@
 (() => {
   'use strict';
 
-  // Build 20.1: one parser entrypoint for the verified legacy runtime.
-  // Historical loaders remain in source control for rollback but are no longer part of the live load path.
+  // Canonical parser-time runtime manifest introduced in Build 20.1.
+  // Historical loaders remain in source control for rollback but are not part of the live load path.
   const scripts = [
     'src/v2/01.js',
     'src/v2/02.js',
@@ -32,6 +32,7 @@
     'src/v19/31-biome-art.js',
     'src/v20/33-hollow-den-art.js',
     'src/runtime/hooks.js',
+    'src/v21/35-onboarding.js',
     'src/runtime/release-info.js',
   ];
 
@@ -51,8 +52,6 @@
   window.__BRIAR_GLEN_MANIFEST = manifest;
   document.documentElement.dataset.briarGlenBootstrap = manifest.id;
 
-  // document.write is intentionally limited to this parser-time bootstrap. It preserves the exact
-  // synchronous ordering of the historical static script chain while reducing index.html to one entrypoint.
   if (document.readyState !== 'loading') {
     throw new Error('Briar Glen canonical bootstrap must execute while the document is loading');
   }
