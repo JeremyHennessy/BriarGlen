@@ -102,7 +102,7 @@ try {
     const pickup = page.locator('#polish23-pickup');
     if (!(await pickup.isVisible())) throw new Error(`${vp.name}: interaction pickup ribbon did not become visible`);
     const pickupText = await pickup.innerText();
-    if (!pickupText.includes('Ironpine Resin +1')) throw new Error(`${vp.name}: Resin pickup ribbon incorrect: ${pickupText}`);
+    if (!pickupText.toUpperCase().includes('IRONPINE RESIN +1')) throw new Error(`${vp.name}: Resin pickup ribbon incorrect: ${pickupText}`);
     const pickupBox = await pickup.boundingBox();
     if (!inside(pickupBox, vp)) throw new Error(`${vp.name}: pickup ribbon outside viewport ${JSON.stringify(pickupBox)}`);
 
@@ -115,7 +115,6 @@ try {
     if (!animationName.includes('polish23PanelIn')) throw new Error(`${vp.name}: final panel transition missing: ${animationName}`);
     await page.locator('#inventory-close').click();
 
-    // Loading/setting an already-completed state must never interrupt postgame UI with the end-cap.
     await page.evaluate(() => window.__BRIAR_GLENDebug.setProgress({ stonepineBossDefeated:true, stonepineCacheClaimed:true }));
     await sleep(120);
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getFinalPolishState());
@@ -123,7 +122,6 @@ try {
       throw new Error(`${vp.name}: completed state auto-opened the final presentation ${JSON.stringify(state)}`);
     }
 
-    // The real Stonepine cache claim transition must produce the deliberate, dismissible end-cap.
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.setProgress({ stonepineBossDefeated:true, stonepineCacheClaimed:false });
