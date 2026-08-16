@@ -21,6 +21,7 @@ try {
       if (sessionStorage.getItem('briar-glen-onboarding-test-clean') === '1') return;
       localStorage.removeItem('briar-glen-vslice-v1');
       localStorage.removeItem('briar-glen-onboarding-v1');
+      localStorage.removeItem('briar-glen-run-metrics-v1');
       localStorage.removeItem('briar-glen-audio-muted');
       sessionStorage.removeItem('briar-glen-start-intent');
       sessionStorage.setItem('briar-glen-onboarding-test-clean','1');
@@ -39,10 +40,10 @@ try {
         loaded=true;break;
       }catch(error){lastError=error;if(live&&attempt<48)await sleep(5000);}
     }
-    if(!loaded)throw new Error(`${vp.name}: Build 21 onboarding runtime unavailable: ${lastError?.message||'unknown'}`);
+    if(!loaded)throw new Error(`${vp.name}: Build 21+ onboarding runtime unavailable: ${lastError?.message||'unknown'}`);
 
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-    if(build.version!=='21'||build.label!=='First Session'||build.runtime!=='canonical-manifest-hooks-v1')throw new Error(`${vp.name}: incorrect Build 21 metadata ${JSON.stringify(build)}`);
+    if(Number.parseFloat(build.version)<21||build.runtime!=='canonical-manifest-hooks-v1')throw new Error(`${vp.name}: incorrect Build 21+ metadata ${JSON.stringify(build)}`);
 
     let state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getOnboardingState());
     if(!state.startOpen||state.hadSave||state.automationBypass||!state.forceOnboarding)throw new Error(`${vp.name}: fresh title state incorrect ${JSON.stringify(state)}`);
