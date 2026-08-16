@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // Build 24.1 proof: opt-in authored sprite integration for Briar Glen + Meadow Road.
+  // Build 24.1 proof: opt-in authored sprite integration for one Briar Glen hero cluster.
   // Disabled by default. No world entities, blockers, saves, combat, progression or UI are mutated.
   const requested = new URLSearchParams(location.search).get('spriteProof') === '1';
   const baseline = {
@@ -15,34 +15,54 @@
     ready: !requested,
     failed: false,
     failure: '',
-    mode: requested ? 'authored-sprites' : 'build23-canvas',
+    mode: requested ? 'authored-hero-cluster' : 'build23-canvas',
     assets: {},
     draws: 0,
     fallbackDraws: 0,
     replacements: { cottage:0, tall_tree:0, pine_tree:0 },
+    drawSites: {},
     baseline,
   };
 
   document.documentElement.dataset.spriteProof = requested ? 'loading' : 'off';
 
   const defs = {
-    cottage: { src:'assets/v24/cottage-authored.png', width:182, height:182, anchor:.83 },
-    tall_tree: { src:'assets/v24/tall-tree-authored.png', width:150, height:150, anchor:.88 },
-    pine_tree: { src:'assets/v24/pine-tree-authored.png', width:156, height:156, anchor:.90 },
+    cottage: {
+      src:'assets/v24/cottage-authored.png', width:210, height:210, anchor:.84,
+      filter:'saturate(.82) brightness(.88) contrast(.96)', shadow:[64,31,.30],
+    },
+    tall_tree: {
+      src:'assets/v24/tall-tree-authored.png', width:174, height:174, anchor:.91,
+      filter:'hue-rotate(44deg) saturate(.58) brightness(.78) contrast(.94)', shadow:[36,18,.25],
+    },
+    pine_tree: {
+      src:'assets/v24/pine-tree-authored.png', width:178, height:178, anchor:.92,
+      filter:'saturate(.72) brightness(.82) contrast(.96)', shadow:[34,17,.24],
+    },
   };
+
+  const HERO_COTTAGE = { x:-575, y:-365 };
+  const HERO_TREE_RADIUS = 260;
 
   function inProofSlice(x, y) {
     return x >= -1000 && x <= 690 && !(x > -80 && y < -425);
   }
 
-  function visible(p, margin = 180) {
+  function visible(p, margin = 210) {
     return p.x > -margin && p.x < viewport.w + margin && p.y > -margin && p.y < viewport.h + margin;
   }
 
+  function isHeroCottage(o) {
+    return o.type === 'cottage' && Math.hypot(o.x - HERO_COTTAGE.x, o.y - HERO_COTTAGE.y) < 12;
+  }
+
+  function isHeroTree(o) {
+    return o.type === 'tree' && Math.hypot(o.x - HERO_COTTAGE.x, o.y - HERO_COTTAGE.y) < HERO_TREE_RADIUS;
+  }
+
   function treeAsset(o) {
-    // Stable coordinate-based variation: no gameplay state and no random-frame flicker.
-    const key = Math.abs(Math.floor(o.x * .031 + o.y * .017));
-    return key % 4 === 0 ? 'pine_tree' : 'tall_tree';
+    // One nearby pine on the west side, two greener deciduous trees around the house.
+    return o.x < -600 ? 'pine_tree' : 'tall_tree';
   }
 
   function loadAsset(name, def) {
@@ -54,7 +74,7 @@
         resolve();
       };
       image.onerror = () => reject(new Error(`Build 24.1 sprite failed to load: ${def.src}`));
-      image.src = `${def.src}?v=24.1`;
+      image.src = `${def.src}?v=24.1b`;
     });
   }
 
@@ -76,11 +96,12 @@
 
   const build23DrawObject = drawObject;
   drawObject = function build241SpriteProofDrawObject(o) {
-    if (!proof.enabled || !proof.ready || !inProofSlice(o.x, o.y) || !['tree','cottage'].includes(o.type)) {
+    const selected = isHeroCottage(o) || isHeroTree(o);
+    if (!proof.enabled || !proof.ready || !selected || !inProofSlice(o.x, o.y)) {
       return build23DrawObject(o);
     }
 
-    const assetName = o.type === 'cottage' ? 'cottage' : treeAsset(o);
+    const assetName = isHeroCottage(o) ? 'cottage' : treeAsset(o);
     const record = proof.assets[assetName];
     if (!record?.loaded) {
       proof.fallbackDraws += 1;
@@ -94,15 +115,35 @@
     const w = def.width * scale;
     const h = def.height * scale;
 
+    // Preserve the existing world anchor while giving the authored sprite a real contact shadow.
+    shadow(o.x, o.y, def.shadow[0] * (o.s || 1), def.shadow[1] * (o.s || 1), def.shadow[2]);
+    if (assetName === 'tall_tree') {
+      // A small painted-under trunk/base keeps the canopy grounded at mobile scale.
+      ctx.save();
+      ctx.fillStyle = 'rgba(70,53,35,.82)';
+      ctx.fillRect(p.x - 5*scale, p.y - 38*scale, 10*scale, 40*scale);
+      ctx.restore();
+    }
+
     ctx.save();
-    ctx.globalAlpha = .99;
+    ctx.globalAlpha = .97;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
+    ctx.filter = def.filter;
     ctx.drawImage(record.image, p.x - w / 2, p.y - h * def.anchor, w, h);
     ctx.restore();
 
     proof.draws += 1;
     proof.replacements[assetName] += 1;
+    const siteKey = `${o.type}:${Math.round(o.x)},${Math.round(o.y)}`;
+    proof.drawSites[siteKey] = {
+      asset:assetName,
+      world:{ x:o.x, y:o.y },
+      screen:{ x:p.x, y:p.y },
+      size:{ w, h },
+      anchor:def.anchor,
+      draws:(proof.drawSites[siteKey]?.draws || 0) + 1,
+    };
   };
 
   function currentCounts() {
@@ -125,6 +166,14 @@
       draws: proof.draws,
       fallbackDraws: proof.fallbackDraws,
       replacements: { ...proof.replacements },
+      drawSites: Object.fromEntries(Object.entries(proof.drawSites).map(([key, site]) => [key, {
+        asset:site.asset,
+        world:{ ...site.world },
+        screen:{ ...site.screen },
+        size:{ ...site.size },
+        anchor:site.anchor,
+        draws:site.draws,
+      }])),
       baseline: { ...proof.baseline },
       current: currentCounts(),
     });
