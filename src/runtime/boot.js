@@ -52,6 +52,15 @@
   window.__BRIAR_GLEN_MANIFEST = manifest;
   document.documentElement.dataset.briarGlenBootstrap = manifest.id;
 
+  // New Game is initiated late in the prior document, whose visibilitychange handler can save once more
+  // during navigation. Resolve that intent here, before the legacy loadGame() path executes.
+  try {
+    if (sessionStorage.getItem('briar-glen-start-intent') === 'new') {
+      localStorage.removeItem(manifest.saveKey);
+      localStorage.removeItem('briar-glen-onboarding-v1');
+    }
+  } catch (_) { /* storage may be unavailable in private contexts */ }
+
   if (document.readyState !== 'loading') {
     throw new Error('Briar Glen canonical bootstrap must execute while the document is loading');
   }
