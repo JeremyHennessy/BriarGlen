@@ -66,16 +66,21 @@ try {
       if (state.draws < 1 || state.replacements.cottage < 1) throw new Error(`${vp.name}: authored cottage sprite was not drawn in Briar Glen ${JSON.stringify(state)}`);
       if (JSON.stringify(state.baseline) !== JSON.stringify(state.current)) throw new Error(`${vp.name}: sprite proof mutated gameplay entities ${JSON.stringify(state)}`);
 
-      const drawsBeforeOff = state.draws;
-      await page.evaluate(() => window.__BRIAR_GLENDebug.setSpriteProofEnabled(false));
+      const offState = await page.evaluate(() => {
+        const d = window.__BRIAR_GLENDebug;
+        d.setSpriteProofEnabled(false);
+        return d.getSpriteProofState();
+      });
+      const drawsAtDisable = offState.draws;
+      if (offState.enabled) throw new Error(`${vp.name}: proof toggle-off did not disable renderer ${JSON.stringify(offState)}`);
       await sleep(180);
       state = await page.evaluate(() => window.__BRIAR_GLENDebug.getSpriteProofState());
-      if (state.enabled || state.draws !== drawsBeforeOff) throw new Error(`${vp.name}: proof toggle-off did not restore prior renderer ${JSON.stringify(state)}`);
+      if (state.enabled || state.draws !== drawsAtDisable) throw new Error(`${vp.name}: proof toggle-off did not restore prior renderer ${JSON.stringify(state)}`);
 
       await page.evaluate(() => window.__BRIAR_GLENDebug.setSpriteProofEnabled(true));
       await sleep(220);
       state = await page.evaluate(() => window.__BRIAR_GLENDebug.getSpriteProofState());
-      if (!state.enabled || state.draws <= drawsBeforeOff) throw new Error(`${vp.name}: proof toggle-on did not resume authored draws ${JSON.stringify(state)}`);
+      if (!state.enabled || state.draws <= drawsAtDisable) throw new Error(`${vp.name}: proof toggle-on did not resume authored draws ${JSON.stringify(state)}`);
       if (JSON.stringify(state.baseline) !== JSON.stringify(state.current)) throw new Error(`${vp.name}: re-enabled proof mutated gameplay entities`);
 
       await page.screenshot({ path:path.join(artifactDir, `${vp.name}.png`), fullPage:false });
