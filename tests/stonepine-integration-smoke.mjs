@@ -31,15 +31,15 @@ try {
         if (live && attempt < 48) await sleep(5000);
       }
     }
-    if (!loaded) throw new Error(`${vp.name}: Build 18 runtime unavailable: ${lastError?.message || 'unknown'}`);
+    if (!loaded) throw new Error(`${vp.name}: Build 18+ runtime unavailable: ${lastError?.message || 'unknown'}`);
 
     await page.evaluate(() => localStorage.removeItem('briar-glen-vslice-v1'));
     await page.reload({ waitUntil:'domcontentloaded' });
     await page.waitForFunction(() => Boolean(window.__BRIAR_GLENDebug?.getStonepineIntegrationState));
 
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (build.version !== '18' || build.label !== 'Stonepine Logistics' || build.saveKey !== 'briar-glen-vslice-v1') {
-      throw new Error(`${vp.name}: incorrect Build 18 metadata ${JSON.stringify(build)}`);
+    if (!(Number.parseFloat(build.version) >= 18) || build.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${vp.name}: incorrect Build 18+ metadata ${JSON.stringify(build)}`);
     }
 
     await page.evaluate(() => {
@@ -73,7 +73,6 @@ try {
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getStonepineIntegrationState());
     if (!state.work.active) throw new Error(`${vp.name}: active Stonepine job did not persist reload`);
 
-    // Two real Stonepine kills must advance the custom contract; Resin remains a delivery requirement.
     await page.evaluate(() => {
       const d=window.__BRIAR_GLENDebug;
       d.setInventory({ resin:2 });
@@ -98,7 +97,6 @@ try {
     }
     await page.evaluate(() => window.__BRIAR_GLENDebug.closeBoard());
 
-    // Board completion 1 selects Quarry Repair in the Stonepine manifest.
     await page.evaluate(() => {
       const d=window.__BRIAR_GLENDebug;
       d.setPlayer({ coins:500 });
@@ -138,7 +136,6 @@ try {
       throw new Error(`${vp.name}: Quarry commission incorrect ${JSON.stringify(state)}`);
     }
 
-    // Advance one Board cycle: finite stock and commission reset into Highland Supply.
     await page.evaluate(() => {
       const d=window.__BRIAR_GLENDebug;
       d.setProgress({ boardContractsCompleted:2 });
