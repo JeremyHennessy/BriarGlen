@@ -246,12 +246,17 @@
   }
 
   runtime.registerHook('beforeInteract', 'build23-interact-snapshot', () => {
-    polish.interactionSnapshot = inventorySnapshot();
+    polish.interactionSnapshot = {
+      inventory: inventorySnapshot(),
+      stonepineCacheClaimed: !!progress.stonepineCacheClaimed,
+    };
   }, -50);
 
   runtime.registerHook('afterInteract', 'build23-interact-feedback', () => {
-    const text = summarizeDelta(polish.interactionSnapshot, inventorySnapshot());
+    const snapshot = polish.interactionSnapshot;
+    const text = summarizeDelta(snapshot?.inventory, inventorySnapshot());
     if (text) showPickup(text);
+    if (snapshot && !snapshot.stonepineCacheClaimed && progress.stonepineCacheClaimed) showCompletion(false);
     polish.interactionSnapshot = null;
   }, 900);
 
@@ -275,8 +280,6 @@
       setTimeout(() => shell.classList.remove('polish23-recovered'), 700);
     }
     polish.previous = { x:player.x, y:player.y, hp:player.hp };
-
-    if (progress.stonepineCacheClaimed && !polish.completionSeen) showCompletion(false);
     syncDocumentState();
   }, 1100);
 
