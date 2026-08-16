@@ -47,7 +47,23 @@ if (!fs.existsSync(indexPath) || fs.statSync(indexPath).size === 0) {
   for (const ref of refs) requireFile(ref, 'index.html');
 
   releaseRefs = scriptRefs.filter(ref => /release-info\.js(?:[?#].*)?$/i.test(ref));
-  if (!releaseRefs.length) failures.push('index.html does not activate a release-info runtime');
+
+  const canonicalBoot = scriptRefs.find(ref => ref.split(/[?#]/, 1)[0] === 'src/runtime/boot.js');
+  if (canonicalBoot) {
+    const bootPath = path.resolve(root, canonicalBoot.split(/[?#]/, 1)[0]);
+    if (fs.existsSync(bootPath)) {
+      const boot = fs.readFileSync(bootPath, 'utf8');
+      const manifestRefs = [...boot.matchAll(/["']((?:src|styles)[^"']+\.(?:js|css))["']/g)]
+        .map(match => match[1])
+        .filter(isLocalRef);
+      for (const ref of new Set(manifestRefs)) requireFile(ref, 'src/runtime/boot.js');
+      releaseRefs.push(...manifestRefs.filter(ref => /release-info\.js(?:[?#].*)?$/i.test(ref)));
+      if (!boot.includes('__BRIAR_GLEN_MANIFEST')) failures.push('src/runtime/boot.js does not expose __BRIAR_GLEN_MANIFEST');
+      if (!boot.includes('canonical-parser-manifest')) failures.push('src/runtime/boot.js lost canonical manifest mode');
+    }
+  }
+
+  if (!releaseRefs.length) failures.push('runtime activation has no release-info runtime');
   if (!html.includes('viewport-fit=cover') || !html.includes('user-scalable=no')) {
     failures.push('index.html lost the mobile viewport/zoom guard');
   }
@@ -94,4 +110,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`PASS static sanity: ${runtimeFiles.length} runtime JS + ${testFiles.length} test JS syntax-clean; local runtime references resolve; ${releaseRefs.length} release marker(s)`);
+console.log(`PASS static sanity: ${runtimeFiles.length} runtime JS + ${testFiles.length} test JS syntax-clean; local runtime references resolve; ${new Set(releaseRefs).size} release marker(s)`);
