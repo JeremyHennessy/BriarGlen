@@ -32,10 +32,10 @@ try {
         loaded=true;break;
       }catch(error){lastError=error;if(live&&attempt<48)await sleep(5000);}
     }
-    if(!loaded)throw new Error(`${vp.name}: Build 22 balance runtime unavailable: ${lastError?.message||'unknown'}`);
+    if(!loaded)throw new Error(`${vp.name}: Build 22+ balance runtime unavailable: ${lastError?.message||'unknown'}`);
 
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-    if(build.version!=='22'||build.label!=='Balance & Pacing'||build.runtime!=='canonical-manifest-hooks-v1')throw new Error(`${vp.name}: incorrect Build 22 metadata ${JSON.stringify(build)}`);
+    if(Number(build.version)<22||build.runtime!=='canonical-manifest-hooks-v1')throw new Error(`${vp.name}: incorrect Build 22+ metadata ${JSON.stringify(build)}`);
 
     let state=await page.evaluate(()=>window.__BRIAR_GLENDebug.resetBalanceMetrics());
     const expectedBaseline={
