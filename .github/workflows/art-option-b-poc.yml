@@ -1,0 +1,248 @@
+name: Build 24 isolated art pipeline
+
+on:
+  push:
+    branches: [agent/build24-art-pipeline]
+    paths:
+      - 'tools/art_poc/**'
+      - '.github/workflows/art-option-b-poc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-and-browser-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BUILD23_BASE_SHA: 9642630cab6eb0b57779d0978cb82e510f4bf6e4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Prove Build 23 game runtime is untouched
+        run: |
+          git fetch origin "$BUILD23_BASE_SHA" --depth=1
+          python3 - <<'PY'
+          import subprocess
+
+          base = '9642630cab6eb0b57779d0978cb82e510f4bf6e4'
+          allowed = {
+              '.github/workflows/art-option-b-poc.yml',
+              'tools/art_poc/capture.mjs',
+              'tools/art_poc/preview.html',
+              'tools/art_poc/render_scene.py',
+          }
+          changed = set(
+              subprocess.check_output(
+                  ['git', 'diff', '--name-only', f'{base}...HEAD'],
+                  text=True,
+              ).splitlines()
+          )
+          if changed != allowed:
+              raise SystemExit(
+                  'Build 24 scope violation. Expected only isolated art-pipeline files.\n'
+                  f'Expected: {sorted(allowed)}\nActual: {sorted(changed)}'
+              )
+          print('PASS isolated scope:', sorted(changed))
+          PY
+
+      - name: Install headless Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender libegl1 libgl1
+          blender --version
+
+      - name: Render seven transparent medieval targets and comparison scenes
+        run: |
+          rm -rf tools/art_poc/generated
+          mkdir -p tools/art_poc/generated
+          blender --background --python tools/art_poc/render_scene.py -- --output tools/art_poc/generated
+
+      - name: Verify PNG dimensions, alpha, manifest and expected outputs
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import struct
+          import zlib
+
+          root = 'tools/art_poc/generated'
+          targets = {
+              'cottage.png': (512, 512),
+              'tall_tree.png': (512, 512),
+              'pine_tree.png': (512, 512),
+              'rock_cluster.png': (384, 384),
+              'crate_barrel_set.png': (384, 384),
+              'copper_ore.png': (384, 384),
+              'fence_signpost.png': (384, 384),
+          }
+          composites = {
+              'asset_sheet.png': (1280, 720),
+              'village_scene.png': (1280, 720),
+          }
+
+          def paeth(a, b, c):
+              p = a + b - c
+              pa = abs(p - a)
+              pb = abs(p - b)
+              pc = abs(p - c)
+              if pa <= pb and pa <= pc:
+                  return a
+              if pb <= pc:
+                  return b
+              return c
+
+          def inspect_png(path, expected_dims, require_transparency):
+              if not os.path.isfile(path) or os.path.getsize(path) < 2500:
+                  raise SystemExit(f'missing/empty render: {path}')
+
+              with open(path, 'rb') as handle:
+                  if handle.read(8) != b'\x89PNG\r\n\x1a\n':
+                      raise SystemExit(f'not a PNG: {path}')
+                  width = height = bit_depth = color_type = None
+                  idat = bytearray()
+                  while True:
+                      raw_len = handle.read(4)
+                      if not raw_len:
+                          break
+                      length = struct.unpack('>I', raw_len)[0]
+                      kind = handle.read(4)
+                      data = handle.read(length)
+                      handle.read(4)
+                      if kind == b'IHDR':
+                          width, height, bit_depth, color_type, _, _, _ = struct.unpack('>IIBBBBB', data)
+                      elif kind == b'IDAT':
+                          idat.extend(data)
+                      elif kind == b'IEND':
+                          break
+
+              if (width, height) != expected_dims:
+                  raise SystemExit(f'wrong dimensions for {path}: {(width, height)} != {expected_dims}')
+              if bit_depth != 8 or color_type != 6:
+                  raise SystemExit(f'{path} must be 8-bit RGBA PNG; got depth={bit_depth}, type={color_type}')
+
+              report = {
+                  'width': width,
+                  'height': height,
+                  'bytes': os.path.getsize(path),
+                  'color_type': color_type,
+              }
+
+              if require_transparency:
+                  decoded = zlib.decompress(bytes(idat))
+                  bpp = 4
+                  row_bytes = width * bpp
+                  previous = bytearray(row_bytes)
+                  offset = 0
+                  transparent = 0
+                  visible = 0
+                  partial = 0
+
+                  for _ in range(height):
+                      filter_type = decoded[offset]
+                      offset += 1
+                      raw = bytearray(decoded[offset:offset + row_bytes])
+                      offset += row_bytes
+                      recon = bytearray(row_bytes)
+
+                      for i, value in enumerate(raw):
+                          left = recon[i - bpp] if i >= bpp else 0
+                          up = previous[i]
+                          up_left = previous[i - bpp] if i >= bpp else 0
+                          if filter_type == 0:
+                              recon[i] = value
+                          elif filter_type == 1:
+                              recon[i] = (value + left) & 255
+                          elif filter_type == 2:
+                              recon[i] = (value + up) & 255
+                          elif filter_type == 3:
+                              recon[i] = (value + ((left + up) // 2)) & 255
+                          elif filter_type == 4:
+                              recon[i] = (value + paeth(left, up, up_left)) & 255
+                          else:
+                              raise SystemExit(f'unsupported PNG filter {filter_type} in {path}')
+
+                      for alpha in recon[3::4]:
+                          if alpha == 0:
+                              transparent += 1
+                          else:
+                              visible += 1
+                              if alpha < 255:
+                                  partial += 1
+                      previous = recon
+
+                  pixels = width * height
+                  if transparent < pixels * 0.05:
+                      raise SystemExit(f'{path} does not preserve meaningful transparent background')
+                  if visible < pixels * 0.015:
+                      raise SystemExit(f'{path} is effectively empty')
+                  report.update({
+                      'transparent_pixels': transparent,
+                      'visible_pixels': visible,
+                      'partial_alpha_pixels': partial,
+                  })
+
+              return report
+
+          report = {}
+          for name, dims in targets.items():
+              report[name] = inspect_png(os.path.join(root, name), dims, True)
+          for name, dims in composites.items():
+              report[name] = inspect_png(os.path.join(root, name), dims, False)
+
+          manifest_path = os.path.join(root, 'manifest.json')
+          with open(manifest_path, encoding='utf-8') as handle:
+              manifest = json.load(handle)
+
+          expected_targets = list(targets)
+          expected_composites = list(composites)
+          if manifest.get('target_assets') != expected_targets:
+              raise SystemExit(f'manifest target mismatch: {manifest.get("target_assets")}')
+          if manifest.get('comparison_outputs') != expected_composites:
+              raise SystemExit(f'manifest comparison mismatch: {manifest.get("comparison_outputs")}')
+          if manifest.get('production_game_modified') is not False:
+              raise SystemExit('manifest must explicitly preserve production_game_modified=false')
+          if manifest.get('render_style', {}).get('background') != 'transparent RGBA PNG':
+              raise SystemExit('manifest must record transparent RGBA background')
+
+          print(json.dumps(report, indent=2))
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install browser verification runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Render generated sprites through browser Canvas
+        run: |
+          python3 -m http.server 4174 > /tmp/briarglen-build24-art-http.log 2>&1 &
+          echo $! > /tmp/briarglen-build24-art-http.pid
+          sleep 2
+          node tools/art_poc/capture.mjs \
+            http://127.0.0.1:4174/tools/art_poc/preview.html \
+            tools/art_poc/generated/browser-proof.png
+
+      - name: Verify browser proof artifacts exist
+        run: |
+          test -s tools/art_poc/generated/browser-proof.png
+          test -s tools/art_poc/generated/gameplay-scale-proof.png
+          test -s tools/art_poc/generated/comparison-proof.png
+          echo "PASS browser proof outputs"
+
+      - name: Upload Build 24 proof artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build24-art-pipeline-${{ github.sha }}
+          path: |
+            tools/art_poc/generated/*.png
+            tools/art_poc/generated/manifest.json
+          if-no-files-found: error
+          retention-days: 14
