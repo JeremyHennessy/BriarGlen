@@ -67,7 +67,6 @@ try {
       throw new Error(`${vp.name}: final polish changed verified balance or style identity ${JSON.stringify(state)}`);
     }
 
-    // Real zone transition should surface the authored area-entry moment without changing world state.
     const areaBefore = state.areaShows;
     await page.evaluate(() => window.__BRIAR_GLENDebug.teleport(1050, 20));
     await page.waitForFunction(before => window.__BRIAR_GLENDebug.getFinalPolishState().areaShows > before, areaBefore);
@@ -78,7 +77,6 @@ try {
     const areaText = await area.innerText();
     if (!areaText.includes('COPPER HOLLOW') || !areaText.includes('OLD QUARRY WORKS')) throw new Error(`${vp.name}: area moment copy incomplete: ${areaText}`);
 
-    // Stonepine should now have a final presentation layer: ambient highland marks + interact focus.
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.setProgress({
@@ -95,7 +93,6 @@ try {
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getFinalPolishState());
     if (JSON.stringify(state.entityCounts) !== JSON.stringify(entities)) throw new Error(`${vp.name}: final polish mutated world entities`);
 
-    // Use the actual interaction path: Resin gain should generate the concise pickup ribbon.
     const pickupBefore = state.pickupShows;
     await page.evaluate(() => window.__BRIAR_GLENDebug.interact());
     await page.waitForFunction(before => {
@@ -109,7 +106,6 @@ try {
     const pickupBox = await pickup.boundingBox();
     if (!inside(pickupBox, vp)) throw new Error(`${vp.name}: pickup ribbon outside viewport ${JSON.stringify(pickupBox)}`);
 
-    // Existing functional panels remain viewport-safe and gain a consistent presentation transition.
     await page.locator('#inventory-strip').click();
     await page.waitForFunction(() => !document.getElementById('inventory-panel')?.hidden);
     const panel = page.locator('#inventory-panel');
@@ -119,9 +115,26 @@ try {
     if (!animationName.includes('polish23PanelIn')) throw new Error(`${vp.name}: final panel transition missing: ${animationName}`);
     await page.locator('#inventory-close').click();
 
-    // The completed vertical slice gets a deliberate, dismissible end-cap without ending free play.
-    await page.evaluate(() => window.__BRIAR_GLENDebug.triggerFinalPolishCompletion());
-    await page.waitForFunction(() => !document.getElementById('polish23-complete')?.hidden);
+    // Loading/setting an already-completed state must never interrupt postgame UI with the end-cap.
+    await page.evaluate(() => window.__BRIAR_GLENDebug.setProgress({ stonepineBossDefeated:true, stonepineCacheClaimed:true }));
+    await sleep(120);
+    state = await page.evaluate(() => window.__BRIAR_GLENDebug.getFinalPolishState());
+    if (state.completionOpen || state.completionShows !== 0) {
+      throw new Error(`${vp.name}: completed state auto-opened the final presentation ${JSON.stringify(state)}`);
+    }
+
+    // The real Stonepine cache claim transition must produce the deliberate, dismissible end-cap.
+    await page.evaluate(() => {
+      const d = window.__BRIAR_GLENDebug;
+      d.setProgress({ stonepineBossDefeated:true, stonepineCacheClaimed:false });
+      d.teleport(3255, -1900);
+    });
+    const completionBefore = (await page.evaluate(() => window.__BRIAR_GLENDebug.getFinalPolishState())).completionShows;
+    await page.evaluate(() => window.__BRIAR_GLENDebug.interact());
+    await page.waitForFunction(before => {
+      const s = window.__BRIAR_GLENDebug.getFinalPolishState();
+      return s.completionOpen && s.completionShows > before && window.__BRIAR_GLENDebug.getStonepineState().cacheClaimed;
+    }, completionBefore);
     const completion = page.locator('#polish23-complete .polish23-complete-card');
     const completionBox = await completion.boundingBox();
     if (!inside(completionBox, vp)) throw new Error(`${vp.name}: completion presentation outside viewport ${JSON.stringify(completionBox)}`);
@@ -132,7 +145,6 @@ try {
     await page.locator('#polish23-complete-close').click();
     if (await page.locator('#polish23-complete').isVisible()) throw new Error(`${vp.name}: completion presentation did not dismiss`);
 
-    // Build 23 must use the canonical hook bus, never restart the historical wrapper chain.
     const runtime = await page.evaluate(() => window.__BRIAR_GLENDebug.getRuntimeArchitectureState());
     const requiredHooks = [
       ['beforeInteract','build23-interact-snapshot'],
@@ -148,7 +160,6 @@ try {
       throw new Error(`${vp.name}: canonical runtime regressed ${JSON.stringify(runtime)}`);
     }
 
-    // User-requested softened feedback remains an explicit release gate.
     await page.evaluate(() => window.__BRIAR_GLENDebug.setCameraShake(12));
     await sleep(40);
     const feedback = await page.evaluate(() => window.__BRIAR_GLENDebug.getFeedbackTuningState());
