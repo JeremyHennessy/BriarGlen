@@ -169,7 +169,10 @@ try {
     }
 
     await page.evaluate(() => window.__BRIAR_GLENDebug.openMap());
-    await page.waitForFunction(() => document.querySelector('#map-marker-stonepine .marker-label')?.textContent === 'STONEPINE REACH');
+    await page.waitForFunction(() =>
+      document.querySelector('#map-marker-stonepine .marker-label')?.textContent === 'STONEPINE REACH' &&
+      document.getElementById('map-discovery-count')?.textContent?.includes('/ 8 locations charted')
+    );
     const mapText = await page.locator('#map-discovery-count').innerText();
     if (!mapText.includes('/ 8 locations charted')) throw new Error(`${vp.name}: map location total was not extended to 8: ${mapText}`);
     await page.evaluate(() => window.__BRIAR_GLENDebug.openJournal());
