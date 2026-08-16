@@ -100,8 +100,12 @@ try {
     await page.waitForFunction(()=>!document.getElementById('inventory-panel').hidden&&window.__BRIAR_GLENDebug.getOnboardingState().guide.stage==='skills');
     await page.locator('#inventory-close').click();
 
-    if((await page.locator('#skill-btn').evaluate(el=>getComputedStyle(el).visibility))!=='visible')throw new Error(`${vp.name}: SKILL was not revealed`);
-    await page.locator('#skill-btn').click();
+    if(vp.touch){
+      if((await page.locator('#skill-btn').evaluate(el=>getComputedStyle(el).visibility))!=='visible')throw new Error(`${vp.name}: SKILL was not revealed`);
+      await page.locator('#skill-btn').click();
+    }else{
+      await page.keyboard.press('KeyF');
+    }
     await page.waitForFunction(()=>window.__BRIAR_GLENDebug.getOnboardingState().guide.stage==='map');
     if((await page.locator('#warden-map-btn').evaluate(el=>getComputedStyle(el).visibility))!=='visible')throw new Error(`${vp.name}: MAP was not revealed`);
     await page.locator('#warden-map-btn').click();
