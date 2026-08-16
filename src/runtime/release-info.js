@@ -1,8 +1,8 @@
 (() => {
   'use strict';
   const BUILD_INFO = Object.freeze({
-    version:'22',
-    label:'Balance & Pacing',
+    version:'23',
+    label:'Vertical Slice Polish',
     saveKey:'briar-glen-vslice-v1',
     schema:1,
     runtime:'canonical-manifest-hooks-v1',
