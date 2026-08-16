@@ -1,0 +1,93 @@
+name: Option B art pipeline POC
+
+on:
+  push:
+    branches: [agent/art-option-b-poc-20260816]
+    paths:
+      - 'tools/art_poc/**'
+      - '.github/workflows/art-option-b-poc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-and-browser-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install headless Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+          blender --version
+
+      - name: Render transparent isometric-style PNG sprites
+        run: |
+          mkdir -p tools/art_poc/generated
+          blender --background --python tools/art_poc/render_scene.py -- --output tools/art_poc/generated
+
+      - name: Verify generated PNG files without image libraries
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import struct
+
+          root = 'tools/art_poc/generated'
+          expected = {
+              'cottage.png': (512, 512),
+              'tree.png': (512, 512),
+              'crate.png': (384, 384),
+              'copper_ore.png': (384, 384),
+              'scene.png': (960, 640),
+          }
+          report = {}
+          for name, dims in expected.items():
+              path = os.path.join(root, name)
+              if not os.path.isfile(path) or os.path.getsize(path) < 1000:
+                  raise SystemExit(f'missing/empty render: {path}')
+              with open(path, 'rb') as handle:
+                  signature = handle.read(8)
+                  if signature != b'\x89PNG\r\n\x1a\n':
+                      raise SystemExit(f'not a PNG: {path}')
+                  length = struct.unpack('>I', handle.read(4))[0]
+                  chunk_type = handle.read(4)
+                  if chunk_type != b'IHDR' or length < 13:
+                      raise SystemExit(f'invalid IHDR: {path}')
+                  width, height = struct.unpack('>II', handle.read(8))
+              if (width, height) != dims:
+                  raise SystemExit(f'wrong dimensions for {name}: {(width, height)} != {dims}')
+              report[name] = {'width': width, 'height': height, 'bytes': os.path.getsize(path)}
+          print(json.dumps(report, indent=2))
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install browser verification runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Render sprites through browser Canvas and capture result
+        run: |
+          python3 -m http.server 4174 > /tmp/briarglen-art-poc-http.log 2>&1 &
+          echo $! > /tmp/briarglen-art-poc-http.pid
+          sleep 2
+          node tools/art_poc/capture.mjs \
+            http://127.0.0.1:4174/tools/art_poc/preview.html \
+            tools/art_poc/generated/browser-preview.png
+
+      - name: Upload proof artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: option-b-art-poc-${{ github.sha }}
+          path: |
+            tools/art_poc/generated/*.png
+            tools/art_poc/generated/manifest.json
+          if-no-files-found: error
+          retention-days: 14
