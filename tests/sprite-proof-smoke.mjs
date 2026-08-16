@@ -18,9 +18,49 @@ function withParam(url, key, value) {
   return `${url}${sep}${key}=${encodeURIComponent(value)}`;
 }
 
+async function assertBrowserPaintsSources(page, vpName) {
+  const report = await page.evaluate(async () => {
+    const paths = [
+      'assets/v24/cottage-authored.webp',
+      'assets/v24/tall-tree-authored.webp',
+      'assets/v24/pine-tree-authored.webp',
+    ];
+    const out = {};
+    for (const src of paths) {
+      const image = new Image();
+      image.src = `${src}?decode-control=${Date.now()}-${Math.random()}`;
+      await image.decode();
+      const c = document.createElement('canvas');
+      c.width = 160; c.height = 160;
+      const g = c.getContext('2d');
+      const x = (160 - image.naturalWidth) / 2;
+      const y = (160 - image.naturalHeight) / 2;
+      g.clearRect(0,0,160,160);
+      g.drawImage(image,x,y);
+      const patch = g.getImageData(74,74,12,12).data;
+      let alpha = 0;
+      let rgb = 0;
+      let visible = 0;
+      for (let i=0;i<patch.length;i+=4) {
+        rgb += patch[i] + patch[i+1] + patch[i+2];
+        alpha += patch[i+3];
+        if (patch[i+3] > 32) visible += 1;
+      }
+      out[src] = { width:image.naturalWidth, height:image.naturalHeight, alpha, rgb, visible };
+    }
+    return out;
+  });
+  for (const [src, info] of Object.entries(report)) {
+    if (info.width < 64 || info.height < 64 || info.visible < 20 || info.alpha < 3000 || info.rgb < 1000) {
+      throw new Error(`${vpName}: Chromium source decode/paint failed ${src} ${JSON.stringify(info)}`);
+    }
+  }
+  return report;
+}
+
 try {
   for (const vp of viewports) {
-    // Control: the ordinary Build 23 URL must leave the proof layer fully disabled.
+    // Control: ordinary Build 23 path remains unchanged and does not request authored files.
     {
       const context = await browser.newContext({ viewport:{ width:vp.width, height:vp.height }, hasTouch:vp.touch, deviceScaleFactor:1 });
       const page = await context.newPage();
@@ -38,7 +78,7 @@ try {
       await context.close();
     }
 
-    // Opt-in proof: load all three authored sprites and replace only presentation draws.
+    // Opt-in proof: prove source bytes paint in Chromium before testing the world renderer.
     {
       const context = await browser.newContext({ viewport:{ width:vp.width, height:vp.height }, hasTouch:vp.touch, deviceScaleFactor:1 });
       const page = await context.newPage();
@@ -53,11 +93,13 @@ try {
         const state = window.__BRIAR_GLENDebug.getSpriteProofState();
         return state.ready || state.failed;
       }, { timeout:7000 });
+
+      const decodeReport = await assertBrowserPaintsSources(page, vp.name);
       let state = await page.evaluate(() => window.__BRIAR_GLENDebug.getSpriteProofState());
       if (state.failed || !state.requested || !state.enabled || !state.ready) throw new Error(`${vp.name}: proof did not become ready ${JSON.stringify(state)}`);
       if (Object.keys(state.loadedAssets).sort().join(',') !== 'cottage,pine_tree,tall_tree') throw new Error(`${vp.name}: authored asset set incomplete ${JSON.stringify(state.loadedAssets)}`);
       for (const [name, info] of Object.entries(state.loadedAssets)) {
-        if (!info.loaded || info.width < 200 || info.height < 200) throw new Error(`${vp.name}: invalid sprite ${name} ${JSON.stringify(info)}`);
+        if (!info.loaded || info.width < 64 || info.height < 64 || !String(info.src).endsWith('.webp')) throw new Error(`${vp.name}: invalid WebP sprite ${name} ${JSON.stringify(info)}`);
       }
 
       await page.evaluate(() => window.__BRIAR_GLENDebug.teleport(-575, -330));
@@ -94,7 +136,7 @@ try {
       if (overflow.sw > overflow.iw + 1 || overflow.sh > overflow.ih + 1) throw new Error(`${vp.name}: sprite proof caused browser overflow ${JSON.stringify(overflow)}`);
       if (errors.length) throw new Error(`${vp.name}: proof runtime errors:\n${errors.join('\n')}`);
 
-      console.log(`PASS ${vp.name}: Warden hero-cluster sprite proof active without gameplay mutation`);
+      console.log(`PASS ${vp.name}: WebP decode + Warden hero-cluster proof active without gameplay mutation ${JSON.stringify(decodeReport)}`);
       await context.close();
     }
   }

@@ -28,15 +28,15 @@
 
   const defs = {
     cottage: {
-      src:'assets/v24/cottage-authored.png', width:210, height:210, anchor:.84,
+      src:'assets/v24/cottage-authored.webp', width:210, height:210, anchor:.84,
       filter:'saturate(.82) brightness(.88) contrast(.96)', shadow:[64,31,.30],
     },
     tall_tree: {
-      src:'assets/v24/tall-tree-authored.png', width:174, height:174, anchor:.91,
+      src:'assets/v24/tall-tree-authored.webp', width:174, height:174, anchor:.91,
       filter:'hue-rotate(44deg) saturate(.58) brightness(.78) contrast(.94)', shadow:[36,18,.25],
     },
     pine_tree: {
-      src:'assets/v24/pine-tree-authored.png', width:178, height:178, anchor:.92,
+      src:'assets/v24/pine-tree-authored.webp', width:178, height:178, anchor:.92,
       filter:'saturate(.72) brightness(.82) contrast(.96)', shadow:[34,17,.24],
     },
   };
@@ -61,7 +61,6 @@
   }
 
   function treeAsset(o) {
-    // One nearby pine on the west side, two greener deciduous trees around the house.
     return o.x < -600 ? 'pine_tree' : 'tall_tree';
   }
 
@@ -70,11 +69,11 @@
       const image = new Image();
       image.decoding = 'async';
       image.onload = () => {
-        proof.assets[name] = { loaded:true, width:image.naturalWidth, height:image.naturalHeight, image };
+        proof.assets[name] = { loaded:true, width:image.naturalWidth, height:image.naturalHeight, image, src:def.src };
         resolve();
       };
       image.onerror = () => reject(new Error(`Build 24.1 sprite failed to load: ${def.src}`));
-      image.src = `${def.src}?v=24.1b`;
+      image.src = `${def.src}?v=24.1d`;
     });
   }
 
@@ -115,10 +114,8 @@
     const w = def.width * scale;
     const h = def.height * scale;
 
-    // Preserve the existing world anchor while giving the authored sprite a real contact shadow.
     shadow(o.x, o.y, def.shadow[0] * (o.s || 1), def.shadow[1] * (o.s || 1), def.shadow[2]);
     if (assetName === 'tall_tree') {
-      // A small painted-under trunk/base keeps the canopy grounded at mobile scale.
       ctx.save();
       ctx.fillStyle = 'rgba(70,53,35,.82)';
       ctx.fillRect(p.x - 5*scale, p.y - 38*scale, 10*scale, 40*scale);
@@ -162,7 +159,7 @@
       failed: proof.failed,
       failure: proof.failure,
       mode: proof.mode,
-      loadedAssets: Object.fromEntries(Object.entries(proof.assets).map(([name, value]) => [name, { loaded:value.loaded, width:value.width, height:value.height }])),
+      loadedAssets: Object.fromEntries(Object.entries(proof.assets).map(([name, value]) => [name, { loaded:value.loaded, width:value.width, height:value.height, src:value.src }])),
       draws: proof.draws,
       fallbackDraws: proof.fallbackDraws,
       replacements: { ...proof.replacements },

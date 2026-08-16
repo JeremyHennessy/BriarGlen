@@ -1,12 +1,15 @@
 # Build 24.1 authored sprite proof assets
 
-These three PNGs are experimental Briar Glen look-development assets for the opt-in `?spriteProof=1` browser proof.
+These files are experimental Briar Glen look-development assets for the opt-in `?spriteProof=1` browser proof.
 
-- `cottage-authored.png`
-- `tall-tree-authored.png`
-- `pine-tree-authored.png`
+Current browser-proof sources:
+- `cottage-authored.webp`
+- `tall-tree-authored.webp`
+- `pine-tree-authored.webp`
 
-Provenance: generated specifically for Briar Glen in the project ChatGPT session on 2026-08-16, then downscaled and palette-quantized for browser proof use. They are not third-party asset-pack files.
+Provenance: generated specifically for Briar Glen in the project ChatGPT session on 2026-08-16 from the project look-development images, then re-encoded locally as alpha-enabled WebP for browser compatibility testing. They are not third-party asset-pack files.
+
+The earlier palette-PNG proof files are temporarily retained only as rollback/debug evidence and are no longer loaded by the proof runtime. They will be removed after the WebP path is verified visually and technically.
 
 Status: **experimental / not visually approved / not production baseline**.
 
