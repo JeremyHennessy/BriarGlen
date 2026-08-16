@@ -34,6 +34,7 @@
     'src/runtime/hooks.js',
     'src/v21/35-onboarding.js',
     'src/v22/36-balance-pacing.js',
+    'src/v23/37-final-polish.js',
     'src/runtime/release-info.js',
   ];
 
@@ -60,6 +61,7 @@
       localStorage.removeItem(manifest.saveKey);
       localStorage.removeItem('briar-glen-onboarding-v1');
       localStorage.removeItem('briar-glen-run-metrics-v1');
+      localStorage.removeItem('briar-glen-vertical-slice-complete-v1');
     }
   } catch (_) { /* storage may be unavailable in private contexts */ }
 
