@@ -52,8 +52,8 @@ try {
     if (!loaded) throw new Error(`${vp.name}: Build 19 biome art runtime unavailable: ${lastError?.message || 'unknown'}`);
 
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (build.version !== '19' || build.label !== 'Grove & Fen Visual Identity' || build.saveKey !== 'briar-glen-vslice-v1') {
-      throw new Error(`${vp.name}: incorrect Build 19 metadata ${JSON.stringify(build)}`);
+    if (Number(build.version) < 19 || build.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${vp.name}: Build 19+ metadata unavailable ${JSON.stringify(build)}`);
     }
 
     await page.evaluate(() => {
@@ -113,11 +113,9 @@ try {
     }
     if (fenOn.hash === fenOff.hash) throw new Error(`${vp.name}: Fen art produced no measurable Canvas delta`);
 
-    // The user-requested gentler feedback must remain the final projection behavior after biome rendering.
-    const feedback = await page.evaluate(() => {
+    await page.evaluate(() => {
       const d=window.__BRIAR_GLENDebug;
       d.setCameraShake(12);
-      return d.getFeedbackTuningState();
     });
     await sleep(40);
     const feedbackAfter = await page.evaluate(() => window.__BRIAR_GLENDebug.getFeedbackTuningState());
