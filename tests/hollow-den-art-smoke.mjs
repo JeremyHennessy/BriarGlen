@@ -42,14 +42,14 @@ try {
         loaded=true;break;
       }catch(error){lastError=error;if(live&&attempt<48)await sleep(5000);}
     }
-    if(!loaded)throw new Error(`${vp.name}: Build 20 art runtime unavailable: ${lastError?.message||'unknown'}`);
+    if(!loaded)throw new Error(`${vp.name}: Build 20+ art runtime unavailable: ${lastError?.message||'unknown'}`);
 
     await page.evaluate(()=>localStorage.removeItem('briar-glen-vslice-v1'));
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getHollowDenArtState));
 
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-    if(build.version!=='20'||build.label!=='Hollow & Den Visual Identity'||build.saveKey!=='briar-glen-vslice-v1')throw new Error(`${vp.name}: incorrect Build 20 metadata ${JSON.stringify(build)}`);
+    if(Number.parseFloat(build.version)<20||build.saveKey!=='briar-glen-vslice-v1')throw new Error(`${vp.name}: incorrect Build 20+ metadata ${JSON.stringify(build)}`);
 
     await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setHollowDenArtEnabled(true);d.teleport(1040,120);});
     await sleep(240);
@@ -89,14 +89,14 @@ try {
     if(denOffState.frame.denGround!==0||denOffState.frame.denObjects!==0||denOffState.frame.denEnemies!==0||denOffState.frame.ambient!==0)throw new Error(`${vp.name}: Den debug disable did not fall through ${JSON.stringify(denOffState.frame)}`);
     if(denOn.hash===denOff.hash)throw new Error(`${vp.name}: Den art produced no measurable Canvas delta`);
 
-    const feedback=await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setHollowDenArtEnabled(true);d.setCameraShake(12);return d.getFeedbackTuningState();});
+    await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setHollowDenArtEnabled(true);d.setCameraShake(12);});
     await sleep(40);
     const feedbackAfter=await page.evaluate(()=>window.__BRIAR_GLENDebug.getFeedbackTuningState());
-    if(feedbackAfter.renderedAmplitude>1.55||Math.hypot(feedbackAfter.frameX,feedbackAfter.frameY)>1.95)throw new Error(`${vp.name}: Build 20 regressed gentle feedback ${JSON.stringify(feedbackAfter)}`);
+    if(feedbackAfter.renderedAmplitude>1.55||Math.hypot(feedbackAfter.frameX,feedbackAfter.frameY)>1.95)throw new Error(`${vp.name}: Build 20+ regressed gentle feedback ${JSON.stringify(feedbackAfter)}`);
     await page.evaluate(()=>window.__BRIAR_GLENDebug.setCameraShake(0));
 
     const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));
-    if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Build 20 caused browser overflow ${JSON.stringify(overflow)}`);
+    if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Build 20+ caused browser overflow ${JSON.stringify(overflow)}`);
     if(errors.length)throw new Error(`${vp.name}: runtime errors:\n${errors.join('\n')}`);
     console.log(`PASS ${vp.name}: Copper Hollow + Emberback Den visual identity active with gentle feedback preserved`);
     await context.close();
