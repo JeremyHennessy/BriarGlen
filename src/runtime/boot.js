@@ -33,6 +33,7 @@
     'src/v20/33-hollow-den-art.js',
     'src/runtime/hooks.js',
     'src/v21/35-onboarding.js',
+    'src/v22/36-balance-pacing.js',
     'src/runtime/release-info.js',
   ];
 
@@ -58,6 +59,7 @@
     if (sessionStorage.getItem('briar-glen-start-intent') === 'new') {
       localStorage.removeItem(manifest.saveKey);
       localStorage.removeItem('briar-glen-onboarding-v1');
+      localStorage.removeItem('briar-glen-run-metrics-v1');
     }
   } catch (_) { /* storage may be unavailable in private contexts */ }
 
