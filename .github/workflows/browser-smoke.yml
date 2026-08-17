@@ -28,16 +28,18 @@ jobs:
           sleep 2
       - name: Test Build 25 approved art scope and Canvas rollback
         run: node tests/build25-production-smoke.mjs http://127.0.0.1:4173/
-      - name: Test Build 26 Willow and Meadow Greenway
-        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
-      - name: Test Build 26 production art gate
+      - name: Test Build 26 approved Greenway scope
         run: node tests/build26-production-smoke.mjs http://127.0.0.1:4173/
-      - name: Upload Build 26 Greenway screenshots
+      - name: Test Build 27 Mooncap entry and ruins canopy
+        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
+      - name: Test Build 27 production art gate
+        run: node tests/build27-production-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload Build 27 Mooncap screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build26-greenway-${{ github.sha }}
-          path: test-artifacts/build26/*.png
+          name: build27-mooncap-${{ github.sha }}
+          path: test-artifacts/build27/*.png
           if-no-files-found: warn
           retention-days: 14
       - name: Test repository build in browser
@@ -93,3 +95,4 @@ jobs:
           node tests/final-polish-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/build25-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/build26-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/build27-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
