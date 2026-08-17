@@ -110,7 +110,12 @@ try {
       d.forceEnemyTactic('mireling', 'mire-bind');
       return { before };
     });
-    await sleep(960);
+    await page.waitForFunction(before => {
+      const d = window.__BRIAR_GLENDebug;
+      const identity = d.getCombatIdentityState();
+      const player = d.getState().player;
+      return identity.counters.hazardHits > before && identity.playerRoot > 0 && player.hp < 100;
+    }, mireSetup.before, { timeout: 2600 });
     const mire = await page.evaluate(() => ({
       player: window.__BRIAR_GLENDebug.getState().player,
       identity: window.__BRIAR_GLENDebug.getCombatIdentityState(),
