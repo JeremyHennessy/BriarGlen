@@ -133,8 +133,14 @@ try {
     await sleep(230);
     const beforeSteps = await page.evaluate(() => window.__BRIAR_GLENDebug.getFeelState().stepEvents);
     await page.keyboard.down('KeyD');
-    await sleep(460);
-    await page.keyboard.up('KeyD');
+    try {
+      await page.waitForFunction(before => {
+        const feel = window.__BRIAR_GLENDebug.getFeelState();
+        return feel.stepEvents > before && feel.recentAudio.includes('step');
+      }, beforeSteps, { timeout: 3000 });
+    } finally {
+      await page.keyboard.up('KeyD');
+    }
     const afterMove = await page.evaluate(() => ({ feel: window.__BRIAR_GLENDebug.getFeelState(), player: window.__BRIAR_GLENDebug.getState().player }));
     if (afterMove.feel.stepEvents <= beforeSteps || !afterMove.feel.recentAudio.includes('step')) {
       throw new Error(`${vp.name}: movement cadence feedback missing ${JSON.stringify(afterMove.feel)}`);
