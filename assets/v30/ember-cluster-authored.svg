@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="62%" r="50%">
+      <stop offset="0" stop-color="#ffb85e" stop-opacity=".68"/>
+      <stop offset=".45" stop-color="#e65d36" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#d4492f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="coal" x1="20" y1="28" x2="96" y2="86" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#584640"/>
+      <stop offset="1" stop-color="#282426"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="60" cy="66" rx="54" ry="31" fill="url(#glow)"/>
+  <g stroke="#241f20" stroke-width="3.5" stroke-linejoin="round">
+    <path d="M19 77 25 59 39 50 51 56 55 72 44 84 28 85Z" fill="url(#coal)"/>
+    <path d="M41 61 47 40 63 31 75 39 78 59 66 72 52 73Z" fill="url(#coal)"/>
+    <path d="M68 70 73 50 89 43 101 55 101 73 90 84 77 83Z" fill="url(#coal)"/>
+  </g>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M31 61 38 67 34 75M57 44 64 52 59 61M82 55 88 62 84 71" stroke="#9e3e2f" stroke-width="6" opacity=".9"/>
+    <path d="M31 61 38 67 34 75M57 44 64 52 59 61M82 55 88 62 84 71" stroke="#ff9e52" stroke-width="2.6"/>
+    <path d="M37 54 41 57M68 39l4 5M93 50l3 4" stroke="#ffd58a" stroke-width="2" opacity=".75"/>
+  </g>
+  <circle cx="51" cy="34" r="2.2" fill="#ffb15d" opacity=".85"/>
+  <circle cx="91" cy="39" r="1.8" fill="#f07343" opacity=".75"/>
+</svg>

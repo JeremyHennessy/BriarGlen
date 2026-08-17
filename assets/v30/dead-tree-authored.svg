@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 190">
+  <defs>
+    <linearGradient id="bark" x1="40" y1="170" x2="102" y2="25" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3c3028"/>
+      <stop offset=".52" stop-color="#594536"/>
+      <stop offset="1" stop-color="#745844"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M73 171C68 147 73 129 69 111c-5-22 6-34 4-55-1-12 2-24 7-35" stroke="#2e2822" stroke-width="28"/>
+    <path d="M73 169C68 145 74 126 70 108c-4-20 7-33 5-53-1-10 2-22 6-31" stroke="url(#bark)" stroke-width="20"/>
+    <path d="M75 92c-16-8-27-19-35-35M79 65c15-8 26-20 36-35M74 119c17-2 30-11 41-24M68 137c-14 3-25 12-35 24" stroke="#4b392e" stroke-width="13"/>
+    <path d="M41 57 28 42M40 58l-20 3M114 30l11-14M114 31l18 2M115 95l19-8M34 160l-18 9" stroke="#5a4334" stroke-width="8"/>
+    <path d="M58 173 35 184M76 173l8 13M90 170l25 11" stroke="#3a2d25" stroke-width="11"/>
+    <path d="M68 142c5-24 2-45 8-66 5-18 3-34 9-48M58 116c8-7 13-12 17-22M81 89c8-10 13-17 20-25" stroke="#9a7757" stroke-width="3.5" opacity=".55"/>
+    <path d="M61 151c-5-2-11-1-16 2M82 123c6-2 12-1 17 2" stroke="#7f8358" stroke-width="4" opacity=".32"/>
+  </g>
+</svg>

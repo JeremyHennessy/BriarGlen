@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120">
+  <defs>
+    <linearGradient id="backStone" x1="22" y1="19" x2="125" y2="101" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#96947b"/>
+      <stop offset=".52" stop-color="#6c705f"/>
+      <stop offset="1" stop-color="#484d43"/>
+    </linearGradient>
+    <linearGradient id="frontStone" x1="43" y1="45" x2="111" y2="109" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#817f69"/>
+      <stop offset="1" stop-color="#51574b"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="43" y1="48" x2="112" y2="81" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#efad72"/>
+      <stop offset=".45" stop-color="#c5764d"/>
+      <stop offset="1" stop-color="#7e4937"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <!-- Rear crag: taller, off-centre and deliberately uneven. -->
+    <path d="M20 96 23 72 34 54 49 46 57 29 76 20 93 28 100 42 118 44 133 59 139 80 132 96Z"
+          fill="url(#backStone)" stroke="#3d433a" stroke-width="4.5"/>
+    <path d="M31 68 49 51 61 44 69 28 84 27 94 43 82 55 64 58 52 74Z"
+          fill="#aaa58a" opacity=".34"/>
+    <path d="M98 47 116 49 129 61 132 77 115 73 104 64 88 61Z"
+          fill="#565d50" opacity=".62"/>
+
+    <!-- Lower foreground slab breaks the monolithic triangle silhouette. -->
+    <path d="M18 98 31 79 49 74 62 62 79 66 94 60 111 71 126 76 142 92 135 104 108 109 73 107 47 111 28 107Z"
+          fill="url(#frontStone)" stroke="#40463d" stroke-width="4"/>
+    <path d="M31 91 51 79 68 78 79 69 94 67 109 76 92 88 66 91 49 101Z"
+          fill="#92917a" opacity=".45"/>
+    <path d="M88 90 108 78 128 83 137 94 123 101 103 100Z"
+          fill="#454b42" opacity=".58"/>
+
+    <!-- Copper follows a natural fracture between planes instead of crossing the whole face. -->
+    <path d="M45 83c10-6 17-8 25-13 8-5 15-4 23-8 7-4 13-6 21-5"
+          fill="none" stroke="#754638" stroke-width="7" opacity=".72"/>
+    <path d="M45 83c10-6 17-8 25-13 8-5 15-4 23-8 7-4 13-6 21-5"
+          fill="none" stroke="url(#copper)" stroke-width="3.5"/>
+    <path d="M59 77 66 84M82 66l5 8M101 60l5 6" fill="none" stroke="#f4c28d" stroke-width="1.8" opacity=".7"/>
+
+    <!-- Small quarry chips and face cuts add hand-authored scale cues. -->
+    <path d="M42 59 52 53M78 35l7 8M112 55l8 5M36 101l9-5M118 96l9-4"
+          stroke="#cbc3a0" stroke-width="2" opacity=".3"/>
+    <path d="M13 105 20 97 28 100 31 108 22 112Z" fill="#5b6154" stroke="#41463d" stroke-width="2.5"/>
+    <path d="M132 105 139 98 149 102 147 110 137 113Z" fill="#6b6e5c" stroke="#41463d" stroke-width="2.5"/>
+    <ellipse cx="78" cy="109" rx="49" ry="5" fill="#30372f" opacity=".24"/>
+  </g>
+</svg>
