@@ -17,12 +17,12 @@
   }
 
   const defs = {
-    player_sword:{src:'assets/v31/warden-sword.svg',width:62,height:78,anchor:.96,filter:'saturate(.88) brightness(.94) contrast(1.02)'},
-    player_bow:{src:'assets/v31/warden-bow.svg',width:62,height:78,anchor:.96,filter:'saturate(.88) brightness(.94) contrast(1.02)'},
-    player_staff:{src:'assets/v31/warden-staff.svg',width:62,height:78,anchor:.96,filter:'saturate(.9) brightness(.96) contrast(1.02)'},
-    wolf:{src:'assets/v31/briar-wolf.svg',width:80,height:52,anchor:.90,filter:'saturate(.72) brightness(.88) contrast(1.05)'},
-    boar:{src:'assets/v31/hollow-boar.svg',width:86,height:58,anchor:.89,filter:'saturate(.84) brightness(.91) contrast(1.04)'},
-    boss:{src:'assets/v31/emberback.svg',width:116,height:82,anchor:.90,filter:'saturate(.9) brightness(.88) contrast(1.06)'},
+    player_sword:{src:'assets/v31/warden-sword.svg',width:64,height:82,anchor:.96,filter:'saturate(.86) brightness(.93) contrast(1.03)'},
+    player_bow:{src:'assets/v31/warden-bow.svg',width:64,height:82,anchor:.96,filter:'saturate(.86) brightness(.93) contrast(1.03)'},
+    player_staff:{src:'assets/v31/warden-staff.svg',width:64,height:82,anchor:.96,filter:'saturate(.88) brightness(.95) contrast(1.03)'},
+    wolf:{src:'assets/v31/briar-wolf.svg',width:82,height:53,anchor:.90,filter:'saturate(.7) brightness(.89) contrast(1.04)'},
+    boar:{src:'assets/v31/hollow-boar.svg',width:88,height:59,anchor:.89,filter:'saturate(.82) brightness(.92) contrast(1.03)'},
+    boss:{src:'assets/v31/emberback.svg',width:118,height:83,anchor:.90,filter:'saturate(.88) brightness(.89) contrast(1.05)'},
   };
 
   const proof = {
@@ -87,17 +87,30 @@
 
   const priorDrawPlayer = drawPlayer;
   drawPlayer = function build31LivingCastDrawPlayer() {
+    if (!proof.enabled || !proof.ready || !baseEnabled()) {
+      priorDrawPlayer();
+      return;
+    }
+
+    // Execute the complete historical player draw stack for counters/hooks, but clip its pixels
+    // offscreen so the authored Warden is not visually doubled with the old simplified body.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-10000,-10000,1,1);
+    ctx.clip();
     priorDrawPlayer();
-    if (!proof.enabled || !proof.ready || !baseEnabled()) return;
+    ctx.restore();
+
     const p = worldToScreen(player.x,player.y);
     const asset = player.weaponType === 'bow' ? 'player_bow' : player.weaponType === 'staff' ? 'player_staff' : 'player_sword';
     const def = defs[asset];
-    const scale = camera.zoom * .98;
+    const scale = camera.zoom;
     const w = def.width * scale, h = def.height * scale;
     const blink = player.invuln > 0 && Math.floor(player.invuln*18)%2===0;
     const attackNudge = player.attackAnim > 0 ? Math.min(3.5*camera.zoom, player.attackAnim*8*camera.zoom) : 0;
     const facing = player.facingX < -.05;
     const sp = {x:p.x + (facing ? -attackNudge : attackNudge), y:p.y};
+    shadow(player.x,player.y,23,13,.29);
     if (!drawSprite(asset,sp,w,h,def.anchor,facing,blink?.58:1,def.filter)) return;
     proof.playerDraws += 1;
     proof.replacements[asset] += 1;
