@@ -19,6 +19,7 @@ The slice now includes:
 - discovery-based world map and Warden Journal
 - Contract Board 2.0 with repeatable hunt, delivery and Fen survey work
 - persistent local saves
+- Build 25 authored Briar Glen presentation: the approved Warden House cottage + two-tree hero cluster is active by default, with `?canvasArt=1` available for direct rollback/A-B comparison
 
 The authored progression runs from Briar Glen through Emberback, Mooncap Grove and Mosswater Fen, then opens into repeatable Warden contracts and continued exploration/crafting.
 
@@ -66,7 +67,7 @@ Then open `http://localhost:8000`.
 
 The game uses resolution-independent world coordinates and a responsive Canvas/HUD layer. Runtime functionality has been added in versioned, additive layers so previously verified releases remain recoverable while the prototype evolves.
 
-The production release is protected by GitHub Actions browser regression tests. Every gameplay suite runs in Chromium at phone landscape, phone portrait and desktop sizes. On pushes to `main`, the same suites are repeated against the deployed GitHub Pages URL.
+The production release is protected by GitHub Actions browser regression tests. Every gameplay suite runs in Chromium at phone landscape, phone portrait and desktop sizes. On pushes to `main`, the same suites are repeated against the deployed GitHub Pages URL. Build 25 also has a production-specific hosted smoke that requires exact Build 25 metadata, verifies the authored Warden cluster is the default, and verifies `?canvasArt=1` restores the prior Canvas presentation.
 
 Build 12.1 adds a fast static integrity/syntax gate ahead of Chromium so missing, empty or truncated runtime assets fail before the slower browser stage.
 
