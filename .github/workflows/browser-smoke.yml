@@ -32,16 +32,18 @@ jobs:
         run: node tests/build26-production-smoke.mjs http://127.0.0.1:4173/
       - name: Test Build 27 approved Mooncap scope
         run: node tests/build27-production-smoke.mjs http://127.0.0.1:4173/
-      - name: Test Build 28 Old Warden Crossing and reliquary shroud
-        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
-      - name: Test Build 28 production art gate
+      - name: Test Build 28 approved Mosswater scope
         run: node tests/build28-production-smoke.mjs http://127.0.0.1:4173/
-      - name: Upload Build 28 Mosswater screenshots
+      - name: Test Build 29 Stonepine Pass and quarry timberline
+        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
+      - name: Test Build 29 production art gate
+        run: node tests/build29-production-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload Build 29 Stonepine screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build28-mosswater-${{ github.sha }}
-          path: test-artifacts/build28/*.png
+          name: build29-stonepine-${{ github.sha }}
+          path: test-artifacts/build29/*.png
           if-no-files-found: warn
           retention-days: 14
       - name: Test repository build in browser
@@ -99,3 +101,4 @@ jobs:
           node tests/build26-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/build27-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/build28-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/build29-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
