@@ -26,16 +26,18 @@ jobs:
           python3 -m http.server 4173 > /tmp/briarglen-http.log 2>&1 &
           echo $! > /tmp/briarglen-http.pid
           sleep 2
-      - name: Test Build 25 authored default and Canvas rollback
-        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
-      - name: Test Build 25 production art gate
+      - name: Test Build 25 approved art scope and Canvas rollback
         run: node tests/build25-production-smoke.mjs http://127.0.0.1:4173/
-      - name: Upload Build 25 A-B screenshots
+      - name: Test Build 26 Willow and Meadow Greenway
+        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
+      - name: Test Build 26 production art gate
+        run: node tests/build26-production-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload Build 26 Greenway screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build25-art-rollout-${{ github.sha }}
-          path: test-artifacts/build25/*.png
+          name: build26-greenway-${{ github.sha }}
+          path: test-artifacts/build26/*.png
           if-no-files-found: warn
           retention-days: 14
       - name: Test repository build in browser
@@ -90,3 +92,4 @@ jobs:
           node tests/balance-pacing-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/final-polish-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/build25-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/build26-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
