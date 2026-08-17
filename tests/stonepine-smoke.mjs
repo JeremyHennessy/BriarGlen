@@ -99,7 +99,9 @@ try {
       d.triggerStonepineScree(0);
       return before;
     });
-    await sleep(850);
+    // Wait for the actual hazard event rather than wall-clock time. The game loop caps simulated dt,
+    // so a loaded CI runner can advance less game time than an 850ms fixed sleep implies.
+    await page.waitForFunction(expected => window.__BRIAR_GLENDebug.getStonepineState().counters.screeHits >= expected, screeBefore + 1, { timeout: 3000 });
     const screeAfter = await page.evaluate(() => ({ player:window.__BRIAR_GLENDebug.getState().player, stone:window.__BRIAR_GLENDebug.getStonepineState() }));
     if (screeAfter.stone.counters.screeHits !== screeBefore + 1 || screeAfter.player.hp !== 87) {
       throw new Error(`${vp.name}: scree hazard did not deal exact 13 damage ${JSON.stringify(screeAfter)}`);
@@ -125,7 +127,12 @@ try {
       d.setThreat('quarrywisp',{ hp:68,dead:false,x:2820,y:-1280 });
       d.forceStonepineTactic('quarrywisp','wisp-shot');
     });
-    await sleep(760);
+    // Wait for the actual committed ranged shot and live projectile rather than assuming a fixed
+    // amount of wall-clock time equals the Wisp's simulated windup time under CI load.
+    await page.waitForFunction(() => {
+      const stone=window.__BRIAR_GLENDebug.getStonepineState();
+      return stone.counters.wispShots >= 1 && stone.bolts >= 1;
+    }, { timeout: 3000 });
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getStonepineState());
     if (state.counters.wispShots < 1 || state.bolts < 1) {
       throw new Error(`${vp.name}: Quarry Wisp ranged shot missing ${JSON.stringify(state)}`);

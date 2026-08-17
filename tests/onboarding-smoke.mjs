@@ -72,8 +72,14 @@ try {
     if(state.startOpen||state.hadSave||state.guide.stage!=='move'||state.guide.complete)throw new Error(`${vp.name}: New Game did not enter a fresh move guide ${JSON.stringify(state)}`);
     if((await page.locator('#attack-btn').evaluate(el=>getComputedStyle(el).visibility))!=='hidden')throw new Error(`${vp.name}: attack should be concealed during movement lesson`);
 
-    await page.keyboard.down('KeyD'); await sleep(420); await page.keyboard.up('KeyD');
-    await page.waitForFunction(()=>window.__BRIAR_GLENDebug.getOnboardingState().guide.stage==='gather');
+    // Keep the real desktop/touch movement path under test, but wait for the actual movement lesson
+    // transition instead of assuming 420ms of wall time always advances enough capped game-loop time.
+    await page.keyboard.down('KeyD');
+    try {
+      await page.waitForFunction(()=>window.__BRIAR_GLENDebug.getOnboardingState().guide.stage==='gather',{timeout:3000});
+    } finally {
+      await page.keyboard.up('KeyD');
+    }
     if((await page.locator('#interact-btn').evaluate(el=>getComputedStyle(el).visibility))!=='visible')throw new Error(`${vp.name}: USE was not revealed for gathering`);
 
     await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setInventory({herb:3});d.setProgress({step:1});});
@@ -119,10 +125,18 @@ try {
       if((await page.locator(selector).evaluate(el=>getComputedStyle(el).visibility))!=='visible')throw new Error(`${vp.name}: ${selector} stayed hidden after guide completion`);
     }
 
-    await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setPlayer({hp:10,maxHp:100});d.teleport(1100,0);});
-    await sleep(80);
+    // Recovery depends on two distinct afterUpdate snapshots: first low HP away from town, then
+    // restored HP back in Briar Glen. Wait for the canonical runtime to observe the armed state
+    // instead of assuming an 80ms wall-clock sleep necessarily contains an update under CI load.
+    const recoveryArmDispatch=await page.evaluate(()=>{
+      const d=window.__BRIAR_GLENDebug;
+      d.setPlayer({hp:10,maxHp:100});
+      d.teleport(1100,0);
+      return d.getRuntimeArchitectureState().dispatchCounts.afterUpdate;
+    });
+    await page.waitForFunction(before=>window.__BRIAR_GLENDebug.getRuntimeArchitectureState().dispatchCounts.afterUpdate>before,recoveryArmDispatch,{timeout:3000});
     await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setPlayer({hp:100});d.teleport(-720,30);});
-    await page.waitForFunction(()=>window.__BRIAR_GLENDebug.getOnboardingState().recoveryCount>=1);
+    await page.waitForFunction(()=>window.__BRIAR_GLENDebug.getOnboardingState().recoveryCount>=1,{timeout:3000});
     if(!(await page.locator('#onboarding21-recovery').isVisible()))throw new Error(`${vp.name}: recovery presentation did not appear`);
 
     const runtime=await page.evaluate(()=>window.__BRIAR_GLENDebug.getRuntimeArchitectureState());
