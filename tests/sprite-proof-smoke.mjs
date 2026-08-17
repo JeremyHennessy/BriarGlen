@@ -9,7 +9,7 @@ const viewports=[
   {name:'desktop',width:1440,height:900,touch:false},
 ];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-const artifactDir=path.resolve('test-artifacts/build27');
+const artifactDir=path.resolve('test-artifacts/build28');
 fs.mkdirSync(artifactDir,{recursive:true});
 const browser=await chromium.launch({headless:true});
 
@@ -21,7 +21,7 @@ async function assertBrowserPaintsSources(page,vpName){
     const out={};
     for(const src of paths){
       const image=new Image();
-      image.src=`${src}?decode27=${Date.now()}-${Math.random()}`;
+      image.src=`${src}?decode28=${Date.now()}-${Math.random()}`;
       await image.decode();
       const c=document.createElement('canvas');c.width=160;c.height=160;
       const g=c.getContext('2d');
@@ -40,22 +40,25 @@ async function assertBrowserPaintsSources(page,vpName){
 }
 
 async function openArt(page,url,label){
-  await page.goto(withParam(url,'canopyRun',`${Date.now()}-${label}`),{waitUntil:'domcontentloaded',timeout:15000});
+  await page.goto(withParam(url,'mosswaterRun',`${Date.now()}-${label}`),{waitUntil:'domcontentloaded',timeout:15000});
   await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getAuthoredArtState&&window.__BRIAR_GLENDebug?.getBuildInfo),{timeout:7000});
   await page.waitForFunction(()=>{const s=window.__BRIAR_GLENDebug.getAuthoredArtState();return s.ready||s.failed;},{timeout:7000});
 }
 
-function assertBuild27State(state,vp){
-  if(state.failed||!state.productionDefault||state.rollbackRequested||state.build25ScopeRequested||state.build26ScopeRequested||!state.expanded||!state.groveExpanded||!state.requested||!state.enabled||!state.ready||state.mode!=='authored-mooncap-canopy')throw new Error(`${vp.name}: Build 27 Mooncap default inactive ${JSON.stringify(state)}`);
-  if(state.cottageTargets?.length!==2)throw new Error(`${vp.name}: Build 27 cottage baseline drifted ${JSON.stringify(state.cottageTargets)}`);
-  if(state.heroTreeTargets?.length!==2||state.greenwayTreeTargets?.length!==6)throw new Error(`${vp.name}: approved Warden/Greenway tree baselines drifted ${JSON.stringify(state)}`);
-  if(state.willowTreeTargets?.length!==2||state.meadowTreeTargets?.length!==2)throw new Error(`${vp.name}: Build 26 clusters drifted ${JSON.stringify(state)}`);
-  if(state.groveTreeTargets?.length!==4)throw new Error(`${vp.name}: Mooncap Canopy must target exactly four Grove trees ${JSON.stringify(state.groveTreeTargets)}`);
-  if(state.authoredTreeTargets?.length!==10)throw new Error(`${vp.name}: total authored tree target count must be ten ${JSON.stringify(state.authoredTreeTargets)}`);
-  if(new Set(state.authoredTreeTargets.map(t=>`${Math.round(t.x)},${Math.round(t.y)}`)).size!==10)throw new Error(`${vp.name}: authored tree target set contains duplicates ${JSON.stringify(state.authoredTreeTargets)}`);
-  const anchors=state.groveTreeTargets.map(t=>t.anchor).sort().join(',');
-  if(anchors!=='grove-entry-deep,grove-entry-west,grove-ruin-east,grove-ruin-west')throw new Error(`${vp.name}: Grove target anchors drifted ${JSON.stringify(state.groveTreeTargets)}`);
-  if(JSON.stringify(state.baseline)!==JSON.stringify(state.current))throw new Error(`${vp.name}: Mooncap rollout mutated gameplay entities ${JSON.stringify(state)}`);
+function assertBuild28State(state,vp){
+  if(state.failed||!state.productionDefault||state.rollbackRequested||state.build25ScopeRequested||state.build26ScopeRequested||state.build27ScopeRequested||!state.expanded||!state.groveExpanded||!state.fenExpanded||!state.requested||!state.enabled||!state.ready||state.mode!=='authored-mosswater-shroud')throw new Error(`${vp.name}: Build 28 Mosswater default inactive ${JSON.stringify(state)}`);
+  if(state.cottageTargets?.length!==2)throw new Error(`${vp.name}: Build 28 cottage baseline drifted ${JSON.stringify(state.cottageTargets)}`);
+  if(state.heroTreeTargets?.length!==2||state.greenwayTreeTargets?.length!==6||state.groveTreeTargets?.length!==4)throw new Error(`${vp.name}: approved prior tree baselines drifted ${JSON.stringify(state)}`);
+  if(state.fenTreeTargets?.length!==4)throw new Error(`${vp.name}: Mosswater Shroud must target exactly four Fen trees ${JSON.stringify(state.fenTreeTargets)}`);
+  if(state.authoredTreeTargets?.length!==14)throw new Error(`${vp.name}: total authored tree target count must be fourteen ${JSON.stringify(state.authoredTreeTargets)}`);
+  if(new Set(state.authoredTreeTargets.map(t=>`${Math.round(t.x)},${Math.round(t.y)}`)).size!==14)throw new Error(`${vp.name}: authored tree target set contains duplicates ${JSON.stringify(state.authoredTreeTargets)}`);
+  const anchors=state.fenTreeTargets.map(t=>t.anchor).sort().join(',');
+  if(anchors!=='fen-crossing-deep,fen-crossing-west,fen-reliquary-east,fen-warden-north')throw new Error(`${vp.name}: Fen target anchors drifted ${JSON.stringify(state.fenTreeTargets)}`);
+  if(JSON.stringify(state.baseline)!==JSON.stringify(state.current))throw new Error(`${vp.name}: Mosswater rollout mutated gameplay entities ${JSON.stringify(state)}`);
+}
+
+function sitesFor(state,targets){
+  return targets.map(t=>state.drawSites?.[`fenTree:${Math.round(t.x)},${Math.round(t.y)}`]).filter(Boolean);
 }
 
 try{
@@ -67,44 +70,44 @@ try{
     page.on('console',m=>{if(m.type()==='error')errors.push(`console: ${m.text()}`);});
     await openArt(page,target,`${vp.name}-default`);
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-    if(build.version!=='27'||build.label!=='Mooncap Canopy')throw new Error(`${vp.name}: incorrect Build 27 metadata ${JSON.stringify(build)}`);
+    if(build.version!=='28'||build.label!=='Mosswater Shroud')throw new Error(`${vp.name}: incorrect Build 28 metadata ${JSON.stringify(build)}`);
     const decode=await assertBrowserPaintsSources(page,vp.name);
     let state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    assertBuild27State(state,vp);
+    assertBuild28State(state,vp);
 
-    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(185,-585));
+    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(1090,-1375));
     await sleep(420);
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    assertBuild27State(state,vp);
-    const entryTargets=state.groveTreeTargets.filter(t=>String(t.anchor).startsWith('grove-entry'));
-    const entrySites=entryTargets.map(t=>state.drawSites?.[`tree:${Math.round(t.x)},${Math.round(t.y)}`]).filter(Boolean);
-    if(entrySites.length<1||entrySites.some(site=>site.variant!=='grove-canopy-tree'||site.draws<1||site.size.w>145||site.size.h>145))throw new Error(`${vp.name}: Mooncap entry canopy did not render cleanly ${JSON.stringify(entrySites)}`);
-    await page.screenshot({path:path.join(artifactDir,`${vp.name}-grove-entry.png`),fullPage:false});
+    assertBuild28State(state,vp);
+    const crossingTargets=state.fenTreeTargets.filter(t=>String(t.anchor).startsWith('fen-crossing'));
+    const crossingSites=sitesFor(state,crossingTargets);
+    if(crossingSites.length<1||crossingSites.some(site=>site.variant!=='fen-shroud-tree'||site.draws<1||site.size.w<55||site.size.w>125||site.size.h<55||site.size.h>125))throw new Error(`${vp.name}: Old Warden Crossing shroud did not render cleanly ${JSON.stringify(crossingSites)}`);
+    await page.screenshot({path:path.join(artifactDir,`${vp.name}-fen-crossing.png`),fullPage:false});
 
-    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(615,-900));
+    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(1640,-1660));
     await sleep(420);
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    assertBuild27State(state,vp);
-    const ruinTargets=state.groveTreeTargets.filter(t=>String(t.anchor).startsWith('grove-ruin'));
-    const ruinSites=ruinTargets.map(t=>state.drawSites?.[`tree:${Math.round(t.x)},${Math.round(t.y)}`]).filter(Boolean);
-    if(ruinSites.length<1||ruinSites.some(site=>site.variant!=='grove-canopy-tree'||site.draws<1||site.size.w>150||site.size.h>150))throw new Error(`${vp.name}: Mooncap ruin canopy did not render cleanly ${JSON.stringify(ruinSites)}`);
-    await page.screenshot({path:path.join(artifactDir,`${vp.name}-grove-ruins.png`),fullPage:false});
+    assertBuild28State(state,vp);
+    const wardenTargets=state.fenTreeTargets.filter(t=>String(t.anchor).startsWith('fen-warden')||String(t.anchor).startsWith('fen-reliquary'));
+    const wardenSites=sitesFor(state,wardenTargets);
+    if(wardenSites.length<1||wardenSites.some(site=>site.variant!=='fen-shroud-tree'||site.draws<1||site.size.w>125||site.size.h>125))throw new Error(`${vp.name}: Drowned Warden/reliquary shroud did not render cleanly ${JSON.stringify(wardenSites)}`);
+    await page.screenshot({path:path.join(artifactDir,`${vp.name}-fen-reliquary.png`),fullPage:false});
 
     const off=await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setAuthoredArtEnabled(false);return d.getAuthoredArtState();});
     const drawsAtDisable=off.draws;
-    if(off.enabled)throw new Error(`${vp.name}: Mooncap debug toggle failed to disable`);
+    if(off.enabled)throw new Error(`${vp.name}: Mosswater debug toggle failed to disable`);
     await sleep(160);
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    if(state.enabled||state.draws!==drawsAtDisable)throw new Error(`${vp.name}: disabled Mooncap renderer continued drawing`);
+    if(state.enabled||state.draws!==drawsAtDisable)throw new Error(`${vp.name}: disabled Mosswater renderer continued drawing`);
     await page.evaluate(()=>window.__BRIAR_GLENDebug.setAuthoredArtEnabled(true));
     await sleep(180);
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    if(!state.enabled||state.draws<=drawsAtDisable)throw new Error(`${vp.name}: Mooncap renderer did not restore`);
+    if(!state.enabled||state.draws<=drawsAtDisable)throw new Error(`${vp.name}: Mosswater renderer did not restore`);
 
     const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));
-    if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Mooncap Canopy caused browser overflow ${JSON.stringify(overflow)}`);
-    if(errors.length)throw new Error(`${vp.name}: Build 27 runtime errors:\n${errors.join('\n')}`);
-    console.log(`PASS ${vp.name}: Build 27 Mooncap entry + ruins canopy active ${JSON.stringify(decode)}`);
+    if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Mosswater Shroud caused browser overflow ${JSON.stringify(overflow)}`);
+    if(errors.length)throw new Error(`${vp.name}: Build 28 runtime errors:\n${errors.join('\n')}`);
+    console.log(`PASS ${vp.name}: Build 28 Old Warden Crossing + reliquary shroud active ${JSON.stringify(decode)}`);
     await context.close();
   }
 }finally{await browser.close();}
