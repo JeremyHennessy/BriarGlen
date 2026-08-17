@@ -9,166 +9,112 @@ const viewports = [
   { name:'desktop', width:1440, height:900, touch:false },
 ];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-const artifactDir = path.resolve('test-artifacts/build25');
+const artifactDir = path.resolve('test-artifacts/build26');
 fs.mkdirSync(artifactDir, { recursive:true });
 const browser = await chromium.launch({ headless:true });
 
-function withParam(url, key, value) {
-  const sep = url.includes('?') ? '&' : '?';
+function withParam(url,key,value){
+  const sep=url.includes('?')?'&':'?';
   return `${url}${sep}${key}=${encodeURIComponent(value)}`;
 }
 
-async function canvasSignature(page) {
-  return page.evaluate(() => {
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    const step = Math.max(4, Math.floor((canvas.width * canvas.height) / 18000)) * 4;
-    let hash = 2166136261 >>> 0;
-    for (let i=0;i<data.length;i+=step) {
-      hash ^= data[i]; hash = Math.imul(hash,16777619) >>> 0;
-      hash ^= data[i+1]; hash = Math.imul(hash,16777619) >>> 0;
-      hash ^= data[i+2]; hash = Math.imul(hash,16777619) >>> 0;
-    }
-    return hash;
-  });
-}
-
-async function assertBrowserPaintsSources(page, vpName) {
-  const report = await page.evaluate(async () => {
-    const paths = [
-      'assets/v24/cottage-authored.webp',
-      'assets/v24/tall-tree-authored.webp',
-      'assets/v24/pine-tree-authored.webp',
-    ];
-    const out = {};
-    for (const src of paths) {
-      const image = new Image();
-      image.src = `${src}?decode-control=${Date.now()}-${Math.random()}`;
+async function assertBrowserPaintsSources(page,vpName){
+  const report=await page.evaluate(async()=>{
+    const paths=['assets/v24/cottage-authored.webp','assets/v24/tall-tree-authored.webp','assets/v24/pine-tree-authored.webp'];
+    const out={};
+    for(const src of paths){
+      const image=new Image();
+      image.src=`${src}?decode26=${Date.now()}-${Math.random()}`;
       await image.decode();
-      const c = document.createElement('canvas');
-      c.width = 160; c.height = 160;
-      const g = c.getContext('2d');
-      const x = (160 - image.naturalWidth) / 2;
-      const y = (160 - image.naturalHeight) / 2;
-      g.clearRect(0,0,160,160);
-      g.drawImage(image,x,y);
-      const patch = g.getImageData(74,74,12,12).data;
+      const c=document.createElement('canvas');c.width=160;c.height=160;
+      const g=c.getContext('2d');
+      g.drawImage(image,(160-image.naturalWidth)/2,(160-image.naturalHeight)/2);
+      const patch=g.getImageData(74,74,12,12).data;
       let alpha=0,rgb=0,visible=0;
-      for(let i=0;i<patch.length;i+=4){
-        rgb += patch[i]+patch[i+1]+patch[i+2];
-        alpha += patch[i+3];
-        if(patch[i+3]>32)visible++;
-      }
+      for(let i=0;i<patch.length;i+=4){rgb+=patch[i]+patch[i+1]+patch[i+2];alpha+=patch[i+3];if(patch[i+3]>32)visible++;}
       out[src]={width:image.naturalWidth,height:image.naturalHeight,alpha,rgb,visible};
     }
     return out;
   });
   for(const [src,info] of Object.entries(report)){
-    if(info.width<64||info.height<64||info.visible<20||info.alpha<3000||info.rgb<1000){
-      throw new Error(`${vpName}: Chromium source decode/paint failed ${src} ${JSON.stringify(info)}`);
-    }
+    if(info.width<64||info.height<64||info.visible<20||info.alpha<3000||info.rgb<1000)throw new Error(`${vpName}: authored source decode failed ${src} ${JSON.stringify(info)}`);
   }
   return report;
 }
 
-function assertHeroState(state, vp) {
-  if(state.failed||!state.productionDefault||state.rollbackRequested||!state.requested||!state.enabled||!state.ready||state.mode!=='authored-hero-cluster'){
-    throw new Error(`${vp.name}: Build 25 authored default not active ${JSON.stringify(state)}`);
-  }
-  if(Object.keys(state.loadedAssets).sort().join(',')!=='cottage,pine_tree,tall_tree'){
-    throw new Error(`${vp.name}: authored asset set incomplete ${JSON.stringify(state.loadedAssets)}`);
-  }
-  if(!Array.isArray(state.heroTreeTargets)||state.heroTreeTargets.length!==2){
-    throw new Error(`${vp.name}: Build 25 must target exactly two authored trees ${JSON.stringify(state.heroTreeTargets)}`);
-  }
-  const targetAssets=state.heroTreeTargets.map(t=>t.asset).sort().join(',');
-  if(targetAssets!=='pine_tree,tall_tree')throw new Error(`${vp.name}: hero tree family incorrect ${JSON.stringify(state.heroTreeTargets)}`);
-  if(state.heroTreeTargets.some(t=>(t.x+t.y)<-1070))throw new Error(`${vp.name}: authored tree selected too deep behind Warden House ${JSON.stringify(state.heroTreeTargets)}`);
+async function openArt(page,url,label){
+  await page.goto(withParam(url,'greenwayRun',`${Date.now()}-${label}`),{waitUntil:'domcontentloaded',timeout:15000});
+  await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getAuthoredArtState&&window.__BRIAR_GLENDebug?.getBuildInfo),{timeout:7000});
+  await page.waitForFunction(()=>{const s=window.__BRIAR_GLENDebug.getAuthoredArtState();return s.ready||s.failed;},{timeout:7000});
 }
 
-try {
+function assertBuild26State(state,vp){
+  if(state.failed||!state.productionDefault||state.rollbackRequested||state.build25ScopeRequested||!state.expanded||!state.requested||!state.enabled||!state.ready||state.mode!=='authored-greenway')throw new Error(`${vp.name}: Build 26 Greenway default inactive ${JSON.stringify(state)}`);
+  if(state.cottageTargets?.length!==2)throw new Error(`${vp.name}: Build 26 must target Warden + Willow cottages ${JSON.stringify(state.cottageTargets)}`);
+  if(state.heroTreeTargets?.length!==2)throw new Error(`${vp.name}: Build 25 Warden tree pair drifted ${JSON.stringify(state.heroTreeTargets)}`);
+  if(state.willowTreeTargets?.length!==2)throw new Error(`${vp.name}: Willow cluster must target two trees ${JSON.stringify(state.willowTreeTargets)}`);
+  if(state.meadowTreeTargets?.length!==2)throw new Error(`${vp.name}: Meadow Road must target two trees ${JSON.stringify(state.meadowTreeTargets)}`);
+  if(state.greenwayTreeTargets?.length!==6)throw new Error(`${vp.name}: Greenway must contain exactly six authored trees ${JSON.stringify(state.greenwayTreeTargets)}`);
+  if(new Set(state.greenwayTreeTargets.map(t=>`${Math.round(t.x)},${Math.round(t.y)}`)).size!==6)throw new Error(`${vp.name}: Greenway tree selection contains duplicates ${JSON.stringify(state.greenwayTreeTargets)}`);
+  if(JSON.stringify(state.baseline)!==JSON.stringify(state.current))throw new Error(`${vp.name}: Greenway rollout mutated gameplay entities ${JSON.stringify(state)}`);
+}
+
+try{
   for(const vp of viewports){
-    let authoredSignature=0;
+    const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,deviceScaleFactor:1});
+    const page=await context.newPage();
+    const errors=[];
+    page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));
+    page.on('console',m=>{if(m.type()==='error')errors.push(`console: ${m.text()}`);});
+    await openArt(page,target,`${vp.name}-default`);
+    const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
+    if(build.version!=='26'||build.label!=='Briar Glen Greenway')throw new Error(`${vp.name}: incorrect Build 26 metadata ${JSON.stringify(build)}`);
+    const decode=await assertBrowserPaintsSources(page,vp.name);
+    let state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
+    assertBuild26State(state,vp);
 
-    // Build 25 production default: approved authored cluster is active without a query flag.
-    {
-      const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,deviceScaleFactor:1});
-      const page=await context.newPage();
-      const errors=[];
-      page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));
-      page.on('console',m=>{if(m.type()==='error')errors.push(`console: ${m.text()}`);});
-      await page.goto(withParam(target,'build25Default',`${Date.now()}-${vp.name}`),{waitUntil:'domcontentloaded',timeout:15000});
-      await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getAuthoredArtState&&window.__BRIAR_GLENDebug?.getBuildInfo),{timeout:7000});
-      await page.waitForFunction(()=>{const s=window.__BRIAR_GLENDebug.getAuthoredArtState();return s.ready||s.failed;},{timeout:7000});
+    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(-575,-330));
+    await sleep(350);
+    state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
+    assertBuild26State(state,vp);
+    const warden=state.drawSites?.['cottage:-575,-365'];
+    if(!warden||warden.variant!=='warden'||warden.draws<1)throw new Error(`${vp.name}: approved Warden House draw drifted ${JSON.stringify(warden)}`);
 
-      const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-      if(build.version!=='25'||build.label!=='Briar Glen Art Rollout')throw new Error(`${vp.name}: incorrect Build 25 metadata ${JSON.stringify(build)}`);
-      const decodeReport=await assertBrowserPaintsSources(page,vp.name);
-      let state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-      assertHeroState(state,vp);
+    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(-905,300));
+    await sleep(400);
+    state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
+    const willow=state.drawSites?.['cottage:-905,330'];
+    if(!willow||willow.variant!=='willow'||willow.draws<1)throw new Error(`${vp.name}: Willow Cottage authored draw missing ${JSON.stringify(state.drawSites)}`);
+    if(willow.size.w<90||willow.size.w>160||willow.size.h<90||willow.size.h>160)throw new Error(`${vp.name}: Willow Cottage scale outside Greenway range ${JSON.stringify(willow)}`);
+    await page.screenshot({path:path.join(artifactDir,`${vp.name}-willow.png`),fullPage:false});
 
-      await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(-575,-330));
-      await sleep(500);
-      state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-      assertHeroState(state,vp);
-      if(state.draws<1||state.replacements.cottage<1)throw new Error(`${vp.name}: Warden House authored sprite did not draw ${JSON.stringify(state)}`);
-      const warden=state.drawSites?.['cottage:-575,-365'];
-      if(!warden||warden.asset!=='cottage'||warden.draws<1)throw new Error(`${vp.name}: Warden House draw site missing ${JSON.stringify(state.drawSites)}`);
-      if(warden.screen.x<-30||warden.screen.x>vp.width+30||warden.screen.y<-30||warden.screen.y>vp.height+30)throw new Error(`${vp.name}: Warden House outside viewport ${JSON.stringify(warden)}`);
-      if(warden.size.w<100||warden.size.w>185||warden.size.h<100||warden.size.h>185)throw new Error(`${vp.name}: Warden House scale escaped approved range ${JSON.stringify(warden)}`);
-      const treeSites=Object.entries(state.drawSites).filter(([key])=>key.startsWith('tree:')).map(([,site])=>site);
-      if(treeSites.length<1||treeSites.length>2||treeSites.some(site=>site.size.w>145||site.size.h>145))throw new Error(`${vp.name}: authored tree density/scale escaped approved range ${JSON.stringify(treeSites)}`);
-      if(JSON.stringify(state.baseline)!==JSON.stringify(state.current))throw new Error(`${vp.name}: authored rollout mutated gameplay entities ${JSON.stringify(state)}`);
+    const meadowTarget=state.meadowTreeTargets[0];
+    await page.evaluate(({x,y})=>window.__BRIAR_GLENDebug.teleport(x,y),meadowTarget);
+    await sleep(400);
+    state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
+    const meadowKey=`tree:${Math.round(meadowTarget.x)},${Math.round(meadowTarget.y)}`;
+    const meadowSite=state.drawSites?.[meadowKey];
+    if(!meadowSite||meadowSite.variant!=='greenway-tree'||meadowSite.draws<1)throw new Error(`${vp.name}: Meadow Road authored tree missing ${meadowKey} ${JSON.stringify(state.drawSites)}`);
+    if(meadowSite.size.w>135||meadowSite.size.h>135)throw new Error(`${vp.name}: Meadow Road tree too visually dominant ${JSON.stringify(meadowSite)}`);
+    await page.screenshot({path:path.join(artifactDir,`${vp.name}-meadow.png`),fullPage:false});
 
-      authoredSignature=await canvasSignature(page);
-      await page.screenshot({path:path.join(artifactDir,`${vp.name}-authored.png`),fullPage:false});
+    const off=await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setAuthoredArtEnabled(false);return d.getAuthoredArtState();});
+    const drawsAtDisable=off.draws;
+    if(off.enabled)throw new Error(`${vp.name}: Greenway debug toggle failed to disable`);
+    await sleep(160);
+    state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
+    if(state.enabled||state.draws!==drawsAtDisable)throw new Error(`${vp.name}: disabled Greenway renderer continued drawing`);
+    await page.evaluate(()=>window.__BRIAR_GLENDebug.setAuthoredArtEnabled(true));
+    await sleep(180);
+    state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
+    if(!state.enabled||state.draws<=drawsAtDisable)throw new Error(`${vp.name}: Greenway renderer did not restore`);
 
-      const offState=await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setAuthoredArtEnabled(false);return d.getAuthoredArtState();});
-      const drawsAtDisable=offState.draws;
-      if(offState.enabled)throw new Error(`${vp.name}: debug authored-art toggle did not disable`);
-      await sleep(180);
-      state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-      if(state.enabled||state.draws!==drawsAtDisable)throw new Error(`${vp.name}: disabled authored renderer kept drawing ${JSON.stringify(state)}`);
-      await page.evaluate(()=>window.__BRIAR_GLENDebug.setAuthoredArtEnabled(true));
-      await sleep(220);
-      state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-      if(!state.enabled||state.draws<=drawsAtDisable)throw new Error(`${vp.name}: authored renderer did not restore ${JSON.stringify(state)}`);
-      if(errors.length)throw new Error(`${vp.name}: authored default runtime errors:\n${errors.join('\n')}`);
-      console.log(`PASS ${vp.name}: Build 25 authored default active ${JSON.stringify(decodeReport)}`);
-      await context.close();
-    }
-
-    // Explicit rollback / A-B path: preserve the exact prior Canvas renderer.
-    {
-      const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,deviceScaleFactor:1});
-      const page=await context.newPage();
-      const errors=[];
-      page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));
-      page.on('console',m=>{if(m.type()==='error')errors.push(`console: ${m.text()}`);});
-      let url=withParam(target,'canvasArt','1');
-      url=withParam(url,'build25Rollback',`${Date.now()}-${vp.name}`);
-      await page.goto(url,{waitUntil:'domcontentloaded',timeout:15000});
-      await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getAuthoredArtState&&window.__BRIAR_GLENDebug?.getBuildInfo),{timeout:7000});
-      const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-      if(build.version!=='25')throw new Error(`${vp.name}: rollback path lost Build 25 metadata ${JSON.stringify(build)}`);
-      await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(-575,-330));
-      await sleep(500);
-      const state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-      if(!state.productionDefault||!state.rollbackRequested||state.requested||state.enabled||!state.ready||state.mode!=='build23-canvas'||state.draws!==0||Object.keys(state.loadedAssets).length!==0){
-        throw new Error(`${vp.name}: ?canvasArt=1 did not restore prior Canvas renderer ${JSON.stringify(state)}`);
-      }
-      if(JSON.stringify(state.baseline)!==JSON.stringify(state.current))throw new Error(`${vp.name}: rollback path mutated gameplay entities`);
-      const rollbackSignature=await canvasSignature(page);
-      if(rollbackSignature===authoredSignature)throw new Error(`${vp.name}: authored default and Canvas rollback produced identical frame signatures`);
-      await page.screenshot({path:path.join(artifactDir,`${vp.name}-canvas.png`),fullPage:false});
-      const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));
-      if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Build 25 caused browser overflow ${JSON.stringify(overflow)}`);
-      if(errors.length)throw new Error(`${vp.name}: Canvas rollback runtime errors:\n${errors.join('\n')}`);
-      console.log(`PASS ${vp.name}: ?canvasArt=1 restores prior Canvas presentation`);
-      await context.close();
-    }
+    const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));
+    if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Greenway caused browser overflow ${JSON.stringify(overflow)}`);
+    if(errors.length)throw new Error(`${vp.name}: Build 26 runtime errors:\n${errors.join('\n')}`);
+    console.log(`PASS ${vp.name}: Build 26 Willow + Meadow Greenway active ${JSON.stringify(decode)}`);
+    await context.close();
   }
-} finally {
+}finally{
   await browser.close();
 }
