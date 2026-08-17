@@ -214,13 +214,14 @@ try {
     }
     await page.locator('#trade-close').click();
 
-    // Charm must alter the actual dash cooldown.
-    await page.evaluate(() => {
+    // Charm must alter the actual dash cooldown. Sample it atomically with dash() so a render/update
+    // frame cannot legitimately decrement 0.82 before the assertion reads the initialized value.
+    economy = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       d.setPlayer({ dashCd: 0, dashTimer: 0 });
       d.dash();
+      return d.getEconomyState();
     });
-    economy = await page.evaluate(() => window.__BRIAR_GLENDebug.getEconomyState());
     if (Math.abs(economy.dashCd - 0.82) > 0.02) {
       throw new Error(`${vp.name}: Rootstep Charm did not alter dodge cooldown: ${economy.dashCd}`);
     }
