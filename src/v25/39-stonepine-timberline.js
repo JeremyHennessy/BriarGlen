@@ -21,12 +21,12 @@
   const defs = {
     tall_tree: {
       src:'assets/v24/tall-tree-authored.webp', width:112, height:112, anchor:.91,
-      filter:'hue-rotate(8deg) saturate(.42) brightness(.68) contrast(1.04) sepia(.10)',
+      filter:'hue-rotate(4deg) saturate(.48) brightness(.78) contrast(1.02) sepia(.12)',
       shadow:[26,12,.16],
     },
     pine_tree: {
       src:'assets/v24/pine-tree-authored.webp', width:118, height:118, anchor:.92,
-      filter:'hue-rotate(-10deg) saturate(.46) brightness(.70) contrast(1.05) sepia(.08)',
+      filter:'hue-rotate(-8deg) saturate(.54) brightness(.82) contrast(1.02) sepia(.10)',
       shadow:[27,13,.17],
     },
   };
