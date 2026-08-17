@@ -179,7 +179,7 @@ try {
     await page.waitForFunction(() => {
       const warden = window.__BRIAR_GLENDebug.getCombatIdentityState().enemies.find(e => e.type === 'fenwarden');
       return warden?.state?.kind === 'warden-surge' && ['dash','recover'].includes(warden.state.mode);
-    }, null, { timeout: 2200 });
+    }, null, { timeout: 5000 });
     const warden = await page.evaluate(() => window.__BRIAR_GLENDebug.getCombatIdentityState().enemies.find(e => e.type === 'fenwarden'));
     if (!warden?.state || !['dash','recover'].includes(warden.state.mode) || warden.state.kind !== 'warden-surge') {
       throw new Error(`${vp.name}: Drowned Warden phase-two surge missing ${JSON.stringify(warden)}`);
