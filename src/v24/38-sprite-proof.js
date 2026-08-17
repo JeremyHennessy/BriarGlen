@@ -1,15 +1,19 @@
 (() => {
   'use strict';
 
-  // Build 26: extend the approved authored art language beyond the Warden House hero cluster.
-  // Default: Warden House + Willow Cottage + six curated trees across Briar Glen / Meadow Road.
-  // ?artScope=build25 restores the exact Build 25 authored Warden cluster.
+  // Build 27: extend the approved authored tree language into Mooncap Grove.
+  // Default: Build 26 Greenway + four curated Grove trees at the entry trail / old Warden ruins.
+  // ?artScope=build26 restores the exact approved Build 26 Greenway.
+  // ?artScope=build25 restores the exact approved Build 25 Warden cluster.
   // ?canvasArt=1 restores the prior Canvas renderer. Gameplay/world state is never mutated.
   const params = new URLSearchParams(location.search);
   const rollbackRequested = params.get('canvasArt') === '1';
-  const build25ScopeRequested = !rollbackRequested && params.get('artScope') === 'build25';
+  const artScope = params.get('artScope') || '';
+  const build25ScopeRequested = !rollbackRequested && artScope === 'build25';
+  const build26ScopeRequested = !rollbackRequested && artScope === 'build26';
   const requested = !rollbackRequested;
   const expanded = requested && !build25ScopeRequested;
+  const groveExpanded = requested && !build25ScopeRequested && !build26ScopeRequested;
   const baseline = {
     objects: worldObjects.length,
     resources: resources.length,
@@ -19,13 +23,21 @@
     requested,
     rollbackRequested,
     build25ScopeRequested,
+    build26ScopeRequested,
     expanded,
+    groveExpanded,
     productionDefault: true,
     enabled: requested,
     ready: !requested,
     failed: false,
     failure: '',
-    mode: rollbackRequested ? 'build23-canvas' : build25ScopeRequested ? 'authored-hero-cluster' : 'authored-greenway',
+    mode: rollbackRequested
+      ? 'build23-canvas'
+      : build25ScopeRequested
+        ? 'authored-hero-cluster'
+        : build26ScopeRequested
+          ? 'authored-greenway'
+          : 'authored-mooncap-canopy',
     assets: {},
     draws: 0,
     fallbackDraws: 0,
@@ -89,12 +101,29 @@
 
   const greenwayTrees = [...build25Trees, ...willowTrees, ...meadowTrees.map(entry => entry.tree)];
   const greenwayTreeSet = new Set(greenwayTrees);
+
+  const groveAnchors = [
+    { x:130, y:-500, asset:'tall_tree', id:'grove-entry-west' },
+    { x:230, y:-660, asset:'pine_tree', id:'grove-entry-deep' },
+    { x:510, y:-930, asset:'tall_tree', id:'grove-ruin-west' },
+    { x:730, y:-980, asset:'pine_tree', id:'grove-ruin-east' },
+  ];
+  const groveUsed = new Set(greenwayTrees);
+  const groveTrees = groveAnchors.map(anchor => {
+    const [tree] = nearestTrees(anchor, 1, groveUsed, 42);
+    if (tree) groveUsed.add(tree);
+    return tree ? { tree, ...anchor } : null;
+  }).filter(Boolean);
+  const groveTreeSet = new Set(groveTrees.map(entry => entry.tree));
+
   const treeAssets = new Map();
   build25Trees.forEach((tree,index) => treeAssets.set(tree,index === 0 ? 'tall_tree' : 'pine_tree'));
   willowTrees.forEach((tree,index) => treeAssets.set(tree,index === 0 ? 'tall_tree' : 'pine_tree'));
   meadowTrees.forEach(entry => treeAssets.set(entry.tree,entry.asset));
+  groveTrees.forEach(entry => treeAssets.set(entry.tree,entry.asset));
 
   function inArtSlice(x, y) {
+    if (groveExpanded && y <= -430 && y >= -1120 && x >= -80 && x <= 900) return true;
     return x >= -1000 && x <= 690 && !(x > -80 && y < -425);
   }
 
@@ -110,6 +139,7 @@
   }
 
   function isAuthoredTree(o) {
+    if (groveExpanded && groveTreeSet.has(o)) return true;
     return expanded ? greenwayTreeSet.has(o) : build25TreeSet.has(o);
   }
 
@@ -125,8 +155,8 @@
         proof.assets[name] = { loaded:true, width:image.naturalWidth, height:image.naturalHeight, image, src:def.src };
         resolve();
       };
-      image.onerror = () => reject(new Error(`Build 26 authored sprite failed to load: ${def.src}`));
-      image.src = `${def.src}?v=26`;
+      image.onerror = () => reject(new Error(`Build 27 authored sprite failed to load: ${def.src}`));
+      image.src = `${def.src}?v=27`;
     });
   }
 
@@ -148,7 +178,7 @@
   }
 
   const priorDrawObject = drawObject;
-  drawObject = function build26AuthoredGreenwayDrawObject(o) {
+  drawObject = function build27AuthoredMooncapDrawObject(o) {
     const cottage = cottageKind(o);
     const authoredTree = isAuthoredTree(o);
     const selected = !!cottage || authoredTree;
@@ -167,21 +197,29 @@
     if (!visible(p)) return;
     const def = defs[assetName];
     const isBuild25Tree = build25TreeSet.has(o);
-    const treeScale = Math.max(.90, Math.min(1.02, .96 + ((o.s || 1) - 1) * .12)) * (isBuild25Tree ? 1 : .90);
+    const isGroveTree = groveTreeSet.has(o);
+    const treeMultiplier = isBuild25Tree ? 1 : isGroveTree ? .94 : .90;
+    const treeScale = Math.max(.90, Math.min(1.02, .96 + ((o.s || 1) - 1) * .12)) * treeMultiplier;
     const cottageScale = cottage === 'willow' ? .89 : 1;
     const scale = camera.zoom * (cottage ? cottageScale : treeScale);
     const w = def.width * scale;
     const h = def.height * scale;
-    const filter = cottage === 'willow'
-      ? 'sepia(.10) saturate(.65) brightness(.83) contrast(.95)'
-      : !cottage && !isBuild25Tree
-        ? assetName === 'tall_tree'
-          ? 'hue-rotate(34deg) saturate(.46) brightness(.72) contrast(.95)'
-          : 'hue-rotate(12deg) saturate(.55) brightness(.76) contrast(.95)'
-        : def.filter;
+    let filter = def.filter;
+    if (cottage === 'willow') {
+      filter = 'sepia(.10) saturate(.65) brightness(.83) contrast(.95)';
+    } else if (!cottage && isGroveTree) {
+      filter = assetName === 'tall_tree'
+        ? 'hue-rotate(52deg) saturate(.47) brightness(.70) contrast(.97)'
+        : 'hue-rotate(32deg) saturate(.52) brightness(.72) contrast(.97)';
+    } else if (!cottage && !isBuild25Tree) {
+      filter = assetName === 'tall_tree'
+        ? 'hue-rotate(34deg) saturate(.46) brightness(.72) contrast(.95)'
+        : 'hue-rotate(12deg) saturate(.55) brightness(.76) contrast(.95)';
+    }
     const shadowScale = cottage ? cottageScale : treeScale;
+    const shadowAlpha = cottage === 'willow' ? .22 : isGroveTree ? .18 : def.shadow[2];
 
-    shadow(o.x, o.y, def.shadow[0] * shadowScale, def.shadow[1] * shadowScale, cottage === 'willow' ? .22 : def.shadow[2]);
+    shadow(o.x, o.y, def.shadow[0] * shadowScale, def.shadow[1] * shadowScale, shadowAlpha);
 
     ctx.save();
     ctx.globalAlpha = .96;
@@ -196,7 +234,7 @@
     const siteKey = `${o.type}:${Math.round(o.x)},${Math.round(o.y)}`;
     proof.drawSites[siteKey] = {
       asset:assetName,
-      variant:cottage || (isBuild25Tree ? 'build25-tree' : 'greenway-tree'),
+      variant:cottage || (isBuild25Tree ? 'build25-tree' : isGroveTree ? 'grove-canopy-tree' : 'greenway-tree'),
       world:{ x:o.x, y:o.y },
       screen:{ x:p.x, y:p.y },
       size:{ w, h },
@@ -221,11 +259,18 @@
   }
 
   function state() {
+    const currentTreeTargets = groveExpanded
+      ? [...greenwayTrees, ...groveTrees.map(entry => entry.tree)]
+      : expanded
+        ? greenwayTrees
+        : build25Trees;
     return {
       requested: proof.requested,
       rollbackRequested: proof.rollbackRequested,
       build25ScopeRequested: proof.build25ScopeRequested,
+      build26ScopeRequested: proof.build26ScopeRequested,
       expanded: proof.expanded,
+      groveExpanded: proof.groveExpanded,
       productionDefault: proof.productionDefault,
       enabled: proof.enabled,
       ready: proof.ready,
@@ -237,6 +282,8 @@
       greenwayTreeTargets: expanded ? greenwayTrees.map(targetRecord) : build25Trees.map(targetRecord),
       willowTreeTargets: expanded ? willowTrees.map(targetRecord) : [],
       meadowTreeTargets: expanded ? meadowTrees.map((entry,index) => ({...targetRecord(entry.tree,index), anchor:entry.id})) : [],
+      groveTreeTargets: groveExpanded ? groveTrees.map((entry,index) => ({...targetRecord(entry.tree,index), anchor:entry.id})) : [],
+      authoredTreeTargets: currentTreeTargets.map(targetRecord),
       loadedAssets: Object.fromEntries(Object.entries(proof.assets).map(([name, value]) => [name, { loaded:value.loaded, width:value.width, height:value.height, src:value.src }])),
       draws: proof.draws,
       fallbackDraws: proof.fallbackDraws,
