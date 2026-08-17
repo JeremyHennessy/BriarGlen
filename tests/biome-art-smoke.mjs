@@ -72,7 +72,7 @@ try {
     }
     const groveOn = await signature(page);
     const groveFrames = state.frames;
-    await sleep(420);
+    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getBiomeArtState().frames >= before + 5, groveFrames, { timeout: 3000 });
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getBiomeArtState());
     if (state.frames - groveFrames < 5) throw new Error(`${vp.name}: Grove renderer cadence stalled`);
     if (JSON.stringify(state.entityCounts) !== JSON.stringify(baselineEntities)) throw new Error(`${vp.name}: Grove renderer mutated entities`);
@@ -99,7 +99,7 @@ try {
     }
     const fenOn = await signature(page);
     const fenFrames = state.frames;
-    await sleep(420);
+    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getBiomeArtState().frames >= before + 5, fenFrames, { timeout: 3000 });
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getBiomeArtState());
     if (state.frames - fenFrames < 5) throw new Error(`${vp.name}: Fen renderer cadence stalled`);
     if (JSON.stringify(state.entityCounts) !== JSON.stringify(baselineEntities)) throw new Error(`${vp.name}: Fen renderer mutated entities`);
