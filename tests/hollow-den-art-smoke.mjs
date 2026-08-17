@@ -60,7 +60,7 @@ try {
       throw new Error(`${vp.name}: Copper Hollow visual identity incomplete ${JSON.stringify(state)}`);
     }
     const hollowOn=await signature(page), hollowFrames=state.frames;
-    await sleep(420);
+    await page.waitForFunction(before=>window.__BRIAR_GLENDebug.getHollowDenArtState().frames>=before+5,hollowFrames,{timeout:3000});
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getHollowDenArtState());
     if(state.frames-hollowFrames<5)throw new Error(`${vp.name}: Hollow renderer cadence stalled`);
     if(JSON.stringify(state.entityCounts)!==JSON.stringify(baseline))throw new Error(`${vp.name}: Hollow renderer mutated entities`);
@@ -77,7 +77,7 @@ try {
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getHollowDenArtState());
     if(!state.zone.includes('EMBERBACK')||state.frame.denGround<12||state.frame.denObjects<1||state.frame.denEnemies<1||state.frame.ambient<2)throw new Error(`${vp.name}: Emberback Den visual identity incomplete ${JSON.stringify(state)}`);
     const denOn=await signature(page),denFrames=state.frames;
-    await sleep(420);
+    await page.waitForFunction(before=>window.__BRIAR_GLENDebug.getHollowDenArtState().frames>=before+5,denFrames,{timeout:3000});
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getHollowDenArtState());
     if(state.frames-denFrames<5)throw new Error(`${vp.name}: Den renderer cadence stalled`);
     if(JSON.stringify(state.entityCounts)!==JSON.stringify(baseline))throw new Error(`${vp.name}: Den renderer mutated entities`);
