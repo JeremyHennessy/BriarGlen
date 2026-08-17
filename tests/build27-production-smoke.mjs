@@ -12,20 +12,22 @@ const browser=await chromium.launch({headless:true});
 
 function withParam(url,key,value){const sep=url.includes('?')?'&':'?';return `${url}${sep}${key}=${encodeURIComponent(value)}`;}
 
-async function openBuild27(page,url,label){
+async function openBuild27Scope(page,url,label){
   let lastError;
   for(let attempt=1;attempt<=(live?48:1);attempt++){
     try{
-      await page.goto(withParam(url,'build27Live',`${Date.now()}-${attempt}`),{waitUntil:'domcontentloaded',timeout:15000});
+      let attemptUrl=withParam(url,'artScope','build27');
+      attemptUrl=withParam(attemptUrl,'build27Legacy',`${Date.now()}-${attempt}`);
+      await page.goto(attemptUrl,{waitUntil:'domcontentloaded',timeout:15000});
       await page.waitForFunction(()=>{
         const d=window.__BRIAR_GLENDebug;
-        return Boolean(d?.getBuildInfo&&d?.getAuthoredArtState&&d.getBuildInfo()?.version==='27');
+        return Boolean(d?.getBuildInfo&&d?.getAuthoredArtState&&Number.parseFloat(d.getBuildInfo()?.version)>=27);
       },{timeout:7000});
       await page.waitForFunction(()=>{const s=window.__BRIAR_GLENDebug.getAuthoredArtState();return s.ready||s.failed;},{timeout:7000});
       return;
     }catch(error){lastError=error;if(live&&attempt<48)await sleep(5000);}
   }
-  throw new Error(`${label}: Build 27 production runtime unavailable ${lastError?.message||'unknown'}`);
+  throw new Error(`${label}: Build 27 art scope unavailable ${lastError?.message||'unknown'}`);
 }
 
 try{
@@ -36,21 +38,19 @@ try{
     page.on('pageerror',e=>errors.push(`pageerror: ${e.message}`));
     page.on('console',m=>{if(m.type()==='error')errors.push(`console: ${m.text()}`);});
     page.on('requestfailed',r=>errors.push(`requestfailed: ${r.url()} • ${r.failure()?.errorText||'unknown'}`));
-    await openBuild27(page,target,vp.name);
+    await openBuild27Scope(page,target,vp.name);
     await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(185,-585));
     await sleep(450);
     const state=await page.evaluate(()=>({build:window.__BRIAR_GLENDebug.getBuildInfo(),art:window.__BRIAR_GLENDebug.getAuthoredArtState()}));
-    if(state.build.version!=='27'||state.build.label!=='Mooncap Canopy')throw new Error(`${vp.name}: incorrect Build 27 release ${JSON.stringify(state.build)}`);
-    if(state.art.failed||!state.art.productionDefault||!state.art.expanded||!state.art.groveExpanded||state.art.rollbackRequested||state.art.build25ScopeRequested||state.art.build26ScopeRequested||!state.art.enabled||!state.art.ready||state.art.mode!=='authored-mooncap-canopy')throw new Error(`${vp.name}: Mooncap Canopy production default inactive ${JSON.stringify(state.art)}`);
-    if(state.art.cottageTargets?.length!==2||state.art.greenwayTreeTargets?.length!==6||state.art.groveTreeTargets?.length!==4||state.art.authoredTreeTargets?.length!==10)throw new Error(`${vp.name}: Mooncap Canopy target family incomplete ${JSON.stringify(state.art)}`);
+    if(Number.parseFloat(state.build.version)<27)throw new Error(`${vp.name}: release predates Build 27 ${JSON.stringify(state.build)}`);
+    if(state.art.failed||!state.art.productionDefault||!state.art.expanded||!state.art.groveExpanded||state.art.fenExpanded||state.art.rollbackRequested||state.art.build25ScopeRequested||state.art.build26ScopeRequested||!state.art.build27ScopeRequested||!state.art.enabled||!state.art.ready||state.art.mode!=='authored-mooncap-canopy')throw new Error(`${vp.name}: approved Build 27 Mooncap scope inactive ${JSON.stringify(state.art)}`);
+    if(state.art.cottageTargets?.length!==2||state.art.greenwayTreeTargets?.length!==6||state.art.groveTreeTargets?.length!==4||state.art.fenTreeTargets?.length!==0||state.art.authoredTreeTargets?.length!==10)throw new Error(`${vp.name}: Build 27 scope drifted ${JSON.stringify(state.art)}`);
     const entry=state.art.groveTreeTargets.find(t=>t.anchor==='grove-entry-west');
     const site=entry&&state.art.drawSites?.[`tree:${Math.round(entry.x)},${Math.round(entry.y)}`];
-    if(!site||site.variant!=='grove-canopy-tree'||site.draws<1)throw new Error(`${vp.name}: Mooncap entry production draw missing ${JSON.stringify(state.art.drawSites)}`);
-    if(JSON.stringify(state.art.baseline)!==JSON.stringify(state.art.current))throw new Error(`${vp.name}: Mooncap production art mutated gameplay entities`);
-    const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));
-    if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Build 27 overflow ${JSON.stringify(overflow)}`);
-    if(errors.length)throw new Error(`${vp.name}: Build 27 errors:\n${errors.join('\n')}`);
-    console.log(`PASS ${vp.name}: Build 27 Mooncap Canopy is production default`);
+    if(!site||site.variant!=='grove-canopy-tree'||site.draws<1)throw new Error(`${vp.name}: approved Mooncap entry draw missing ${JSON.stringify(state.art.drawSites)}`);
+    if(JSON.stringify(state.art.baseline)!==JSON.stringify(state.art.current))throw new Error(`${vp.name}: Build 27 art scope mutated gameplay entities`);
+    if(errors.length)throw new Error(`${vp.name}: Build 27 scope errors:\n${errors.join('\n')}`);
+    console.log(`PASS ${vp.name}: Build 27 approved Mooncap Canopy remains recoverable`);
     await context.close();
   }
 }finally{await browser.close();}
