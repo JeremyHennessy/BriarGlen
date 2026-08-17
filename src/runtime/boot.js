@@ -38,6 +38,7 @@
     'src/v24/38-sprite-proof.js',
     'src/v25/39-stonepine-timberline.js',
     'src/v26/40-copper-ember.js',
+    'src/v27/41-living-cast.js',
     'src/runtime/release-info.js',
   ];
 
