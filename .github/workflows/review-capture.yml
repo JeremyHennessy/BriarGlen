@@ -1,0 +1,37 @@
+name: Build 30 UI review capture
+
+on:
+  pull_request:
+    paths:
+      - 'tests/review-capture.mjs'
+      - '.github/workflows/review-capture.yml'
+  workflow_dispatch:
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-review-http.log 2>&1 &
+          echo $! > /tmp/briarglen-review-http.pid
+          sleep 2
+      - name: Capture Build 30 UI and feature states
+        run: node tests/review-capture.mjs http://127.0.0.1:4173/
+      - name: Upload review screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build30-ui-review-${{ github.sha }}
+          path: test-artifacts/review/**/*.png
+          if-no-files-found: error
+          retention-days: 14
