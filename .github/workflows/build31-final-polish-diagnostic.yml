@@ -1,0 +1,27 @@
+name: Build 31 final polish diagnostic
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/build31-final-polish-diagnostic.yml'
+  workflow_dispatch:
+
+jobs:
+  final-polish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-final-polish-diag.log 2>&1 &
+          sleep 2
+      - name: Run final polish test at all supported viewports
+        run: node tests/final-polish-smoke.mjs http://127.0.0.1:4173/
