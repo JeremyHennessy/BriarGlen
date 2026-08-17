@@ -44,8 +44,12 @@
   };
 
   const HERO_COTTAGE = { x:-575, y:-365 };
+  const HERO_DEPTH = HERO_COTTAGE.x + HERO_COTTAGE.y;
+  // Keep the authored trees beside/forward of the Warden House. A deep-background pine in the
+  // earlier proof aligned with the roof ridge and read as if it were growing out of the cottage.
   const heroTrees = worldObjects
     .filter(o => o.type === 'tree' && Math.hypot(o.x - HERO_COTTAGE.x, o.y - HERO_COTTAGE.y) <= 300)
+    .filter(o => (o.x + o.y) >= HERO_DEPTH - 130)
     .sort((a, b) => Math.hypot(a.x - HERO_COTTAGE.x, a.y - HERO_COTTAGE.y) - Math.hypot(b.x - HERO_COTTAGE.x, b.y - HERO_COTTAGE.y))
     .slice(0, 2);
   const heroTreeSet = new Set(heroTrees);
@@ -80,7 +84,7 @@
         resolve();
       };
       image.onerror = () => reject(new Error(`Build 24.1 sprite failed to load: ${def.src}`));
-      image.src = `${def.src}?v=24.1e`;
+      image.src = `${def.src}?v=24.1f`;
     });
   }
 
@@ -162,7 +166,7 @@
       failure: proof.failure,
       mode: proof.mode,
       heroTreeTargets: heroTrees.map((tree, index) => ({
-        x:tree.x, y:tree.y, asset:heroTreeAssets.get(tree), order:index,
+        x:tree.x, y:tree.y, depth:tree.x + tree.y, asset:heroTreeAssets.get(tree), order:index,
       })),
       loadedAssets: Object.fromEntries(Object.entries(proof.assets).map(([name, value]) => [name, { loaded:value.loaded, width:value.width, height:value.height, src:value.src }])),
       draws: proof.draws,
