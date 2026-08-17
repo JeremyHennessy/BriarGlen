@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120">
+  <defs>
+    <linearGradient id="stone" x1="18" y1="20" x2="135" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8a8a73"/>
+      <stop offset=".48" stop-color="#686b5c"/>
+      <stop offset="1" stop-color="#484c43"/>
+    </linearGradient>
+    <linearGradient id="face" x1="44" y1="38" x2="84" y2="105" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a09b7d"/>
+      <stop offset="1" stop-color="#5b5f51"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 98 22 70 39 47 58 40 72 24 98 28 114 41 136 50 148 81 132 103 37 108Z" fill="url(#stone)" stroke="#3d433a" stroke-width="5"/>
+    <path d="M24 73 47 53 71 50 91 34 113 44 128 62 100 67 79 80 49 82Z" fill="url(#face)" opacity=".82"/>
+    <path d="M39 99 54 80 79 81 99 67 130 64 139 83 126 99Z" fill="#575c50" opacity=".88"/>
+    <path d="M48 82c14-8 22-7 35-14 13-7 23-13 39-12" fill="none" stroke="#b96d48" stroke-width="5" opacity=".9"/>
+    <path d="M55 86c14-8 22-8 33-14" fill="none" stroke="#e19a68" stroke-width="2.4" opacity=".85"/>
+    <path d="M35 59 57 47M91 37l10 15M107 73l19 9" stroke="#c5bea0" stroke-width="2" opacity=".32"/>
+    <ellipse cx="49" cy="104" rx="20" ry="4" fill="#343a32" opacity=".38"/>
+    <ellipse cx="111" cy="102" rx="24" ry="4" fill="#343a32" opacity=".3"/>
+  </g>
+</svg>
