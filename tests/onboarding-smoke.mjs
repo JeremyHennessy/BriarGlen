@@ -119,10 +119,18 @@ try {
       if((await page.locator(selector).evaluate(el=>getComputedStyle(el).visibility))!=='visible')throw new Error(`${vp.name}: ${selector} stayed hidden after guide completion`);
     }
 
-    await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setPlayer({hp:10,maxHp:100});d.teleport(1100,0);});
-    await sleep(80);
+    // Recovery depends on two distinct afterUpdate snapshots: first low HP away from town, then
+    // restored HP back in Briar Glen. Wait for the canonical runtime to observe the armed state
+    // instead of assuming an 80ms wall-clock sleep necessarily contains an update under CI load.
+    const recoveryArmDispatch=await page.evaluate(()=>{
+      const d=window.__BRIAR_GLENDebug;
+      d.setPlayer({hp:10,maxHp:100});
+      d.teleport(1100,0);
+      return d.getRuntimeArchitectureState().dispatchCounts.afterUpdate;
+    });
+    await page.waitForFunction(before=>window.__BRIAR_GLENDebug.getRuntimeArchitectureState().dispatchCounts.afterUpdate>before,recoveryArmDispatch,{timeout:3000});
     await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setPlayer({hp:100});d.teleport(-720,30);});
-    await page.waitForFunction(()=>window.__BRIAR_GLENDebug.getOnboardingState().recoveryCount>=1);
+    await page.waitForFunction(()=>window.__BRIAR_GLENDebug.getOnboardingState().recoveryCount>=1,{timeout:3000});
     if(!(await page.locator('#onboarding21-recovery').isVisible()))throw new Error(`${vp.name}: recovery presentation did not appear`);
 
     const runtime=await page.evaluate(()=>window.__BRIAR_GLENDebug.getRuntimeArchitectureState());
