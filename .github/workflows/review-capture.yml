@@ -5,6 +5,7 @@ on:
     paths:
       - 'tests/review-capture.mjs'
       - 'tests/review-capture-extra.mjs'
+      - 'tests/review-capture-core.mjs'
       - '.github/workflows/review-capture.yml'
   workflow_dispatch:
 
@@ -26,8 +27,8 @@ jobs:
           python3 -m http.server 4173 > /tmp/briarglen-review-http.log 2>&1 &
           echo $! > /tmp/briarglen-review-http.pid
           sleep 2
-      - name: Capture remaining Build 30 UI and feature states
-        run: node tests/review-capture-extra.mjs http://127.0.0.1:4173/
+      - name: Capture core Build 30 HUD Satchel and market states
+        run: node tests/review-capture-core.mjs http://127.0.0.1:4173/
       - name: Upload review screenshots
         if: always()
         uses: actions/upload-artifact@v4
