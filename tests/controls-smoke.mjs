@@ -19,6 +19,17 @@ function projectedDelta(before, after) {
   return { x: (dx - dy) * .78, y: (dx + dy) * .39 };
 }
 
+async function waitForProjectedTravel(page, before, axis) {
+  await page.waitForFunction(({ before, axis }) => {
+    const p = window.__BRIAR_GLENDebug?.getState?.().player;
+    if (!p) return false;
+    const dx = p.x - before.x;
+    const dy = p.y - before.y;
+    const projected = { x: (dx - dy) * .78, y: (dx + dy) * .39 };
+    return axis === 'right' ? projected.x >= 25 : projected.y <= -25;
+  }, { before, axis }, { timeout: 2000, polling: 16 });
+}
+
 try {
   for (const vp of viewports) {
     const context = await browser.newContext({
@@ -87,12 +98,12 @@ try {
       if (!pad) throw new Error(`${vp.name}: movement pad missing`);
       await page.mouse.move(pad.x + pad.width / 2 + pad.width * .28, pad.y + pad.height / 2);
       await page.mouse.down();
-      await page.waitForTimeout(280);
-      await page.mouse.up();
+      try { await waitForProjectedTravel(page, before, 'right'); }
+      finally { await page.mouse.up(); }
     } else {
       await page.keyboard.down('KeyD');
-      await page.waitForTimeout(280);
-      await page.keyboard.up('KeyD');
+      try { await waitForProjectedTravel(page, before, 'right'); }
+      finally { await page.keyboard.up('KeyD'); }
     }
 
     let after = await page.evaluate(() => {
@@ -112,14 +123,15 @@ try {
 
     if (vp.touch) {
       const pad = await page.locator('#move-pad').boundingBox();
+      if (!pad) throw new Error(`${vp.name}: movement pad missing`);
       await page.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2 - pad.height * .28);
       await page.mouse.down();
-      await page.waitForTimeout(280);
-      await page.mouse.up();
+      try { await waitForProjectedTravel(page, before, 'up'); }
+      finally { await page.mouse.up(); }
     } else {
       await page.keyboard.down('KeyW');
-      await page.waitForTimeout(280);
-      await page.keyboard.up('KeyW');
+      try { await waitForProjectedTravel(page, before, 'up'); }
+      finally { await page.keyboard.up('KeyW'); }
     }
 
     after = await page.evaluate(() => {
