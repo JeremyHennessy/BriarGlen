@@ -119,10 +119,7 @@ async function captureOnboarding(vp){
   await page.waitForFunction(()=>window.__BRIAR_GLENDebug.getOnboardingState().startOpen===true,{timeout:5000});
   await shot(page,vp,'00-start-screen','Fresh-game title/start screen with New Game, Continue and sound controls.');
 
-  await Promise.all([
-    page.waitForNavigation({waitUntil:'domcontentloaded'}),
-    page.locator('#onboarding21-new').click(),
-  ]);
+  await page.locator('#onboarding21-new').click({noWaitAfter:true});
   await page.waitForFunction(()=>window.__BRIAR_GLENDebug?.getOnboardingState?.().guide?.stage==='move',{timeout:7000});
   await shot(page,vp,'01-onboarding-movement','First-session movement lesson with progressive control reveal.');
 
