@@ -36,16 +36,18 @@ jobs:
         run: node tests/build28-production-smoke.mjs http://127.0.0.1:4173/
       - name: Test Build 29 approved Stonepine scope
         run: node tests/build29-production-smoke.mjs http://127.0.0.1:4173/
-      - name: Test Build 30 Copper Hollow and Emberback Den authored props
-        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
-      - name: Test Build 30 production art gate
+      - name: Test Build 30 approved Copper & Ember scope
         run: node tests/build30-production-smoke.mjs http://127.0.0.1:4173/
-      - name: Upload Build 30 Copper & Ember screenshots
+      - name: Test Build 31 Living Cast player and creature proof
+        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
+      - name: Test Build 31 production cast gate
+        run: node tests/build31-production-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload Build 31 Living Cast screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build30-copper-ember-${{ github.sha }}
-          path: test-artifacts/build30/*.png
+          name: build31-living-cast-${{ github.sha }}
+          path: test-artifacts/build31/*.png
           if-no-files-found: warn
           retention-days: 14
       - name: Test repository build in browser
@@ -105,3 +107,4 @@ jobs:
           node tests/build28-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/build29-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           node tests/build30-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          node tests/build31-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
