@@ -101,6 +101,11 @@ try {
       for (const [name, info] of Object.entries(state.loadedAssets)) {
         if (!info.loaded || info.width < 64 || info.height < 64 || !String(info.src).endsWith('.webp')) throw new Error(`${vp.name}: invalid WebP sprite ${name} ${JSON.stringify(info)}`);
       }
+      if (!Array.isArray(state.heroTreeTargets) || state.heroTreeTargets.length !== 2) {
+        throw new Error(`${vp.name}: hero cluster must target exactly two authored trees ${JSON.stringify(state.heroTreeTargets)}`);
+      }
+      const targetAssets = state.heroTreeTargets.map(target => target.asset).sort().join(',');
+      if (targetAssets !== 'pine_tree,tall_tree') throw new Error(`${vp.name}: hero tree family incorrect ${JSON.stringify(state.heroTreeTargets)}`);
 
       await page.evaluate(() => window.__BRIAR_GLENDebug.teleport(-575, -330));
       await sleep(500);
@@ -112,6 +117,12 @@ try {
       if (wardenSite.screen.x < -30 || wardenSite.screen.x > vp.width + 30 || wardenSite.screen.y < -30 || wardenSite.screen.y > vp.height + 30) {
         throw new Error(`${vp.name}: Warden House authored sprite anchored outside viewport ${JSON.stringify(wardenSite)}`);
       }
+      if (wardenSite.size.w < 100 || wardenSite.size.w > 185 || wardenSite.size.h < 100 || wardenSite.size.h > 185) {
+        throw new Error(`${vp.name}: Warden House authored scale escaped tuned range ${JSON.stringify(wardenSite)}`);
+      }
+      const treeSites = Object.entries(state.drawSites).filter(([key]) => key.startsWith('tree:')).map(([,site]) => site);
+      if (treeSites.length < 1 || treeSites.length > 2) throw new Error(`${vp.name}: hero tree density escaped tuned range ${JSON.stringify(treeSites)}`);
+      if (treeSites.some(site => site.size.w > 145 || site.size.h > 145)) throw new Error(`${vp.name}: authored tree scale too dominant ${JSON.stringify(treeSites)}`);
       if (JSON.stringify(state.baseline) !== JSON.stringify(state.current)) throw new Error(`${vp.name}: sprite proof mutated gameplay entities ${JSON.stringify(state)}`);
 
       const offState = await page.evaluate(() => {
@@ -136,7 +147,7 @@ try {
       if (overflow.sw > overflow.iw + 1 || overflow.sh > overflow.ih + 1) throw new Error(`${vp.name}: sprite proof caused browser overflow ${JSON.stringify(overflow)}`);
       if (errors.length) throw new Error(`${vp.name}: proof runtime errors:\n${errors.join('\n')}`);
 
-      console.log(`PASS ${vp.name}: WebP decode + Warden hero-cluster proof active without gameplay mutation ${JSON.stringify(decodeReport)}`);
+      console.log(`PASS ${vp.name}: tuned WebP hero cluster active without gameplay mutation ${JSON.stringify(decodeReport)}`);
       await context.close();
     }
   }
