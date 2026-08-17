@@ -1,8 +1,8 @@
 (() => {
   'use strict';
   const BUILD_INFO = Object.freeze({
-    version:'27',
-    label:'Mooncap Canopy',
+    version:'28',
+    label:'Mosswater Shroud',
     saveKey:'briar-glen-vslice-v1',
     schema:1,
     runtime:'canonical-manifest-hooks-v1',

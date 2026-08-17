@@ -1,8 +1,9 @@
 (() => {
   'use strict';
 
-  // Build 27: extend the approved authored tree language into Mooncap Grove.
-  // Default: Build 26 Greenway + four curated Grove trees at the entry trail / old Warden ruins.
+  // Build 28: extend the approved authored tree language into Mosswater Fen.
+  // Default: Build 27 Mooncap Canopy + four curated Fen trees at Old Warden Crossing / Drowned Warden corridor.
+  // ?artScope=build27 restores the exact approved Build 27 Mooncap Canopy.
   // ?artScope=build26 restores the exact approved Build 26 Greenway.
   // ?artScope=build25 restores the exact approved Build 25 Warden cluster.
   // ?canvasArt=1 restores the prior Canvas renderer. Gameplay/world state is never mutated.
@@ -11,9 +12,11 @@
   const artScope = params.get('artScope') || '';
   const build25ScopeRequested = !rollbackRequested && artScope === 'build25';
   const build26ScopeRequested = !rollbackRequested && artScope === 'build26';
+  const build27ScopeRequested = !rollbackRequested && artScope === 'build27';
   const requested = !rollbackRequested;
   const expanded = requested && !build25ScopeRequested;
   const groveExpanded = requested && !build25ScopeRequested && !build26ScopeRequested;
+  const fenExpanded = requested && !build25ScopeRequested && !build26ScopeRequested && !build27ScopeRequested;
   const baseline = {
     objects: worldObjects.length,
     resources: resources.length,
@@ -24,8 +27,10 @@
     rollbackRequested,
     build25ScopeRequested,
     build26ScopeRequested,
+    build27ScopeRequested,
     expanded,
     groveExpanded,
+    fenExpanded,
     productionDefault: true,
     enabled: requested,
     ready: !requested,
@@ -37,7 +42,9 @@
         ? 'authored-hero-cluster'
         : build26ScopeRequested
           ? 'authored-greenway'
-          : 'authored-mooncap-canopy',
+          : build27ScopeRequested
+            ? 'authored-mooncap-canopy'
+            : 'authored-mosswater-shroud',
     assets: {},
     draws: 0,
     fallbackDraws: 0,
@@ -116,13 +123,29 @@
   }).filter(Boolean);
   const groveTreeSet = new Set(groveTrees.map(entry => entry.tree));
 
+  const fenAnchors = [
+    { x:1010, y:-1330, asset:'tall_tree', id:'fen-crossing-west' },
+    { x:1190, y:-1435, asset:'pine_tree', id:'fen-crossing-deep' },
+    { x:1580, y:-1550, asset:'tall_tree', id:'fen-warden-north' },
+    { x:1780, y:-1690, asset:'pine_tree', id:'fen-reliquary-east' },
+  ];
+  const fenTrees = fenAnchors.map(anchor => {
+    const tree = worldObjects
+      .filter(o => o.type === 'fenTree')
+      .sort((a,b) => Math.hypot(a.x-anchor.x,a.y-anchor.y) - Math.hypot(b.x-anchor.x,b.y-anchor.y))[0];
+    return tree && Math.hypot(tree.x-anchor.x,tree.y-anchor.y) <= 10 ? { tree, ...anchor } : null;
+  }).filter(Boolean);
+  const fenTreeSet = new Set(fenTrees.map(entry => entry.tree));
+
   const treeAssets = new Map();
   build25Trees.forEach((tree,index) => treeAssets.set(tree,index === 0 ? 'tall_tree' : 'pine_tree'));
   willowTrees.forEach((tree,index) => treeAssets.set(tree,index === 0 ? 'tall_tree' : 'pine_tree'));
   meadowTrees.forEach(entry => treeAssets.set(entry.tree,entry.asset));
   groveTrees.forEach(entry => treeAssets.set(entry.tree,entry.asset));
+  fenTrees.forEach(entry => treeAssets.set(entry.tree,entry.asset));
 
   function inArtSlice(x, y) {
+    if (fenExpanded && y <= -1180 && y >= -2100 && x >= 880 && x <= 2200) return true;
     if (groveExpanded && y <= -430 && y >= -1120 && x >= -80 && x <= 900) return true;
     return x >= -1000 && x <= 690 && !(x > -80 && y < -425);
   }
@@ -139,6 +162,7 @@
   }
 
   function isAuthoredTree(o) {
+    if (fenExpanded && fenTreeSet.has(o)) return true;
     if (groveExpanded && groveTreeSet.has(o)) return true;
     return expanded ? greenwayTreeSet.has(o) : build25TreeSet.has(o);
   }
@@ -155,8 +179,8 @@
         proof.assets[name] = { loaded:true, width:image.naturalWidth, height:image.naturalHeight, image, src:def.src };
         resolve();
       };
-      image.onerror = () => reject(new Error(`Build 27 authored sprite failed to load: ${def.src}`));
-      image.src = `${def.src}?v=27`;
+      image.onerror = () => reject(new Error(`Build 28 authored sprite failed to load: ${def.src}`));
+      image.src = `${def.src}?v=28`;
     });
   }
 
@@ -178,7 +202,7 @@
   }
 
   const priorDrawObject = drawObject;
-  drawObject = function build27AuthoredMooncapDrawObject(o) {
+  drawObject = function build28AuthoredMosswaterDrawObject(o) {
     const cottage = cottageKind(o);
     const authoredTree = isAuthoredTree(o);
     const selected = !!cottage || authoredTree;
@@ -198,7 +222,8 @@
     const def = defs[assetName];
     const isBuild25Tree = build25TreeSet.has(o);
     const isGroveTree = groveTreeSet.has(o);
-    const treeMultiplier = isBuild25Tree ? 1 : isGroveTree ? .94 : .90;
+    const isFenTree = fenTreeSet.has(o);
+    const treeMultiplier = isBuild25Tree ? 1 : isGroveTree ? .94 : isFenTree ? .82 : .90;
     const treeScale = Math.max(.90, Math.min(1.02, .96 + ((o.s || 1) - 1) * .12)) * treeMultiplier;
     const cottageScale = cottage === 'willow' ? .89 : 1;
     const scale = camera.zoom * (cottage ? cottageScale : treeScale);
@@ -207,6 +232,10 @@
     let filter = def.filter;
     if (cottage === 'willow') {
       filter = 'sepia(.10) saturate(.65) brightness(.83) contrast(.95)';
+    } else if (!cottage && isFenTree) {
+      filter = assetName === 'tall_tree'
+        ? 'hue-rotate(78deg) saturate(.32) brightness(.62) contrast(1.02)'
+        : 'hue-rotate(62deg) saturate(.34) brightness(.64) contrast(1.02)';
     } else if (!cottage && isGroveTree) {
       filter = assetName === 'tall_tree'
         ? 'hue-rotate(52deg) saturate(.47) brightness(.70) contrast(.97)'
@@ -217,12 +246,12 @@
         : 'hue-rotate(12deg) saturate(.55) brightness(.76) contrast(.95)';
     }
     const shadowScale = cottage ? cottageScale : treeScale;
-    const shadowAlpha = cottage === 'willow' ? .22 : isGroveTree ? .18 : def.shadow[2];
+    const shadowAlpha = cottage === 'willow' ? .22 : isFenTree ? .14 : isGroveTree ? .18 : def.shadow[2];
 
     shadow(o.x, o.y, def.shadow[0] * shadowScale, def.shadow[1] * shadowScale, shadowAlpha);
 
     ctx.save();
-    ctx.globalAlpha = .96;
+    ctx.globalAlpha = isFenTree ? .91 : .96;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.filter = filter;
@@ -234,7 +263,7 @@
     const siteKey = `${o.type}:${Math.round(o.x)},${Math.round(o.y)}`;
     proof.drawSites[siteKey] = {
       asset:assetName,
-      variant:cottage || (isBuild25Tree ? 'build25-tree' : isGroveTree ? 'grove-canopy-tree' : 'greenway-tree'),
+      variant:cottage || (isBuild25Tree ? 'build25-tree' : isFenTree ? 'fen-shroud-tree' : isGroveTree ? 'grove-canopy-tree' : 'greenway-tree'),
       world:{ x:o.x, y:o.y },
       screen:{ x:p.x, y:p.y },
       size:{ w, h },
@@ -259,18 +288,23 @@
   }
 
   function state() {
-    const currentTreeTargets = groveExpanded
+    const baseTargets = groveExpanded
       ? [...greenwayTrees, ...groveTrees.map(entry => entry.tree)]
       : expanded
         ? greenwayTrees
         : build25Trees;
+    const currentTreeTargets = fenExpanded
+      ? [...baseTargets, ...fenTrees.map(entry => entry.tree)]
+      : baseTargets;
     return {
       requested: proof.requested,
       rollbackRequested: proof.rollbackRequested,
       build25ScopeRequested: proof.build25ScopeRequested,
       build26ScopeRequested: proof.build26ScopeRequested,
+      build27ScopeRequested: proof.build27ScopeRequested,
       expanded: proof.expanded,
       groveExpanded: proof.groveExpanded,
+      fenExpanded: proof.fenExpanded,
       productionDefault: proof.productionDefault,
       enabled: proof.enabled,
       ready: proof.ready,
@@ -283,6 +317,7 @@
       willowTreeTargets: expanded ? willowTrees.map(targetRecord) : [],
       meadowTreeTargets: expanded ? meadowTrees.map((entry,index) => ({...targetRecord(entry.tree,index), anchor:entry.id})) : [],
       groveTreeTargets: groveExpanded ? groveTrees.map((entry,index) => ({...targetRecord(entry.tree,index), anchor:entry.id})) : [],
+      fenTreeTargets: fenExpanded ? fenTrees.map((entry,index) => ({...targetRecord(entry.tree,index), anchor:entry.id})) : [],
       authoredTreeTargets: currentTreeTargets.map(targetRecord),
       loadedAssets: Object.fromEntries(Object.entries(proof.assets).map(([name, value]) => [name, { loaded:value.loaded, width:value.width, height:value.height, src:value.src }])),
       draws: proof.draws,
