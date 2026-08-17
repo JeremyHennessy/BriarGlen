@@ -35,6 +35,7 @@
     'src/v21/35-onboarding.js',
     'src/v22/36-balance-pacing.js',
     'src/v23/37-final-polish.js',
+    'src/v24/38-sprite-proof.js',
     'src/runtime/release-info.js',
   ];
 
