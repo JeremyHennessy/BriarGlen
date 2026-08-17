@@ -1,0 +1,35 @@
+name: Product review Quarry Sentinel screenshots
+
+on:
+  push:
+    branches: [agent/review-full-ui-feature-audit-20260817]
+  workflow_dispatch:
+
+jobs:
+  capture-sentinel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-review-sentinel-http.log 2>&1 &
+          echo $! > /tmp/briarglen-review-sentinel-http.pid
+          sleep 2
+      - name: Capture corrected Quarry Sentinel screens
+        run: node tests/product-review-sentinel-capture.mjs http://127.0.0.1:4173/
+      - name: Upload Sentinel screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: briar-glen-product-review-sentinel-${{ github.sha }}
+          path: test-artifacts/product-review-sentinel/**
+          if-no-files-found: error
+          retention-days: 14
