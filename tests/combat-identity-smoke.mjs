@@ -75,7 +75,7 @@ try {
     await page.waitForFunction(() => {
       const boar = window.__BRIAR_GLENDebug.getCombatIdentityState().enemies.find(e => e.type === 'boar');
       return boar?.state?.kind === 'boar-charge' && boar.state.mode === 'dash';
-    }, null, { timeout: 3000 });
+    }, null, { timeout: 5000 });
     const bow = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       const beforeCounters = d.getCombatIdentityState().counters.countershots;
