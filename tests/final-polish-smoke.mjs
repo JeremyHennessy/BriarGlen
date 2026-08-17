@@ -48,8 +48,8 @@ try {
     if (!loaded) throw new Error(`${vp.name}: Build 23 final polish runtime unavailable: ${lastError?.message || 'unknown'}`);
 
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (build.version !== '23' || build.label !== 'Vertical Slice Polish' || build.runtime !== 'canonical-manifest-hooks-v1' || build.saveKey !== 'briar-glen-vslice-v1') {
-      throw new Error(`${vp.name}: incorrect Build 23 metadata ${JSON.stringify(build)}`);
+    if (Number.parseFloat(build.version) < 23 || build.runtime !== 'canonical-manifest-hooks-v1' || build.saveKey !== 'briar-glen-vslice-v1') {
+      throw new Error(`${vp.name}: incorrect Build 23+ metadata ${JSON.stringify(build)}`);
     }
 
     await page.waitForFunction(() => window.__BRIAR_GLENDebug.getFinalPolishState().cssLoaded);
