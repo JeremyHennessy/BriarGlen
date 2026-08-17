@@ -1,9 +1,12 @@
 (() => {
   'use strict';
 
-  // Build 24.1 proof: opt-in authored sprite integration for one Briar Glen hero cluster.
-  // Disabled by default. No world entities, blockers, saves, combat, progression or UI are mutated.
-  const requested = new URLSearchParams(location.search).get('spriteProof') === '1';
+  // Build 25: production rollout of the user-approved Warden House authored hero cluster.
+  // Authored presentation is now the default. ?canvasArt=1 restores the prior Build 23 Canvas renderer.
+  // No world entities, blockers, saves, combat, progression, economy or UI are mutated.
+  const params = new URLSearchParams(location.search);
+  const rollbackRequested = params.get('canvasArt') === '1';
+  const requested = !rollbackRequested;
   const baseline = {
     objects: worldObjects.length,
     resources: resources.length,
@@ -11,6 +14,8 @@
   };
   const proof = {
     requested,
+    rollbackRequested,
+    productionDefault: true,
     enabled: requested,
     ready: !requested,
     failed: false,
@@ -24,10 +29,10 @@
     baseline,
   };
 
-  document.documentElement.dataset.spriteProof = requested ? 'loading' : 'off';
+  document.documentElement.dataset.spriteProof = requested ? 'loading' : 'canvas-rollback';
+  document.documentElement.dataset.briarGlenArtRollout = requested ? 'authored-hero-cluster' : 'build23-canvas';
 
-  // World-size values are intentionally conservative. The first working WebP proof showed that
-  // source-art quality was correct but its visual mass overwhelmed the current Canvas world.
+  // These world sizes and grades are the user-approved Build 24.1 visual checkpoint.
   const defs = {
     cottage: {
       src:'assets/v24/cottage-authored.webp', width:160, height:160, anchor:.84,
@@ -45,8 +50,6 @@
 
   const HERO_COTTAGE = { x:-575, y:-365 };
   const HERO_DEPTH = HERO_COTTAGE.x + HERO_COTTAGE.y;
-  // Keep the authored trees beside/forward of the Warden House. A deep-background pine in the
-  // earlier proof aligned with the roof ridge and read as if it were growing out of the cottage.
   const heroTrees = worldObjects
     .filter(o => o.type === 'tree' && Math.hypot(o.x - HERO_COTTAGE.x, o.y - HERO_COTTAGE.y) <= 300)
     .filter(o => (o.x + o.y) >= HERO_DEPTH - 130)
@@ -83,8 +86,8 @@
         proof.assets[name] = { loaded:true, width:image.naturalWidth, height:image.naturalHeight, image, src:def.src };
         resolve();
       };
-      image.onerror = () => reject(new Error(`Build 24.1 sprite failed to load: ${def.src}`));
-      image.src = `${def.src}?v=24.1f`;
+      image.onerror = () => reject(new Error(`Build 25 authored sprite failed to load: ${def.src}`));
+      image.src = `${def.src}?v=25`;
     });
   }
 
@@ -100,12 +103,13 @@
         proof.ready = false;
         proof.enabled = false;
         document.documentElement.dataset.spriteProof = 'failed';
+        document.documentElement.dataset.briarGlenArtRollout = 'failed';
         console.error(error);
       });
   }
 
   const build23DrawObject = drawObject;
-  drawObject = function build241SpriteProofDrawObject(o) {
+  drawObject = function build25AuthoredHeroDrawObject(o) {
     const selected = isHeroCottage(o) || isHeroTree(o);
     if (!proof.enabled || !proof.ready || !selected || !inProofSlice(o.x, o.y)) {
       return build23DrawObject(o);
@@ -157,9 +161,11 @@
     };
   }
 
-  if (window.__BRIAR_GLENDebug) {
-    window.__BRIAR_GLENDebug.getSpriteProofState = () => ({
+  function state() {
+    return {
       requested: proof.requested,
+      rollbackRequested: proof.rollbackRequested,
+      productionDefault: proof.productionDefault,
       enabled: proof.enabled,
       ready: proof.ready,
       failed: proof.failed,
@@ -182,10 +188,17 @@
       }])),
       baseline: { ...proof.baseline },
       current: currentCounts(),
-    });
+    };
+  }
+
+  if (window.__BRIAR_GLENDebug) {
+    window.__BRIAR_GLENDebug.getSpriteProofState = state;
+    window.__BRIAR_GLENDebug.getAuthoredArtState = state;
     window.__BRIAR_GLENDebug.setSpriteProofEnabled = value => {
-      proof.enabled = proof.requested && proof.ready && !!value;
+      proof.enabled = !proof.rollbackRequested && proof.ready && !!value;
+      document.documentElement.dataset.briarGlenArtRollout = proof.enabled ? 'authored-hero-cluster' : 'build23-canvas';
       return proof.enabled;
     };
+    window.__BRIAR_GLENDebug.setAuthoredArtEnabled = window.__BRIAR_GLENDebug.setSpriteProofEnabled;
   }
 })();
