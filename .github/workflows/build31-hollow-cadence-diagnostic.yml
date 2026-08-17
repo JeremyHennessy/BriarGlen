@@ -1,0 +1,31 @@
+name: Build 31 Hollow cadence diagnostic
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/build31-hollow-cadence-diagnostic.yml'
+  workflow_dispatch:
+
+jobs:
+  hollow-cadence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-hollow-diag.log 2>&1 &
+          sleep 2
+      - name: Repeat unchanged Hollow/Den renderer cadence test
+        run: |
+          for i in 1 2 3 4 5; do
+            echo "=== unchanged hollow-den run $i ==="
+            node tests/hollow-den-art-smoke.mjs http://127.0.0.1:4173/
+          done
