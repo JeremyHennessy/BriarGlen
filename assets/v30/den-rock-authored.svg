@@ -1,22 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120">
   <defs>
-    <linearGradient id="basalt" x1="24" y1="24" x2="134" y2="105" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#5b4b46"/>
-      <stop offset=".45" stop-color="#403838"/>
-      <stop offset="1" stop-color="#29282a"/>
+    <linearGradient id="rearBasalt" x1="25" y1="21" x2="122" y2="105" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#65524c"/>
+      <stop offset=".48" stop-color="#433b3b"/>
+      <stop offset="1" stop-color="#272629"/>
     </linearGradient>
-    <linearGradient id="heat" x1="55" y1="42" x2="107" y2="86" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ffbf6a"/>
-      <stop offset=".5" stop-color="#e46a3f"/>
-      <stop offset="1" stop-color="#7f3028"/>
+    <linearGradient id="frontBasalt" x1="42" y1="54" x2="112" y2="111" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#534542"/>
+      <stop offset="1" stop-color="#2d2b2e"/>
+    </linearGradient>
+    <linearGradient id="heat" x1="54" y1="39" x2="106" y2="91" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffc276"/>
+      <stop offset=".45" stop-color="#e86d43"/>
+      <stop offset="1" stop-color="#87352c"/>
     </linearGradient>
   </defs>
   <g stroke-linecap="round" stroke-linejoin="round">
-    <path d="M14 98 21 69 43 40 68 34 80 20 105 30 124 44 143 70 137 98 112 108 39 108Z" fill="url(#basalt)" stroke="#251f20" stroke-width="5"/>
-    <path d="M30 76 52 48 78 45 101 35 124 50 136 73 109 78 88 93 55 88Z" fill="#66504a" opacity=".45"/>
-    <path d="M58 43 69 59 61 73 78 86 92 72 103 83" fill="none" stroke="#6f2c28" stroke-width="8" opacity=".8"/>
-    <path d="M58 43 69 59 61 73 78 86 92 72 103 83" fill="none" stroke="url(#heat)" stroke-width="3.2"/>
-    <path d="M102 39 94 56 108 66" fill="none" stroke="#df653e" stroke-width="2.5" opacity=".75"/>
-    <path d="M36 61 52 51M110 89l17-7" stroke="#ad8170" stroke-width="2" opacity=".25"/>
+    <!-- Three separate basalt masses create a craggy volcanic cluster rather than one rune-shaped slab. -->
+    <path d="M18 98 22 73 34 52 48 46 56 27 72 18 85 31 88 50 79 71 66 93Z"
+          fill="url(#rearBasalt)" stroke="#211e20" stroke-width="4.5"/>
+    <path d="M61 101 66 71 77 54 87 37 102 31 116 44 120 62 112 82 101 104Z"
+          fill="#4b3f3e" stroke="#211e20" stroke-width="4.5"/>
+    <path d="M92 104 104 78 119 66 134 68 145 83 142 102 128 110 107 109Z"
+          fill="url(#frontBasalt)" stroke="#211e20" stroke-width="4"/>
+
+    <!-- Facet planes make the stones feel carved by heat and pressure. -->
+    <path d="M30 70 43 51 57 45 69 28 77 42 70 62 55 73Z" fill="#7b6157" opacity=".32"/>
+    <path d="M74 74 84 56 96 40 108 47 111 63 98 71 87 88Z" fill="#6a504a" opacity=".28"/>
+    <path d="M108 88 120 72 133 74 141 84 130 91 119 104Z" fill="#604843" opacity=".34"/>
+
+    <!-- Heat cracks are short, branching fractures embedded inside individual rocks. -->
+    <path d="M55 42 61 54 56 64 65 72" fill="none" stroke="#6d2d29" stroke-width="6" opacity=".76"/>
+    <path d="M55 42 61 54 56 64 65 72" fill="none" stroke="url(#heat)" stroke-width="2.6"/>
+    <path d="M92 50 98 61 94 70 103 77" fill="none" stroke="#6d2d29" stroke-width="5.5" opacity=".72"/>
+    <path d="M92 50 98 61 94 70 103 77" fill="none" stroke="url(#heat)" stroke-width="2.3"/>
+    <path d="M123 77 128 84 125 91" fill="none" stroke="#c75237" stroke-width="2.2" opacity=".8"/>
+
+    <!-- Chips and subdued highlights keep the forms geological instead of icon-like. -->
+    <path d="M38 54 49 48M74 31l6 8M101 43l8 5M118 75l10 4"
+          stroke="#ac7c6c" stroke-width="1.8" opacity=".2"/>
+    <path d="M15 106 22 99 31 103 30 111 20 113Z" fill="#383335" stroke="#211e20" stroke-width="2.5"/>
+    <path d="M137 108 144 102 152 106 149 113 141 115Z" fill="#332f31" stroke="#211e20" stroke-width="2.5"/>
+    <ellipse cx="82" cy="109" rx="53" ry="5" fill="#171719" opacity=".3"/>
   </g>
 </svg>
