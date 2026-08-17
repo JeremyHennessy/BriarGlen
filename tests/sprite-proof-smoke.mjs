@@ -60,7 +60,6 @@ async function assertBrowserPaintsSources(page, vpName) {
 
 try {
   for (const vp of viewports) {
-    // Control: ordinary Build 23 path remains unchanged and does not request authored files.
     {
       const context = await browser.newContext({ viewport:{ width:vp.width, height:vp.height }, hasTouch:vp.touch, deviceScaleFactor:1 });
       const page = await context.newPage();
@@ -78,7 +77,6 @@ try {
       await context.close();
     }
 
-    // Opt-in proof: prove source bytes paint in Chromium before testing the world renderer.
     {
       const context = await browser.newContext({ viewport:{ width:vp.width, height:vp.height }, hasTouch:vp.touch, deviceScaleFactor:1 });
       const page = await context.newPage();
@@ -106,6 +104,9 @@ try {
       }
       const targetAssets = state.heroTreeTargets.map(target => target.asset).sort().join(',');
       if (targetAssets !== 'pine_tree,tall_tree') throw new Error(`${vp.name}: hero tree family incorrect ${JSON.stringify(state.heroTreeTargets)}`);
+      if (state.heroTreeTargets.some(target => (target.x + target.y) < -1070)) {
+        throw new Error(`${vp.name}: authored tree selected too deep behind Warden House ${JSON.stringify(state.heroTreeTargets)}`);
+      }
 
       await page.evaluate(() => window.__BRIAR_GLENDebug.teleport(-575, -330));
       await sleep(500);
