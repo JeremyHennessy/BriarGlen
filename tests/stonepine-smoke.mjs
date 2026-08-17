@@ -114,7 +114,13 @@ try {
       d.forceStonepineTactic('ridgehorn','ridge-charge');
       d.teleport(2750,-1640);
     });
-    await sleep(660);
+    // Wait for the actual committed charge rather than assuming 660ms wall-clock time always
+    // advances the capped game loop through the Ridgehorn windup on a loaded CI runner.
+    await page.waitForFunction(() => {
+      const stone=window.__BRIAR_GLENDebug.getStonepineState();
+      const ridge=stone.enemies.find(e=>e.type==='ridgehorn');
+      return stone.counters.ridgeCharges >= 1 && ridge?.state && ['dash','stagger'].includes(ridge.state.mode);
+    }, { timeout: 3000 });
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getStonepineState());
     const ridge = state.enemies.find(e => e.type === 'ridgehorn');
     if (state.counters.ridgeCharges < 1 || !ridge?.state || !['dash','stagger'].includes(ridge.state.mode)) {
