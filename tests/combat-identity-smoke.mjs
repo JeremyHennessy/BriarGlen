@@ -72,7 +72,10 @@ try {
       d.forceEnemyTactic('boar', 'boar-charge');
       d.teleport(1180, 420);
     });
-    await sleep(660);
+    await page.waitForFunction(() => {
+      const boar = window.__BRIAR_GLENDebug.getCombatIdentityState().enemies.find(e => e.type === 'boar');
+      return boar?.state?.kind === 'boar-charge' && boar.state.mode === 'dash';
+    }, null, { timeout: 3000 });
     const bow = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       const beforeCounters = d.getCombatIdentityState().counters.countershots;
