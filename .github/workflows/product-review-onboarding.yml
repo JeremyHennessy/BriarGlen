@@ -1,0 +1,35 @@
+name: Product review onboarding screenshots
+
+on:
+  push:
+    branches: [agent/review-full-ui-feature-audit-20260817]
+  workflow_dispatch:
+
+jobs:
+  capture-onboarding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-review-ob-http.log 2>&1 &
+          echo $! > /tmp/briarglen-review-ob-http.pid
+          sleep 2
+      - name: Capture verified onboarding screens
+        run: node tests/product-review-onboarding-capture.mjs http://127.0.0.1:4173/
+      - name: Upload onboarding screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: briar-glen-product-review-onboarding-${{ github.sha }}
+          path: test-artifacts/product-review-onboarding/**
+          if-no-files-found: error
+          retention-days: 14
