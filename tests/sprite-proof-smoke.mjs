@@ -2,21 +2,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
-const target = process.argv[2] || 'http://127.0.0.1:4173/';
-const viewports = [
-  { name:'phone-landscape', width:932, height:430, touch:true },
-  { name:'phone-portrait', width:430, height:932, touch:true },
-  { name:'desktop', width:1440, height:900, touch:false },
+const target=process.argv[2]||'http://127.0.0.1:4173/';
+const viewports=[
+  {name:'phone-landscape',width:932,height:430,touch:true},
+  {name:'phone-portrait',width:430,height:932,touch:true},
+  {name:'desktop',width:1440,height:900,touch:false},
 ];
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-const artifactDir = path.resolve('test-artifacts/build26');
-fs.mkdirSync(artifactDir, { recursive:true });
-const browser = await chromium.launch({ headless:true });
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const artifactDir=path.resolve('test-artifacts/build27');
+fs.mkdirSync(artifactDir,{recursive:true});
+const browser=await chromium.launch({headless:true});
 
-function withParam(url,key,value){
-  const sep=url.includes('?')?'&':'?';
-  return `${url}${sep}${key}=${encodeURIComponent(value)}`;
-}
+function withParam(url,key,value){const sep=url.includes('?')?'&':'?';return `${url}${sep}${key}=${encodeURIComponent(value)}`;}
 
 async function assertBrowserPaintsSources(page,vpName){
   const report=await page.evaluate(async()=>{
@@ -24,7 +21,7 @@ async function assertBrowserPaintsSources(page,vpName){
     const out={};
     for(const src of paths){
       const image=new Image();
-      image.src=`${src}?decode26=${Date.now()}-${Math.random()}`;
+      image.src=`${src}?decode27=${Date.now()}-${Math.random()}`;
       await image.decode();
       const c=document.createElement('canvas');c.width=160;c.height=160;
       const g=c.getContext('2d');
@@ -43,20 +40,22 @@ async function assertBrowserPaintsSources(page,vpName){
 }
 
 async function openArt(page,url,label){
-  await page.goto(withParam(url,'greenwayRun',`${Date.now()}-${label}`),{waitUntil:'domcontentloaded',timeout:15000});
+  await page.goto(withParam(url,'canopyRun',`${Date.now()}-${label}`),{waitUntil:'domcontentloaded',timeout:15000});
   await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getAuthoredArtState&&window.__BRIAR_GLENDebug?.getBuildInfo),{timeout:7000});
   await page.waitForFunction(()=>{const s=window.__BRIAR_GLENDebug.getAuthoredArtState();return s.ready||s.failed;},{timeout:7000});
 }
 
-function assertBuild26State(state,vp){
-  if(state.failed||!state.productionDefault||state.rollbackRequested||state.build25ScopeRequested||!state.expanded||!state.requested||!state.enabled||!state.ready||state.mode!=='authored-greenway')throw new Error(`${vp.name}: Build 26 Greenway default inactive ${JSON.stringify(state)}`);
-  if(state.cottageTargets?.length!==2)throw new Error(`${vp.name}: Build 26 must target Warden + Willow cottages ${JSON.stringify(state.cottageTargets)}`);
-  if(state.heroTreeTargets?.length!==2)throw new Error(`${vp.name}: Build 25 Warden tree pair drifted ${JSON.stringify(state.heroTreeTargets)}`);
-  if(state.willowTreeTargets?.length!==2)throw new Error(`${vp.name}: Willow cluster must target two trees ${JSON.stringify(state.willowTreeTargets)}`);
-  if(state.meadowTreeTargets?.length!==2)throw new Error(`${vp.name}: Meadow Road must target two trees ${JSON.stringify(state.meadowTreeTargets)}`);
-  if(state.greenwayTreeTargets?.length!==6)throw new Error(`${vp.name}: Greenway must contain exactly six authored trees ${JSON.stringify(state.greenwayTreeTargets)}`);
-  if(new Set(state.greenwayTreeTargets.map(t=>`${Math.round(t.x)},${Math.round(t.y)}`)).size!==6)throw new Error(`${vp.name}: Greenway tree selection contains duplicates ${JSON.stringify(state.greenwayTreeTargets)}`);
-  if(JSON.stringify(state.baseline)!==JSON.stringify(state.current))throw new Error(`${vp.name}: Greenway rollout mutated gameplay entities ${JSON.stringify(state)}`);
+function assertBuild27State(state,vp){
+  if(state.failed||!state.productionDefault||state.rollbackRequested||state.build25ScopeRequested||state.build26ScopeRequested||!state.expanded||!state.groveExpanded||!state.requested||!state.enabled||!state.ready||state.mode!=='authored-mooncap-canopy')throw new Error(`${vp.name}: Build 27 Mooncap default inactive ${JSON.stringify(state)}`);
+  if(state.cottageTargets?.length!==2)throw new Error(`${vp.name}: Build 27 cottage baseline drifted ${JSON.stringify(state.cottageTargets)}`);
+  if(state.heroTreeTargets?.length!==2||state.greenwayTreeTargets?.length!==6)throw new Error(`${vp.name}: approved Warden/Greenway tree baselines drifted ${JSON.stringify(state)}`);
+  if(state.willowTreeTargets?.length!==2||state.meadowTreeTargets?.length!==2)throw new Error(`${vp.name}: Build 26 clusters drifted ${JSON.stringify(state)}`);
+  if(state.groveTreeTargets?.length!==4)throw new Error(`${vp.name}: Mooncap Canopy must target exactly four Grove trees ${JSON.stringify(state.groveTreeTargets)}`);
+  if(state.authoredTreeTargets?.length!==10)throw new Error(`${vp.name}: total authored tree target count must be ten ${JSON.stringify(state.authoredTreeTargets)}`);
+  if(new Set(state.authoredTreeTargets.map(t=>`${Math.round(t.x)},${Math.round(t.y)}`)).size!==10)throw new Error(`${vp.name}: authored tree target set contains duplicates ${JSON.stringify(state.authoredTreeTargets)}`);
+  const anchors=state.groveTreeTargets.map(t=>t.anchor).sort().join(',');
+  if(anchors!=='grove-entry-deep,grove-entry-west,grove-ruin-east,grove-ruin-west')throw new Error(`${vp.name}: Grove target anchors drifted ${JSON.stringify(state.groveTreeTargets)}`);
+  if(JSON.stringify(state.baseline)!==JSON.stringify(state.current))throw new Error(`${vp.name}: Mooncap rollout mutated gameplay entities ${JSON.stringify(state)}`);
 }
 
 try{
@@ -68,53 +67,44 @@ try{
     page.on('console',m=>{if(m.type()==='error')errors.push(`console: ${m.text()}`);});
     await openArt(page,target,`${vp.name}-default`);
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-    if(build.version!=='26'||build.label!=='Briar Glen Greenway')throw new Error(`${vp.name}: incorrect Build 26 metadata ${JSON.stringify(build)}`);
+    if(build.version!=='27'||build.label!=='Mooncap Canopy')throw new Error(`${vp.name}: incorrect Build 27 metadata ${JSON.stringify(build)}`);
     const decode=await assertBrowserPaintsSources(page,vp.name);
     let state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    assertBuild26State(state,vp);
+    assertBuild27State(state,vp);
 
-    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(-575,-330));
-    await sleep(350);
+    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(185,-585));
+    await sleep(420);
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    assertBuild26State(state,vp);
-    const warden=state.drawSites?.['cottage:-575,-365'];
-    if(!warden||warden.variant!=='warden'||warden.draws<1)throw new Error(`${vp.name}: approved Warden House draw drifted ${JSON.stringify(warden)}`);
+    assertBuild27State(state,vp);
+    const entryTargets=state.groveTreeTargets.filter(t=>String(t.anchor).startsWith('grove-entry'));
+    const entrySites=entryTargets.map(t=>state.drawSites?.[`tree:${Math.round(t.x)},${Math.round(t.y)}`]).filter(Boolean);
+    if(entrySites.length<1||entrySites.some(site=>site.variant!=='grove-canopy-tree'||site.draws<1||site.size.w>145||site.size.h>145))throw new Error(`${vp.name}: Mooncap entry canopy did not render cleanly ${JSON.stringify(entrySites)}`);
+    await page.screenshot({path:path.join(artifactDir,`${vp.name}-grove-entry.png`),fullPage:false});
 
-    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(-905,300));
-    await sleep(400);
+    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(615,-900));
+    await sleep(420);
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    const willow=state.drawSites?.['cottage:-905,330'];
-    if(!willow||willow.variant!=='willow'||willow.draws<1)throw new Error(`${vp.name}: Willow Cottage authored draw missing ${JSON.stringify(state.drawSites)}`);
-    if(willow.size.w<90||willow.size.w>160||willow.size.h<90||willow.size.h>160)throw new Error(`${vp.name}: Willow Cottage scale outside Greenway range ${JSON.stringify(willow)}`);
-    await page.screenshot({path:path.join(artifactDir,`${vp.name}-willow.png`),fullPage:false});
-
-    const meadowTarget=state.meadowTreeTargets[0];
-    await page.evaluate(({x,y})=>window.__BRIAR_GLENDebug.teleport(x,y),meadowTarget);
-    await sleep(400);
-    state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    const meadowKey=`tree:${Math.round(meadowTarget.x)},${Math.round(meadowTarget.y)}`;
-    const meadowSite=state.drawSites?.[meadowKey];
-    if(!meadowSite||meadowSite.variant!=='greenway-tree'||meadowSite.draws<1)throw new Error(`${vp.name}: Meadow Road authored tree missing ${meadowKey} ${JSON.stringify(state.drawSites)}`);
-    if(meadowSite.size.w>135||meadowSite.size.h>135)throw new Error(`${vp.name}: Meadow Road tree too visually dominant ${JSON.stringify(meadowSite)}`);
-    await page.screenshot({path:path.join(artifactDir,`${vp.name}-meadow.png`),fullPage:false});
+    assertBuild27State(state,vp);
+    const ruinTargets=state.groveTreeTargets.filter(t=>String(t.anchor).startsWith('grove-ruin'));
+    const ruinSites=ruinTargets.map(t=>state.drawSites?.[`tree:${Math.round(t.x)},${Math.round(t.y)}`]).filter(Boolean);
+    if(ruinSites.length<1||ruinSites.some(site=>site.variant!=='grove-canopy-tree'||site.draws<1||site.size.w>150||site.size.h>150))throw new Error(`${vp.name}: Mooncap ruin canopy did not render cleanly ${JSON.stringify(ruinSites)}`);
+    await page.screenshot({path:path.join(artifactDir,`${vp.name}-grove-ruins.png`),fullPage:false});
 
     const off=await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setAuthoredArtEnabled(false);return d.getAuthoredArtState();});
     const drawsAtDisable=off.draws;
-    if(off.enabled)throw new Error(`${vp.name}: Greenway debug toggle failed to disable`);
+    if(off.enabled)throw new Error(`${vp.name}: Mooncap debug toggle failed to disable`);
     await sleep(160);
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    if(state.enabled||state.draws!==drawsAtDisable)throw new Error(`${vp.name}: disabled Greenway renderer continued drawing`);
+    if(state.enabled||state.draws!==drawsAtDisable)throw new Error(`${vp.name}: disabled Mooncap renderer continued drawing`);
     await page.evaluate(()=>window.__BRIAR_GLENDebug.setAuthoredArtEnabled(true));
     await sleep(180);
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getAuthoredArtState());
-    if(!state.enabled||state.draws<=drawsAtDisable)throw new Error(`${vp.name}: Greenway renderer did not restore`);
+    if(!state.enabled||state.draws<=drawsAtDisable)throw new Error(`${vp.name}: Mooncap renderer did not restore`);
 
     const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));
-    if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Greenway caused browser overflow ${JSON.stringify(overflow)}`);
-    if(errors.length)throw new Error(`${vp.name}: Build 26 runtime errors:\n${errors.join('\n')}`);
-    console.log(`PASS ${vp.name}: Build 26 Willow + Meadow Greenway active ${JSON.stringify(decode)}`);
+    if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Mooncap Canopy caused browser overflow ${JSON.stringify(overflow)}`);
+    if(errors.length)throw new Error(`${vp.name}: Build 27 runtime errors:\n${errors.join('\n')}`);
+    console.log(`PASS ${vp.name}: Build 27 Mooncap entry + ruins canopy active ${JSON.stringify(decode)}`);
     await context.close();
   }
-}finally{
-  await browser.close();
-}
+}finally{await browser.close();}
