@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/build31-hollow-cadence-diagnostic.yml'
+      - 'tests/hollow-cadence-probe.mjs'
   workflow_dispatch:
 
 jobs:
@@ -23,9 +24,7 @@ jobs:
         run: |
           python3 -m http.server 4173 > /tmp/briarglen-hollow-diag.log 2>&1 &
           sleep 2
-      - name: Repeat unchanged Hollow/Den renderer cadence test
-        run: |
-          for i in 1 2 3 4 5; do
-            echo "=== unchanged hollow-den run $i ==="
-            node tests/hollow-den-art-smoke.mjs http://127.0.0.1:4173/
-          done
+      - name: Measure desktop Hollow renderer progression
+        run: node tests/hollow-cadence-probe.mjs http://127.0.0.1:4173/
+      - name: Re-run unchanged fixed-delay acceptance test
+        run: node tests/hollow-den-art-smoke.mjs http://127.0.0.1:4173/
