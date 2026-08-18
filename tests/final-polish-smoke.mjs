@@ -176,7 +176,7 @@ try {
     if (JSON.stringify(state.entityCounts) !== JSON.stringify(entities) || JSON.stringify(state.balance) !== JSON.stringify(expectedBalance)) {
       throw new Error(`${vp.name}: final polish caused world/balance drift`);
     }
-    const overflow = await page.evaluate(() => ({ sw:document.documentElement.scrollWidth, iw:innerWidth, sh:document.documentHeight, ih:innerHeight }));
+    const overflow = await page.evaluate(() => ({ sw:document.documentElement.scrollWidth, iw:innerWidth, sh:document.documentElement.scrollHeight, ih:innerHeight }));
     if (overflow.sw > overflow.iw + 1 || overflow.sh > overflow.ih + 1) throw new Error(`${vp.name}: final polish caused browser overflow ${JSON.stringify(overflow)}`);
     if (errors.length) throw new Error(`${vp.name}: runtime errors:\n${errors.join('\n')}`);
 
