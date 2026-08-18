@@ -160,7 +160,8 @@
 
   runtime.registerHook('afterUpdateUI','build32-response-ui',()=>{
     syncBoardCompletion();
-    if (bindingCount) bindingCount.textContent = amount('binding');
+    const bindingCounter = document.getElementById('panel-binding-count');
+    if (bindingCounter) bindingCounter.textContent = amount('binding');
     const tradePanel = document.getElementById('trade-panel');
     if (tradePanel && !tradePanel.hidden) render();
   },1250);
