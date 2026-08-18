@@ -71,6 +71,7 @@ try{
       const d=window.__BRIAR_GLENDebug;
       const ok=d.chooseSpecialistTrait('sword','swift');
       const preview=d.previewSpecialistDamage(100,'sword');
+      d.toggleCrafting?.(false);
       d.attack();
       return {ok,state:d.getSpecialistCraftingState(),preview};
     });
