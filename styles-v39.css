@@ -1,0 +1,89 @@
+/* Build 39: phone UI collision corrections. Existing panels and controls are retained. */
+
+/* A blocking window owns the screen. Do not leave the play HUD visible underneath it. */
+#game-shell:has(#inventory-panel:not([hidden])) :is(#hud,#touch-controls,#context-prompt,#rotate-note,#reset-btn,#warden-map-btn,#hud33-combat,#hud33-notification,#combat36-readiness,#onboarding37-prompt),
+#game-shell:has(#trade-panel:not([hidden])) :is(#hud,#touch-controls,#context-prompt,#rotate-note,#reset-btn,#warden-map-btn,#hud33-combat,#hud33-notification,#combat36-readiness,#onboarding37-prompt),
+#game-shell:has(#craft-panel:not([hidden])) :is(#hud,#touch-controls,#context-prompt,#rotate-note,#reset-btn,#warden-map-btn,#hud33-combat,#hud33-notification,#combat36-readiness,#onboarding37-prompt),
+#game-shell:has(#warden-overlay:not([hidden])) :is(#hud,#touch-controls,#context-prompt,#rotate-note,#reset-btn,#warden-map-btn,#hud33-combat,#hud33-notification,#combat36-readiness,#onboarding37-prompt),
+#game-shell:has(#board2-panel:not([hidden])) :is(#hud,#touch-controls,#context-prompt,#rotate-note,#reset-btn,#warden-map-btn,#hud33-combat,#hud33-notification,#combat36-readiness,#onboarding37-prompt) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Contextual onboarding is the highest-priority message while it is visible. */
+#game-shell:has(#onboarding37-prompt:not([hidden])) :is(#hud33-notification,#rotate-note) {
+  display: none !important;
+}
+
+@media (orientation: landscape) and (max-width: 900px) and (max-height: 520px) {
+  #rotate-note { display: none !important; }
+  #onboarding37-prompt {
+    top: max(72px, calc(env(safe-area-inset-top) + 66px));
+    width: min(280px, calc(100vw - 28px));
+  }
+  #hud33-notification {
+    top: max(72px, calc(env(safe-area-inset-top) + 66px));
+    width: min(360px, 64vw);
+  }
+  #warden-map-btn {
+    left: 50%;
+    bottom: max(138px, calc(env(safe-area-inset-bottom) + 132px));
+  }
+  #context-prompt {
+    bottom: max(190px, calc(env(safe-area-inset-bottom) + 184px));
+  }
+  #combat36-readiness {
+    left: 50%;
+    bottom: max(101px, calc(env(safe-area-inset-bottom) + 95px));
+  }
+
+  #inventory-panel.satchel34,
+  #trade-panel,
+  #craft-panel,
+  #board2-panel {
+    top: max(6px, env(safe-area-inset-top));
+    bottom: max(6px, env(safe-area-inset-bottom));
+    height: auto;
+    max-height: none;
+    transform: translateX(-50%);
+  }
+}
+
+@media (orientation: portrait) and (max-width: 520px) {
+  #rotate-note { display: none !important; }
+  #onboarding37-prompt {
+    top: max(150px, calc(env(safe-area-inset-top) + 144px));
+    width: min(320px, calc(100vw - 24px));
+  }
+  #hud33-notification {
+    top: max(150px, calc(env(safe-area-inset-top) + 144px));
+    width: min(340px, calc(100vw - 24px));
+  }
+  .inventory-strip {
+    bottom: max(205px, calc(env(safe-area-inset-bottom) + 190px));
+  }
+  #hud33-combat {
+    bottom: max(150px, calc(env(safe-area-inset-bottom) + 135px));
+  }
+  #combat36-readiness {
+    bottom: max(260px, calc(env(safe-area-inset-bottom) + 245px));
+  }
+  #warden-map-btn {
+    left: 50%;
+    bottom: max(310px, calc(env(safe-area-inset-bottom) + 295px));
+  }
+  #context-prompt {
+    bottom: max(365px, calc(env(safe-area-inset-bottom) + 350px));
+  }
+
+  #inventory-panel.satchel34,
+  #trade-panel,
+  #craft-panel,
+  #board2-panel {
+    top: max(8px, env(safe-area-inset-top));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    height: auto;
+    max-height: none;
+    transform: translateX(-50%);
+  }
+}
