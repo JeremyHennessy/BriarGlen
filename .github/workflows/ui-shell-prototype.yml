@@ -5,6 +5,7 @@ on:
     paths:
       - 'tests/ui-shell-preview.mjs'
       - 'tests/satchel-preview.mjs'
+      - 'tests/map-journal-preview.mjs'
       - '.github/workflows/ui-shell-prototype.yml'
   workflow_dispatch:
 
@@ -29,6 +30,8 @@ jobs:
         run: node tests/ui-shell-preview.mjs http://127.0.0.1:4173/
       - name: Capture reversible Satchel/character prototype
         run: node tests/satchel-preview.mjs http://127.0.0.1:4173/
+      - name: Capture reversible Map and Journal prototypes
+        run: node tests/map-journal-preview.mjs http://127.0.0.1:4173/
       - name: Upload UI prototype screenshots
         uses: actions/upload-artifact@v4
         with:
