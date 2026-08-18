@@ -57,7 +57,14 @@
       const image = new Image();
       image.decoding = 'async';
       image.onload = () => {
-        proof.assets[name] = {loaded:true,width:image.naturalWidth,height:image.naturalHeight,image,src:def.src};
+        const raster = document.createElement('canvas');
+        raster.width = image.naturalWidth;
+        raster.height = image.naturalHeight;
+        const rasterCtx = raster.getContext('2d');
+        rasterCtx.imageSmoothingEnabled = true;
+        rasterCtx.imageSmoothingQuality = 'high';
+        rasterCtx.drawImage(image,0,0,raster.width,raster.height);
+        proof.assets[name] = {loaded:true,width:image.naturalWidth,height:image.naturalHeight,image,raster,src:def.src};
         resolve();
       };
       image.onerror = () => reject(new Error(`Build 31 character sprite failed to load: ${def.src}`));
@@ -92,7 +99,7 @@
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.filter = filter || 'none';
-    ctx.drawImage(record.image,-w/2,-h*anchor,w,h);
+    ctx.drawImage(record.raster || record.image,-w/2,-h*anchor,w,h);
     ctx.restore();
     return true;
   }
