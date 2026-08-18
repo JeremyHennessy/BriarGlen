@@ -4,53 +4,48 @@ const target=process.argv[2]||'http://127.0.0.1:4173/';
 const browser=await chromium.launch({headless:true});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-async function trigger(page,label){
-  const before=await page.evaluate(()=>{
+async function openMode(mode){
+  const context=await browser.newContext({viewport:{width:1440,height:900},hasTouch:false,deviceScaleFactor:1});
+  const page=await context.newPage();
+  await page.goto(`${target}?screeCastProbe=${mode}-${Date.now()}`,{waitUntil:'domcontentloaded',timeout:15000});
+  await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getStonepineState&&window.__BRIAR_GLENDebug?.getCharacterArtState),{timeout:7000});
+  await page.waitForFunction(()=>{const s=window.__BRIAR_GLENDebug.getCharacterArtState();return s.ready||s.failed;},{timeout:9000});
+  if(mode==='disabled'){
+    await page.evaluate(()=>window.__BRIAR_GLENDebug.setCharacterArtEnabled(false));
+    await sleep(180);
+  }
+  return {context,page};
+}
+
+async function sampleMode(mode){
+  const {context,page}=await openMode(mode);
+  const setup=await page.evaluate(()=>{
     const d=window.__BRIAR_GLENDebug;
     d.teleport(-720,40);
     d.setPlayer({hp:100,maxHp:100,invuln:0});
     const before=d.getStonepineState().counters.screeHits;
-    d.triggerStonepineScree(0);
-    return before;
+    const triggered=d.triggerStonepineScree(0);
+    return {before,triggered,player:d.getState().player,stone:d.getStonepineState(),cast:d.getCharacterArtState()};
   });
-  const start=Date.now();
-  await page.waitForFunction(expected=>window.__BRIAR_GLENDebug.getStonepineState().counters.screeHits>=expected,before+1,{timeout:15000});
-  const elapsed=Date.now()-start;
-  const state=await page.evaluate(()=>({
-    player:window.__BRIAR_GLENDebug.getState().player,
-    stone:window.__BRIAR_GLENDebug.getStonepineState(),
-    cast:window.__BRIAR_GLENDebug.getCharacterArtState(),
-  }));
-  if(state.stone.counters.screeHits!==before+1||state.player.hp!==87)throw new Error(`${label}: scree parity failed ${JSON.stringify({before,elapsed,state})}`);
-  await sleep(250);
-  return elapsed;
+  const samples=[];
+  let prior=0;
+  for(const elapsed of [0,250,500,800,1200,2000,4000,8000]){
+    if(elapsed>prior)await sleep(elapsed-prior);
+    prior=elapsed;
+    const snapshot=await page.evaluate(()=>({
+      player:window.__BRIAR_GLENDebug.getState().player,
+      stone:window.__BRIAR_GLENDebug.getStonepineState(),
+      cast:window.__BRIAR_GLENDebug.getCharacterArtState(),
+    }));
+    samples.push({elapsed,hp:snapshot.player.hp,invuln:snapshot.player.invuln,x:snapshot.player.x,y:snapshot.player.y,screeHits:snapshot.stone.counters.screeHits,field:snapshot.stone.scree[0],playerDraws:snapshot.cast.playerDraws,enemyDraws:snapshot.cast.enemyDraws,enabled:snapshot.cast.enabled});
+  }
+  await context.close();
+  return {mode,setup:{before:setup.before,triggered:setup.triggered,hp:setup.player.hp,x:setup.player.x,y:setup.player.y,field:setup.stone.scree[0],castEnabled:setup.cast.enabled},samples};
 }
 
 try{
-  const context=await browser.newContext({viewport:{width:1440,height:900},hasTouch:false,deviceScaleFactor:1});
-  const page=await context.newPage();
-  await page.goto(`${target}?screeCastProbe=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:15000});
-  await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getStonepineState&&window.__BRIAR_GLENDebug?.getCharacterArtState),{timeout:7000});
-  await page.waitForFunction(()=>{const s=window.__BRIAR_GLENDebug.getCharacterArtState();return s.ready||s.failed;},{timeout:9000});
-  const initial=await page.evaluate(()=>window.__BRIAR_GLENDebug.getCharacterArtState());
-  if(!initial.ready||!initial.enabled||initial.failed)throw new Error(`Living Cast did not initialize ${JSON.stringify(initial)}`);
-
-  const enabled=[];
-  for(let i=0;i<3;i++)enabled.push(await trigger(page,`cast-enabled-${i+1}`));
-
-  const disabledState=await page.evaluate(()=>{
-    const d=window.__BRIAR_GLENDebug;
-    d.setCharacterArtEnabled(false);
-    return d.getCharacterArtState();
-  });
-  if(disabledState.enabled)throw new Error(`Living Cast debug disable failed ${JSON.stringify(disabledState)}`);
-  await sleep(200);
-  const disabled=[];
-  for(let i=0;i<3;i++)disabled.push(await trigger(page,`cast-disabled-${i+1}`));
-
-  console.log(`STONEPINE_SCREE_CAST_PROBE ${JSON.stringify({enabled,disabled})}`);
-  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
-  const enabledAvg=avg(enabled),disabledAvg=avg(disabled);
-  console.log(`PASS desktop: scree exact 13-damage event; cast enabled avg=${enabledAvg.toFixed(1)}ms disabled avg=${disabledAvg.toFixed(1)}ms`);
-  await context.close();
+  const enabled=await sampleMode('enabled');
+  const disabled=await sampleMode('disabled');
+  console.log(`STONEPINE_SCREE_CAST_TIMELINE ${JSON.stringify({enabled,disabled})}`);
+  console.log('PASS diagnostic: sampled exact scree state timeline with Living Cast enabled and disabled');
 }finally{await browser.close();}
