@@ -69,13 +69,17 @@ try {
 
     const areaBefore = state.areaShows;
     await page.evaluate(() => window.__BRIAR_GLENDebug.teleport(1050, 20));
-    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getFinalPolishState().areaShows > before, areaBefore);
-    const area = page.locator('#polish23-area');
-    if (!(await area.isVisible())) throw new Error(`${vp.name}: Copper Hollow area moment did not become visible`);
-    const areaBox = await area.boundingBox();
-    if (!inside(areaBox, vp)) throw new Error(`${vp.name}: area moment outside viewport ${JSON.stringify(areaBox)}`);
-    const areaText = await area.innerText();
-    if (!areaText.includes('COPPER HOLLOW') || !areaText.includes('OLD QUARRY WORKS')) throw new Error(`${vp.name}: area moment copy incomplete: ${areaText}`);
+    const areaProofHandle = await page.waitForFunction(before => {
+      const s = window.__BRIAR_GLENDebug.getFinalPolishState();
+      const el = document.getElementById('polish23-area');
+      if (s.areaShows <= before || !el || el.hidden) return false;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return false;
+      return { x:r.x, y:r.y, width:r.width, height:r.height, text:el.innerText };
+    }, areaBefore, { timeout:3000 });
+    const areaProof = await areaProofHandle.jsonValue();
+    if (!inside(areaProof, vp)) throw new Error(`${vp.name}: area moment outside viewport ${JSON.stringify(areaProof)}`);
+    if (!areaProof.text.includes('COPPER HOLLOW') || !areaProof.text.includes('OLD QUARRY WORKS')) throw new Error(`${vp.name}: area moment copy incomplete: ${areaProof.text}`);
 
     await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
@@ -95,16 +99,18 @@ try {
 
     const pickupBefore = state.pickupShows;
     await page.evaluate(() => window.__BRIAR_GLENDebug.interact());
-    await page.waitForFunction(before => {
+    const pickupProofHandle = await page.waitForFunction(before => {
       const s = window.__BRIAR_GLENDebug.getFinalPolishState();
-      return s.pickupShows > before && (window.__BRIAR_GLENDebug.getState().player.inventory.resin || 0) === 1;
-    }, pickupBefore);
-    const pickup = page.locator('#polish23-pickup');
-    if (!(await pickup.isVisible())) throw new Error(`${vp.name}: interaction pickup ribbon did not become visible`);
-    const pickupText = await pickup.innerText();
-    if (!pickupText.toUpperCase().includes('IRONPINE RESIN +1')) throw new Error(`${vp.name}: Resin pickup ribbon incorrect: ${pickupText}`);
-    const pickupBox = await pickup.boundingBox();
-    if (!inside(pickupBox, vp)) throw new Error(`${vp.name}: pickup ribbon outside viewport ${JSON.stringify(pickupBox)}`);
+      const el = document.getElementById('polish23-pickup');
+      const resin = window.__BRIAR_GLENDebug.getState().player.inventory.resin || 0;
+      if (s.pickupShows <= before || resin !== 1 || !el || el.hidden) return false;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return false;
+      return { x:r.x, y:r.y, width:r.width, height:r.height, text:el.innerText };
+    }, pickupBefore, { timeout:3000 });
+    const pickupProof = await pickupProofHandle.jsonValue();
+    if (!pickupProof.text.toUpperCase().includes('IRONPINE RESIN +1')) throw new Error(`${vp.name}: Resin pickup ribbon incorrect: ${pickupProof.text}`);
+    if (!inside(pickupProof, vp)) throw new Error(`${vp.name}: pickup ribbon outside viewport ${JSON.stringify(pickupProof)}`);
 
     await page.locator('#inventory-strip').click();
     await page.waitForFunction(() => !document.getElementById('inventory-panel')?.hidden);
@@ -170,7 +176,7 @@ try {
     if (JSON.stringify(state.entityCounts) !== JSON.stringify(entities) || JSON.stringify(state.balance) !== JSON.stringify(expectedBalance)) {
       throw new Error(`${vp.name}: final polish caused world/balance drift`);
     }
-    const overflow = await page.evaluate(() => ({ sw:document.documentElement.scrollWidth, iw:innerWidth, sh:document.documentElement.scrollHeight, ih:innerHeight }));
+    const overflow = await page.evaluate(() => ({ sw:document.documentElement.scrollWidth, iw:innerWidth, sh:document.documentHeight, ih:innerHeight }));
     if (overflow.sw > overflow.iw + 1 || overflow.sh > overflow.ih + 1) throw new Error(`${vp.name}: final polish caused browser overflow ${JSON.stringify(overflow)}`);
     if (errors.length) throw new Error(`${vp.name}: runtime errors:\n${errors.join('\n')}`);
 
