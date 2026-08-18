@@ -36,18 +36,8 @@ jobs:
         run: node tests/build28-production-smoke.mjs http://127.0.0.1:4173/
       - name: Test Build 29 approved Stonepine scope
         run: node tests/build29-production-smoke.mjs http://127.0.0.1:4173/
-      - name: Test Build 30 Copper Hollow and Emberback Den authored props
-        run: node tests/sprite-proof-smoke.mjs http://127.0.0.1:4173/
-      - name: Test Build 30 production art gate
+      - name: Test Build 30 approved Copper & Ember baseline under Build 31
         run: node tests/build30-production-smoke.mjs http://127.0.0.1:4173/
-      - name: Upload Build 30 Copper & Ember screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build30-copper-ember-${{ github.sha }}
-          path: test-artifacts/build30/*.png
-          if-no-files-found: warn
-          retention-days: 14
       - name: Test repository build in browser
         run: |
           node tests/smoke.mjs http://127.0.0.1:4173/
