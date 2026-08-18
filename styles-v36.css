@@ -1,0 +1,4 @@
+/* Build 36: combat timing/readiness presentation only. */
+#combat36-readiness{position:absolute;z-index:13;left:50%;bottom:max(112px,calc(env(safe-area-inset-bottom) + 112px));transform:translateX(-50%);display:flex;gap:7px;align-items:center;padding:5px 8px;border:1px solid rgba(232,208,153,.18);border-radius:999px;background:rgba(12,23,16,.78);color:#a9b3a6;font:800 7px/1 system-ui,sans-serif;letter-spacing:.05em;pointer-events:none}#combat36-readiness b{color:#ead7a4}#combat36-readiness span.ready{color:#9bd38b;text-shadow:0 0 8px rgba(136,224,112,.45)}body:has(#inventory-panel:not([hidden])) #combat36-readiness,body:has(#warden-overlay:not([hidden])) #combat36-readiness{display:none}
+@media(max-height:500px) and (min-width:700px){#combat36-readiness{left:calc(50% + 35px);bottom:68px;font-size:6px;padding:4px 7px}}
+@media(orientation:portrait) and (max-width:520px){#combat36-readiness{bottom:132px;max-width:260px;flex-wrap:wrap;justify-content:center}}
