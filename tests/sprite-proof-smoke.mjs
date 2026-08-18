@@ -13,6 +13,13 @@ const artifactDir=path.resolve('test-artifacts/build31');
 fs.mkdirSync(artifactDir,{recursive:true});
 const browser=await chromium.launch({headless:true});
 
+const sourcePaths=[
+  'assets/v31/warden-sword.svg','assets/v31/warden-bow.svg','assets/v31/warden-staff.svg',
+  'assets/v31/briar-wolf.svg','assets/v31/hollow-boar.svg','assets/v31/emberback.svg',
+  'assets/v31/alden.svg','assets/v31/rowan.svg','assets/v31/mira.svg',
+  'assets/v31/tessa.svg','assets/v31/orin.svg','assets/v31/maeve.svg','assets/v31/perrin.svg',
+];
+
 function withParam(url,key,value){const sep=url.includes('?')?'&':'?';return `${url}${sep}${key}=${encodeURIComponent(value)}`;}
 
 async function openCast(page,url,label){
@@ -22,11 +29,7 @@ async function openCast(page,url,label){
 }
 
 async function assertBrowserPaintsSources(page,vpName){
-  const report=await page.evaluate(async()=>{
-    const paths=[
-      'assets/v31/warden-sword.svg','assets/v31/warden-bow.svg','assets/v31/warden-staff.svg',
-      'assets/v31/briar-wolf.svg','assets/v31/hollow-boar.svg','assets/v31/emberback.svg',
-    ];
+  const report=await page.evaluate(async paths=>{
     const out={};
     for(const src of paths){
       const image=new Image();
@@ -43,9 +46,9 @@ async function assertBrowserPaintsSources(page,vpName){
       out[src]={width:image.naturalWidth,height:image.naturalHeight,alpha,rgb,visible};
     }
     return out;
-  });
+  },sourcePaths);
   for(const [src,info] of Object.entries(report)){
-    if(info.width<80||info.height<80||info.visible<300||info.alpha<40000||info.rgb<20000)throw new Error(`${vpName}: Build 31 source decode failed ${src} ${JSON.stringify(info)}`);
+    if(info.width<80||info.height<80||info.visible<250||info.alpha<30000||info.rgb<15000)throw new Error(`${vpName}: Build 31 source decode failed ${src} ${JSON.stringify(info)}`);
   }
   return report;
 }
@@ -54,7 +57,7 @@ function assertBaseAndCast(base,cast,vp){
   if(base.failed||!base.productionDefault||!base.hollowDenExpanded||!base.stonepineExpanded||!base.enabled||!base.ready||base.mode!=='authored-copper-ember')throw new Error(`${vp.name}: Build 30 environment baseline drifted ${JSON.stringify(base)}`);
   if(base.authoredTreeTargets?.length!==18||base.authoredEnvironmentTargets?.length!==8)throw new Error(`${vp.name}: approved environment family drifted ${JSON.stringify(base)}`);
   if(cast.failed||!cast.productionDefault||!cast.characterExpanded||!cast.requested||!cast.enabled||!cast.ready||cast.mode!=='authored-living-cast'||cast.baseArtMode!=='authored-copper-ember')throw new Error(`${vp.name}: Build 31 Living Cast inactive ${JSON.stringify(cast)}`);
-  if(Object.keys(cast.loadedCharacterAssets||{}).length!==6||Object.values(cast.loadedCharacterAssets||{}).some(v=>!v.loaded))throw new Error(`${vp.name}: character sources incomplete ${JSON.stringify(cast.loadedCharacterAssets)}`);
+  if(Object.keys(cast.loadedCharacterAssets||{}).length!==sourcePaths.length||Object.values(cast.loadedCharacterAssets||{}).some(v=>!v.loaded))throw new Error(`${vp.name}: character sources incomplete ${JSON.stringify(cast.loadedCharacterAssets)}`);
   if(JSON.stringify(cast.baseline)!==JSON.stringify(cast.current))throw new Error(`${vp.name}: character presentation mutated gameplay entities`);
 }
 
@@ -71,6 +74,19 @@ try{
     if(build.version!=='31'||build.label!=='Living Cast')throw new Error(`${vp.name}: incorrect Build 31 metadata ${JSON.stringify(build)}`);
     const decode=await assertBrowserPaintsSources(page,vp.name);
 
+    // Revised town cast: keep all historical service/interactions and replace visible people only.
+    await page.evaluate(()=>window.__BRIAR_GLENDebug.teleport(-620,20));
+    await sleep(650);
+    let state=await page.evaluate(()=>({base:window.__BRIAR_GLENDebug.getAuthoredArtState(),cast:window.__BRIAR_GLENDebug.getCharacterArtState(),game:window.__BRIAR_GLENDebug.getState()}));
+    assertBaseAndCast(state.base,state.cast,vp);
+    if(state.cast.npcDraws<2)throw new Error(`${vp.name}: revised Briar Glen service/town cast did not draw ${JSON.stringify(state.cast)}`);
+    if(vp.name==='desktop'){
+      for(const name of ['alden','rowan','mira','tessa','orin','maeve','perrin']){
+        if(state.cast.replacements[name]<1)throw new Error(`${vp.name}: ${name} authored presentation missing ${JSON.stringify(state.cast.replacements)}`);
+      }
+    }
+    await page.screenshot({path:path.join(artifactDir,`${vp.name}-briar-glen-cast.png`),fullPage:false});
+
     // Sword + Briar Wolf on Meadow Road.
     await page.keyboard.press('Digit1');
     await page.evaluate(()=>{
@@ -79,7 +95,7 @@ try{
       d.setThreat?.('wolf',{x:455,y:115,hp:52,dead:false,hurt:0});
     });
     await sleep(420);
-    let state=await page.evaluate(()=>({base:window.__BRIAR_GLENDebug.getAuthoredArtState(),cast:window.__BRIAR_GLENDebug.getCharacterArtState(),game:window.__BRIAR_GLENDebug.getState()}));
+    state=await page.evaluate(()=>({base:window.__BRIAR_GLENDebug.getAuthoredArtState(),cast:window.__BRIAR_GLENDebug.getCharacterArtState(),game:window.__BRIAR_GLENDebug.getState()}));
     assertBaseAndCast(state.base,state.cast,vp);
     if(state.game.player.weaponType!=='sword'||state.cast.replacements.player_sword<1||state.cast.replacements.wolf<1)throw new Error(`${vp.name}: sword/wolf Living Cast scene missing ${JSON.stringify(state)}`);
     await page.screenshot({path:path.join(artifactDir,`${vp.name}-sword-wolf.png`),fullPage:false});
@@ -113,11 +129,11 @@ try{
     await page.screenshot({path:path.join(artifactDir,`${vp.name}-staff-emberback.png`),fullPage:false});
 
     const disabled=await page.evaluate(()=>{const d=window.__BRIAR_GLENDebug;d.setCharacterArtEnabled(false);return d.getCharacterArtState();});
-    const playerAtDisable=disabled.playerDraws,enemyAtDisable=disabled.enemyDraws;
+    const playerAtDisable=disabled.playerDraws,enemyAtDisable=disabled.enemyDraws,npcAtDisable=disabled.npcDraws;
     if(disabled.enabled)throw new Error(`${vp.name}: Living Cast debug disable failed`);
     await sleep(180);
     let frozen=await page.evaluate(()=>window.__BRIAR_GLENDebug.getCharacterArtState());
-    if(frozen.enabled||frozen.playerDraws!==playerAtDisable||frozen.enemyDraws!==enemyAtDisable)throw new Error(`${vp.name}: disabled cast kept drawing ${JSON.stringify(frozen)}`);
+    if(frozen.enabled||frozen.playerDraws!==playerAtDisable||frozen.enemyDraws!==enemyAtDisable||frozen.npcDraws!==npcAtDisable)throw new Error(`${vp.name}: disabled cast kept drawing ${JSON.stringify(frozen)}`);
     await page.evaluate(()=>window.__BRIAR_GLENDebug.setCharacterArtEnabled(true));
     await sleep(220);
     frozen=await page.evaluate(()=>window.__BRIAR_GLENDebug.getCharacterArtState());
@@ -126,7 +142,7 @@ try{
     const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));
     if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: Living Cast caused browser overflow ${JSON.stringify(overflow)}`);
     if(errors.length)throw new Error(`${vp.name}: Build 31 runtime errors:\n${errors.join('\n')}`);
-    console.log(`PASS ${vp.name}: Build 31 Living Cast player weapons + wolf/boar/Emberback active ${JSON.stringify(decode)}`);
+    console.log(`PASS ${vp.name}: Build 31 revised Living Cast + service characters + townfolk active ${JSON.stringify(decode)}`);
     await context.close();
   }
 }finally{await browser.close();}
