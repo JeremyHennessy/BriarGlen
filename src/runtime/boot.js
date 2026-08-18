@@ -42,6 +42,7 @@
     'src/v28/42-warden-response-orders.js',
     'src/v29/43-hud-notifications.js',
     'src/v30/44-satchel-character.js',
+    'src/v31/45-map-journal-restructure.js',
     'src/runtime/release-info.js',
   ];
 
