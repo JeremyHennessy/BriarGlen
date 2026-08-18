@@ -58,6 +58,7 @@ jobs:
           node tests/game-feel-smoke.mjs http://127.0.0.1:4173/
           node tests/economy2-smoke.mjs http://127.0.0.1:4173/
           node tests/combat-identity-smoke.mjs http://127.0.0.1:4173/
+          node tests/combat-quality-smoke.mjs http://127.0.0.1:4173/
           node tests/art-direction-smoke.mjs http://127.0.0.1:4173/
           node tests/feedback-tuning-smoke.mjs http://127.0.0.1:4173/
           node tests/stonepine-smoke.mjs http://127.0.0.1:4173/
@@ -97,6 +98,7 @@ jobs:
           run_live node tests/game-feel-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/economy2-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/combat-identity-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          run_live node tests/combat-quality-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/art-direction-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/feedback-tuning-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/stonepine-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
