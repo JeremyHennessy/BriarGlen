@@ -49,6 +49,7 @@ jobs:
           node tests/specialist-crafting-smoke.mjs http://127.0.0.1:4173/
           node tests/warden-response-smoke.mjs http://127.0.0.1:4173/
           node tests/specialist-economy38-smoke.mjs http://127.0.0.1:4173/
+          node tests/phone-ui-collision-smoke.mjs http://127.0.0.1:4173/
           node tests/hud-notifications-smoke.mjs http://127.0.0.1:4173/
           node tests/satchel-character-smoke.mjs http://127.0.0.1:4173/
           node tests/map-journal-smoke.mjs http://127.0.0.1:4173/
@@ -91,6 +92,7 @@ jobs:
           run_live node tests/specialist-crafting-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/warden-response-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/specialist-economy38-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          run_live node tests/phone-ui-collision-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/hud-notifications-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/satchel-character-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/map-journal-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live

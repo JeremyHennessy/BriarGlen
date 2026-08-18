@@ -46,6 +46,7 @@
     'src/v32/46-combat-quality.js',
     'src/v33/47-onboarding-context.js',
     'src/v34/48-specialist-economy.js',
+    'src/v35/49-phone-ui-collision.js',
     'src/runtime/release-info.js',
   ];
 
