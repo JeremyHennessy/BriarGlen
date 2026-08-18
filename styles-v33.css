@@ -1,0 +1,28 @@
+/* Build 33: compact HUD shell and one-at-a-time notification presentation. */
+.hud33-avatar{width:42px;height:50px;grid-row:1/5;display:grid;place-items:center;border:1px solid rgba(230,205,145,.4);border-radius:9px;background:linear-gradient(155deg,#4c6047,#263a2d);color:#ead7a7;font:800 13px/1 Georgia,serif;letter-spacing:.05em}
+.status-panel.hud33-status{display:grid;grid-template-columns:42px minmax(0,1fr);grid-template-rows:auto auto auto auto;gap:2px 9px;width:min(278px,38vw);padding:8px 10px 8px 8px}
+.status-panel.hud33-status>.eyebrow,.status-panel.hud33-status>.status-line,.status-panel.hud33-status>.bar,.status-panel.hud33-status>.bar-label{grid-column:2}
+.quest-panel.hud33-objective{width:min(270px,34vw);padding:8px 10px;text-align:left}
+.quest-panel.hud33-objective .eyebrow{font-size:8px}.quest-panel.hud33-objective strong{font-size:12px}.quest-panel.hud33-objective #quest-text{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.quest-panel.hud33-objective .quest-progress{font-size:8px;margin-top:3px;min-height:9px}
+#hud33-combat{position:absolute;left:50%;bottom:max(65px,calc(env(safe-area-inset-bottom) + 58px));transform:translateX(-50%);display:flex;gap:5px;padding:5px;border-radius:12px;pointer-events:none}
+.hud33-slot{min-width:74px;height:38px;display:grid;grid-template-columns:27px 1fr;grid-template-rows:1fr 1fr;align-items:center;padding:4px 7px;border:1px solid rgba(224,204,154,.16);border-radius:8px;background:rgba(50,70,53,.46)}
+.hud33-slot b{grid-row:1/3;font:900 11px/1 system-ui,sans-serif;color:#ead59d}.hud33-slot strong{font-size:8px;letter-spacing:.07em}.hud33-slot small{font-size:7px;color:#b8c5b3}.hud33-slot[data-ready="false"]{opacity:.66}.hud33-slot[data-weapon="bow"] b{color:#ddc685}.hud33-slot[data-weapon="staff"] b{color:#9ed5b2}
+#hud33-notification{position:absolute;z-index:760;left:50%;top:24%;transform:translateX(-50%);width:min(410px,82vw);padding:8px 13px;border:1px solid rgba(227,207,157,.28);border-radius:12px;background:linear-gradient(145deg,rgba(26,42,31,.95),rgba(15,27,20,.96));box-shadow:0 10px 32px rgba(0,0,0,.28);color:#eee4ca;text-align:center;font:800 10px/1.3 system-ui,sans-serif;letter-spacing:.04em;pointer-events:none}
+#hud33-notification[hidden]{display:none!important}#hud33-notification[data-kind="area"]{font:700 14px/1.25 Georgia,serif}#hud33-notification[data-kind="pickup"]{border-radius:999px;text-transform:uppercase}
+html[data-build33-notifications="true"] #polish23-area,html[data-build33-notifications="true"] #polish23-pickup{opacity:0!important}
+@media(min-width:521px){#warden-map-btn{left:calc(50% + 170px)}}
+@media (pointer:coarse),(max-width:900px){
+  #hud33-combat{bottom:max(8px,env(safe-area-inset-bottom))}
+  .inventory-strip{bottom:max(54px,calc(env(safe-area-inset-bottom) + 48px));transform:translateX(-50%) scale(.76)}
+}
+@media (max-height:520px){
+  .top-row{gap:8px}.status-panel.hud33-status{width:238px;padding:6px 8px 6px 6px;grid-template-columns:36px minmax(0,1fr)}.hud33-avatar{width:36px;height:42px;font-size:11px}
+  .quest-panel.hud33-objective{width:214px;padding:6px 8px}.quest-panel.hud33-objective #quest-text{max-width:195px}
+  #hud33-notification{top:max(68px,calc(env(safe-area-inset-top) + 62px));font-size:9px}
+  #hud33-combat{bottom:max(7px,env(safe-area-inset-bottom))}.hud33-slot{min-width:66px;height:34px}
+}
+@media(max-width:520px) and (min-height:600px){
+  .top-row{display:grid;grid-template-columns:1fr;gap:7px}.status-panel.hud33-status,.quest-panel.hud33-objective{width:min(280px,72vw)}
+  .quest-panel.hud33-objective #quest-text{white-space:normal}.inventory-strip{bottom:max(175px,calc(env(safe-area-inset-bottom) + 160px))}
+  #hud33-combat{bottom:max(126px,calc(env(safe-area-inset-bottom) + 116px))}
+}
