@@ -24,7 +24,7 @@ try{
     await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getWardenResponseState&&window.__BRIAR_GLENDebug?.getSpecialistCraftingState),{timeout:7000});
 
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-    if(build.version!=='32'||build.label!=='Warden Response')throw new Error(`${vp.name}: incorrect Build 32 metadata ${JSON.stringify(build)}`);
+    if(Number.parseFloat(build.version)<32||build.saveKey!=='briar-glen-vslice-v1'||build.schema!==1||build.runtime!=='canonical-manifest-hooks-v1')throw new Error(`${vp.name}: incorrect Build 32+ metadata ${JSON.stringify(build)}`);
 
     await page.evaluate(()=>{
       const d=window.__BRIAR_GLENDebug;
