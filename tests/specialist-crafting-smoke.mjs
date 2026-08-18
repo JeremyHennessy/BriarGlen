@@ -59,9 +59,13 @@ try{
       });
       d.setInventory({iron:10,resin:10,hide:10,binding:10,ore:10,herb:10,mooncap:10,mossglass:10});
       d.toggleCrafting?.(true);
-      return d.getSpecialistCraftingState();
+      d.setThreat('wolf',{hp:52,dead:false,hurt:0});
+      d.damageIdentityThreat('wolf',10,'sword');
+      const wolf=d.getState().enemies.find(e=>e.type==='wolf');
+      return {state:d.getSpecialistCraftingState(),baselineHit:52-(wolf?.hp??52)};
     });
-    if(!setup.masterworks.sword||!setup.masterworks.bow||!setup.masterworks.staff)throw new Error(`${vp.name}: specialist masterwork gate setup failed ${JSON.stringify(setup.masterworks)}`);
+    if(!setup.state.masterworks.sword||!setup.state.masterworks.bow||!setup.state.masterworks.staff)throw new Error(`${vp.name}: specialist masterwork gate setup failed ${JSON.stringify(setup.state.masterworks)}`);
+    if(!(setup.baselineHit>0))throw new Error(`${vp.name}: could not measure existing sword combat baseline ${JSON.stringify(setup)}`);
 
     const cardCount=await page.locator('#specialist31-grid .craft-item').count();
     if(cardCount!==6)throw new Error(`${vp.name}: expected six specialist finishing choices, found ${cardCount}`);
@@ -73,12 +77,13 @@ try{
       d.setThreat('wolf',{hp:52,dead:false,hurt:0});
       d.damageIdentityThreat('wolf',10,'sword');
       const wolf=d.getState().enemies.find(e=>e.type==='wolf');
-      return {ok,state:d.getSpecialistCraftingState(),preview:d.previewSpecialistDamage(100,'sword'),wolfHp:wolf?.hp};
+      return {ok,state:d.getSpecialistCraftingState(),preview:d.previewSpecialistDamage(100,'sword'),hit:52-(wolf?.hp??52)};
     });
     if(!forceSword.ok||forceSword.state.traits.sword!=='forceful'||forceSword.state.materials.iron!==8||forceSword.state.materials.resin!==9){
       throw new Error(`${vp.name}: Quarry Edge crafting incorrect ${JSON.stringify(forceSword)}`);
     }
-    if(forceSword.preview!==130||forceSword.wolfHp!==41)throw new Error(`${vp.name}: forceful sword damage hook incorrect ${JSON.stringify(forceSword)}`);
+    const expectedForceHit=Math.round(setup.baselineHit*1.10);
+    if(forceSword.preview!==130||forceSword.hit!==expectedForceHit)throw new Error(`${vp.name}: forceful sword did not compose with existing combat identity ${JSON.stringify({baseline:setup.baselineHit,expectedForceHit,forceSword})}`);
 
     const swiftSword=await page.evaluate(()=>{
       const d=window.__BRIAR_GLENDebug;
@@ -86,15 +91,15 @@ try{
       const preview=d.previewSpecialistDamage(100,'sword');
       d.setThreat('wolf',{hp:52,dead:false,hurt:0});
       d.damageIdentityThreat('wolf',10,'sword');
-      const wolfHp=d.getState().enemies.find(e=>e.type==='wolf')?.hp;
+      const hit=52-(d.getState().enemies.find(e=>e.type==='wolf')?.hp??52);
       d.toggleCrafting?.(false);
       d.attack();
-      return {ok,state:d.getSpecialistCraftingState(),preview,wolfHp};
+      return {ok,state:d.getSpecialistCraftingState(),preview,hit};
     });
     if(!swiftSword.ok||swiftSword.state.traits.sword!=='swift'||swiftSword.state.materials.hide!==8||swiftSword.state.materials.binding!==9){
       throw new Error(`${vp.name}: Warden Grip reforging incorrect ${JSON.stringify(swiftSword)}`);
     }
-    if(swiftSword.preview!==118||swiftSword.wolfHp!==42)throw new Error(`${vp.name}: swift sword should preserve baseline damage ${JSON.stringify(swiftSword)}`);
+    if(swiftSword.preview!==118||swiftSword.hit!==setup.baselineHit)throw new Error(`${vp.name}: swift sword should preserve existing combat damage ${JSON.stringify({baseline:setup.baselineHit,swiftSword})}`);
     if(!(swiftSword.state.attackCd>0&&swiftSword.state.attackCd<.39))throw new Error(`${vp.name}: swift attack recovery not applied ${JSON.stringify(swiftSword.state)}`);
 
     const otherTraits=await page.evaluate(()=>{
@@ -126,7 +131,7 @@ try{
     const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));
     if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: specialist crafting caused browser overflow ${JSON.stringify(overflow)}`);
     if(errors.length)throw new Error(`${vp.name}: runtime errors:\n${errors.join('\n')}`);
-    console.log(`PASS ${vp.name}: Build 31 specialist finishing uses canonical hooks, material choices, real damage/recovery effects and persistence`);
+    console.log(`PASS ${vp.name}: Build 31 specialist finishing uses canonical hooks, material choices, combat-composed damage/recovery effects and persistence`);
     await context.close();
   }
 }finally{await browser.close();}
