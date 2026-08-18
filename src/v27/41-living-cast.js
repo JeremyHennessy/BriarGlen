@@ -141,6 +141,7 @@
     const entityScale = name === 'boss' ? 1.04 : Math.max(.84,Math.min(1.08,e.scale||1));
     const scale = camera.zoom * entityScale;
     const w = def.width*scale, h=def.height*scale;
+    if (p.x < -w || p.x > viewport.w + w || p.y < -h || p.y > viewport.h + h) return;
     const flip = e.facingX < -.05;
     const alpha = e.hurt > 0 ? .78 : 1;
     const filter = e.hurt > 0 ? `${def.filter} brightness(1.18) saturate(.72)` : def.filter;
