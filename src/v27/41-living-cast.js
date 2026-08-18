@@ -54,7 +54,7 @@
   if (characterExpanded) {
     document.documentElement.dataset.briarGlenCharacterArt = 'loading';
     Promise.all(Object.entries(defs).map(([name,def]) => new Promise((resolve,reject) => {
-      image = new Image();
+      const image = new Image();
       image.decoding = 'async';
       image.onload = () => {
         proof.assets[name] = {loaded:true,width:image.naturalWidth,height:image.naturalHeight,image,src:def.src};
