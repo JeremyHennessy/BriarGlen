@@ -67,6 +67,7 @@ jobs:
           node tests/hollow-den-art-smoke.mjs http://127.0.0.1:4173/
           node tests/runtime-architecture-smoke.mjs http://127.0.0.1:4173/
           node tests/onboarding-smoke.mjs http://127.0.0.1:4173/
+          node tests/contextual-onboarding-smoke.mjs http://127.0.0.1:4173/
           node tests/balance-pacing-smoke.mjs http://127.0.0.1:4173/
           node tests/final-polish-smoke.mjs http://127.0.0.1:4173/
       - name: Test deployed GitHub Pages build in browser
@@ -107,6 +108,7 @@ jobs:
           run_live node tests/hollow-den-art-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/runtime-architecture-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/onboarding-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
+          run_live node tests/contextual-onboarding-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/balance-pacing-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/final-polish-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
           run_live node tests/build25-production-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
