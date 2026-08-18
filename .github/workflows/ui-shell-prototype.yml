@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'tests/ui-shell-preview.mjs'
+      - 'tests/satchel-preview.mjs'
       - '.github/workflows/ui-shell-prototype.yml'
   workflow_dispatch:
 
@@ -26,7 +27,9 @@ jobs:
           sleep 2
       - name: Capture reversible UI shell prototype
         run: node tests/ui-shell-preview.mjs http://127.0.0.1:4173/
-      - name: Upload UI shell screenshots
+      - name: Capture reversible Satchel/character prototype
+        run: node tests/satchel-preview.mjs http://127.0.0.1:4173/
+      - name: Upload UI prototype screenshots
         uses: actions/upload-artifact@v4
         with:
           name: ui-shell-prototype-${{ github.sha }}
