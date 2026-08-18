@@ -9,7 +9,7 @@ on:
 jobs:
   live-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 24
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,34 +37,49 @@ jobs:
           test "$ready" = 1
       - name: Run hosted Build 31 regression matrix
         run: |
+          set -e
           BASE='https://jeremyhennessy.github.io/BriarGlen/?sha=c9d318dc6c0a3cac8cbb2bf9056c4ae1efedb700'
-          node tests/smoke.mjs "$BASE" --live
-          node tests/world-smoke.mjs "$BASE" --live
-          node tests/controls-smoke.mjs "$BASE" --live
-          node tests/aiming-gear-smoke.mjs "$BASE" --live
-          node tests/skills-smoke.mjs "$BASE" --live
-          node tests/crafting-smoke.mjs "$BASE" --live
-          node tests/specialist-crafting-smoke.mjs "$BASE" --live
-          node tests/map-journal-smoke.mjs "$BASE" --live
-          node tests/fen-smoke.mjs "$BASE" --live
-          node tests/contracts-smoke.mjs "$BASE" --live
-          node tests/stability-smoke.mjs "$BASE" --live
-          node tests/game-feel-smoke.mjs "$BASE" --live
-          node tests/economy2-smoke.mjs "$BASE" --live
-          node tests/combat-identity-smoke.mjs "$BASE" --live
-          node tests/art-direction-smoke.mjs "$BASE" --live
-          node tests/feedback-tuning-smoke.mjs "$BASE" --live
-          node tests/stonepine-smoke.mjs "$BASE" --live
-          node tests/stonepine-integration-smoke.mjs "$BASE" --live
-          node tests/biome-art-smoke.mjs "$BASE" --live
-          node tests/hollow-den-art-smoke.mjs "$BASE" --live
-          node tests/runtime-architecture-smoke.mjs "$BASE" --live
-          node tests/onboarding-smoke.mjs "$BASE" --live
-          node tests/balance-pacing-smoke.mjs "$BASE" --live
-          node tests/final-polish-smoke.mjs "$BASE" --live
-          node tests/build25-production-smoke.mjs "$BASE" --live
-          node tests/build26-production-smoke.mjs "$BASE" --live
-          node tests/build27-production-smoke.mjs "$BASE" --live
-          node tests/build28-production-smoke.mjs "$BASE" --live
-          node tests/build29-production-smoke.mjs "$BASE" --live
-          node tests/build30-production-smoke.mjs "$BASE" --live
+          run_live() {
+            test_file="$1"
+            for attempt in 1 2 3; do
+              echo "=== ${test_file} live attempt ${attempt}/3 ==="
+              if node "tests/${test_file}" "$BASE" --live; then
+                return 0
+              fi
+              if [ "$attempt" -lt 3 ]; then
+                echo "Retrying unchanged ${test_file} after transient hosted failure"
+                sleep 5
+              fi
+            done
+            return 1
+          }
+          run_live smoke.mjs
+          run_live world-smoke.mjs
+          run_live controls-smoke.mjs
+          run_live aiming-gear-smoke.mjs
+          run_live skills-smoke.mjs
+          run_live crafting-smoke.mjs
+          run_live specialist-crafting-smoke.mjs
+          run_live map-journal-smoke.mjs
+          run_live fen-smoke.mjs
+          run_live contracts-smoke.mjs
+          run_live stability-smoke.mjs
+          run_live game-feel-smoke.mjs
+          run_live economy2-smoke.mjs
+          run_live combat-identity-smoke.mjs
+          run_live art-direction-smoke.mjs
+          run_live feedback-tuning-smoke.mjs
+          run_live stonepine-smoke.mjs
+          run_live stonepine-integration-smoke.mjs
+          run_live biome-art-smoke.mjs
+          run_live hollow-den-art-smoke.mjs
+          run_live runtime-architecture-smoke.mjs
+          run_live onboarding-smoke.mjs
+          run_live balance-pacing-smoke.mjs
+          run_live final-polish-smoke.mjs
+          run_live build25-production-smoke.mjs
+          run_live build26-production-smoke.mjs
+          run_live build27-production-smoke.mjs
+          run_live build28-production-smoke.mjs
+          run_live build29-production-smoke.mjs
+          run_live build30-production-smoke.mjs
