@@ -12,7 +12,7 @@ try{
     await page.goto(`${target}${target.includes('?')?'&':'?'}build33=${Date.now()}-${vp.name}`,{waitUntil:'domcontentloaded',timeout:15000});
     await page.waitForFunction(()=>window.__BRIAR_GLENDebug?.getHudNotificationState?.().cssLoaded,{timeout:7000});
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-    if(build.version!=='33'||build.label!=='HUD & Notifications')throw new Error(`${vp.name}: wrong Build 33 metadata ${JSON.stringify(build)}`);
+    if(Number.parseFloat(build.version)<33||build.saveKey!=='briar-glen-vslice-v1'||build.schema!==1||build.runtime!=='canonical-manifest-hooks-v1')throw new Error(`${vp.name}: wrong Build 33+ metadata ${JSON.stringify(build)}`);
     for(const selector of ['.hud33-avatar','#hud33-combat','#hud33-weapon','#hud33-skill','#hud33-notification'])if(await page.locator(selector).count()!==1)throw new Error(`${vp.name}: missing ${selector}`);
     for(const selector of ['.hud33-status','.hud33-objective','#hud33-combat'])if(!inside(await page.locator(selector).boundingBox(),vp))throw new Error(`${vp.name}: ${selector} outside viewport`);
     if(vp.width>520){

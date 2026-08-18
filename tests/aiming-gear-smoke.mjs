@@ -145,6 +145,7 @@ try {
     // Exercise the actual satchel equip control.
     await page.locator('#inventory-strip').click();
     if (!(await page.locator('#inventory-panel').isVisible())) throw new Error(`${vp.name}: satchel did not open for gear`);
+    await page.evaluate(() => window.__BRIAR_GLENDebug.selectSatchelCategory?.('equipment'));
     await page.locator('#toggle-relic-btn').click();
     gear = await page.evaluate(() => window.__BRIAR_GLENDebug.getGearState());
     if (gear.relic.equipped || gear.bowDamage !== 18 || gear.staffDamage !== 24) {
@@ -166,6 +167,7 @@ try {
     }
 
     await page.locator('#inventory-strip').click();
+    await page.evaluate(() => window.__BRIAR_GLENDebug.selectSatchelCategory?.('equipment'));
     await page.locator('#toggle-boots-btn').click();
     gear = await page.evaluate(() => window.__BRIAR_GLENDebug.getGearState());
     if (gear.boots.equipped || gear.speed !== 245) {

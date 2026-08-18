@@ -1,8 +1,8 @@
 (() => {
   'use strict';
   const BUILD_INFO = Object.freeze({
-    version:'33',
-    label:'HUD & Notifications',
+    version:'34',
+    label:'Satchel & Character',
     saveKey:'briar-glen-vslice-v1',
     schema:1,
     runtime:'canonical-manifest-hooks-v1',
