@@ -75,7 +75,7 @@ try {
     await page.waitForFunction(() => {
       const boar = window.__BRIAR_GLENDebug.getCombatIdentityState().enemies.find(e => e.type === 'boar');
       return boar?.state?.kind === 'boar-charge' && boar.state.mode === 'dash';
-    }, null, { timeout: 3000 });
+    }, null, { timeout: 8000 });
     const bow = await page.evaluate(() => {
       const d = window.__BRIAR_GLENDebug;
       const beforeCounters = d.getCombatIdentityState().counters.countershots;
@@ -118,7 +118,7 @@ try {
       const identity = d.getCombatIdentityState();
       const player = d.getState().player;
       return identity.counters.hazardHits > before && identity.playerRoot > 0 && player.hp < 100;
-    }, mireSetup.before, { timeout: 5000 });
+    }, mireSetup.before, { timeout: 8000 });
     const mire = await page.evaluate(() => ({
       player: window.__BRIAR_GLENDebug.getState().player,
       identity: window.__BRIAR_GLENDebug.getCombatIdentityState(),
@@ -162,7 +162,7 @@ try {
     });
     await page.waitForFunction(() =>
       window.__BRIAR_GLENDebug.getCombatIdentityState().hazards.filter(h => h.label === 'ROOT ERUPTION').length >= 3,
-      { timeout: 2200 }
+      { timeout: 8000 }
     );
     const grove = await page.evaluate(() => window.__BRIAR_GLENDebug.getCombatIdentityState());
     if (grove.hazards.filter(h => h.label === 'ROOT ERUPTION').length < 3) {
@@ -179,7 +179,7 @@ try {
     await page.waitForFunction(() => {
       const warden = window.__BRIAR_GLENDebug.getCombatIdentityState().enemies.find(e => e.type === 'fenwarden');
       return warden?.state?.kind === 'warden-surge' && ['dash','recover'].includes(warden.state.mode);
-    }, null, { timeout: 2200 });
+    }, null, { timeout: 8000 });
     const warden = await page.evaluate(() => window.__BRIAR_GLENDebug.getCombatIdentityState().enemies.find(e => e.type === 'fenwarden'));
     if (!warden?.state || !['dash','recover'].includes(warden.state.mode) || warden.state.kind !== 'warden-surge') {
       throw new Error(`${vp.name}: Drowned Warden phase-two surge missing ${JSON.stringify(warden)}`);

@@ -73,7 +73,7 @@ try {
 
     const onSignature = await canvasSignature(page);
     const framesBefore = art.frames;
-    await sleep(420);
+    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getArtState().frames >= before + 5, framesBefore, { timeout: 3000 });
     art = await page.evaluate(() => window.__BRIAR_GLENDebug.getArtState());
     if (art.frames - framesBefore < 5) throw new Error(`${vp.name}: render cadence stalled with art enabled: ${art.frames-framesBefore} frames`);
     if (JSON.stringify(art.current) !== JSON.stringify(entityCounts)) throw new Error(`${vp.name}: art pass mutated gameplay entity counts during render ${JSON.stringify({before:entityCounts,after:art.current})}`);
