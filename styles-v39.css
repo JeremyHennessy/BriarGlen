@@ -52,11 +52,11 @@
 @media (orientation: portrait) and (max-width: 520px) {
   #rotate-note { display: none !important; }
   #onboarding37-prompt {
-    top: max(150px, calc(env(safe-area-inset-top) + 144px));
+    top: max(180px, calc(env(safe-area-inset-top) + 174px));
     width: min(320px, calc(100vw - 24px));
   }
   #hud33-notification {
-    top: max(150px, calc(env(safe-area-inset-top) + 144px));
+    top: max(180px, calc(env(safe-area-inset-top) + 174px));
     width: min(340px, calc(100vw - 24px));
   }
   .inventory-strip {
