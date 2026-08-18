@@ -1,0 +1,35 @@
+name: UI shell prototype proof
+
+on:
+  pull_request:
+    paths:
+      - 'tests/ui-shell-preview.mjs'
+      - '.github/workflows/ui-shell-prototype.yml'
+  workflow_dispatch:
+
+jobs:
+  ui-shell-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-ui-preview.log 2>&1 &
+          sleep 2
+      - name: Capture reversible UI shell prototype
+        run: node tests/ui-shell-preview.mjs http://127.0.0.1:4173/
+      - name: Upload UI shell screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-shell-prototype-${{ github.sha }}
+          path: test-artifacts/ui-shell-preview/*.png
+          if-no-files-found: error
+          retention-days: 14
