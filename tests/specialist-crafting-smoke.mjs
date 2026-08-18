@@ -12,10 +12,12 @@ try{
   for(const vp of viewports){
     const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,deviceScaleFactor:1});
     await context.addInitScript(()=>{
+      if(sessionStorage.getItem('briar-glen-specialist-test-reset')==='1')return;
       localStorage.removeItem('briar-glen-vslice-v1');
       localStorage.removeItem('briar-glen-onboarding-v1');
       localStorage.removeItem('briar-glen-run-metrics-v1');
       localStorage.removeItem('briar-glen-vertical-slice-complete-v1');
+      sessionStorage.setItem('briar-glen-specialist-test-reset','1');
     });
     const page=await context.newPage();
     const errors=[];
