@@ -39,6 +39,7 @@
     'src/v25/39-stonepine-timberline.js',
     'src/v26/40-copper-ember.js',
     'src/v27/41-specialist-crafting.js',
+    'src/v28/42-warden-response-orders.js',
     'src/runtime/release-info.js',
   ];
 

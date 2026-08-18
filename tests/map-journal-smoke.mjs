@@ -63,7 +63,10 @@ try {
       await sleep(100);
     }
     await page.evaluate(() => window.__BRIAR_GLENDebug.setProgress({ groveDiscovered: true, shortcutUnlocked: true }));
-    await sleep(120);
+    await page.waitForFunction(() => {
+      const discoveries = window.__BRIAR_GLENDebug.getJournalState().discoveries;
+      return ['briar','meadow','hollow','den','grove','rootway'].every(key => discoveries[key]);
+    }, { timeout: 3000 });
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getJournalState());
     for (const key of ['briar','meadow','hollow','den','grove','rootway']) {
       if (!state.discoveries[key]) throw new Error(`${vp.name}: ${key} was not charted`);

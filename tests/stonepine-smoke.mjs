@@ -91,19 +91,30 @@ try {
       throw new Error(`${vp.name}: Pitchwork Kit accounting incorrect ${JSON.stringify(state)}`);
     }
 
-    const screeBefore = await page.evaluate(() => {
+    await page.evaluate(() => window.__BRIAR_GLENDebug.teleport(0, 0));
+    await page.waitForFunction(() => !window.__BRIAR_GLENDebug.getStonepineState().scree[0].active, { timeout: 5000 });
+    const screeSetup = await page.evaluate(() => {
       const d=window.__BRIAR_GLENDebug;
       d.teleport(-720, 40);
       d.setPlayer({ hp: 100, maxHp: 100, invuln: 0 });
       const before=d.getStonepineState().counters.screeHits;
-      d.triggerStonepineScree(0);
-      return before;
+      return { before, triggered:d.triggerStonepineScree(0) };
+    });
+    if (!screeSetup.triggered) throw new Error(`${vp.name}: explicit scree trigger was not scheduled`);
+    await page.waitForFunction(() => {
+      const active = window.__BRIAR_GLENDebug.getStonepineState().scree[0].active;
+      return active && !active.triggered && active.timer <= .12;
+    }, { timeout: 5000 });
+    await page.evaluate(() => {
+      const d=window.__BRIAR_GLENDebug;
+      d.teleport(-720, 40);
+      d.setPlayer({ hp: 100, maxHp: 100, invuln: 0 });
     });
     // Wait for the actual hazard event rather than wall-clock time. The game loop caps simulated dt,
     // so a loaded CI runner can advance less game time than an 850ms fixed sleep implies.
-    await page.waitForFunction(expected => window.__BRIAR_GLENDebug.getStonepineState().counters.screeHits >= expected, screeBefore + 1, { timeout: 5000 });
+    await page.waitForFunction(expected => window.__BRIAR_GLENDebug.getStonepineState().counters.screeHits >= expected, screeSetup.before + 1, { timeout: 5000 });
     const screeAfter = await page.evaluate(() => ({ player:window.__BRIAR_GLENDebug.getState().player, stone:window.__BRIAR_GLENDebug.getStonepineState() }));
-    if (screeAfter.stone.counters.screeHits !== screeBefore + 1 || screeAfter.player.hp !== 87) {
+    if (screeAfter.stone.counters.screeHits !== screeSetup.before + 1 || screeAfter.player.hp !== 87) {
       throw new Error(`${vp.name}: scree hazard did not deal exact 13 damage ${JSON.stringify(screeAfter)}`);
     }
 
