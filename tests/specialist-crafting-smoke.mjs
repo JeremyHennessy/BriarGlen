@@ -7,6 +7,7 @@ const viewports=[
   {name:'desktop',width:1440,height:900,touch:false},
 ];
 const browser=await chromium.launch({headless:true});
+const expectedWrappers={update:'runtimeUpdate',draw:'runtimeDraw',interact:'runtimeInteract',damageEnemy:'runtimeDamageEnemy',killEnemy:'runtimeKillEnemy',updateUI:'runtimeUpdateUI'};
 
 try{
   for(const vp of viewports){
@@ -31,6 +32,7 @@ try{
       window.__BRIAR_GLENDebug?.chooseSpecialistTrait&&
       window.__BRIAR_GLENDebug?.previewSpecialistDamage&&
       window.__BRIAR_GLENDebug?.getBalanceState&&
+      window.__BRIAR_GLENDebug?.getRuntimeArchitectureState&&
       window.__BRIAR_GLENDebug?.getBuildInfo
     ),{timeout:7000});
 
@@ -42,6 +44,12 @@ try{
     let state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getSpecialistCraftingState());
     if(JSON.stringify(state.entityCounts)!==JSON.stringify(state.baselineEntities))throw new Error(`${vp.name}: specialist layer mutated entities on load ${JSON.stringify(state)}`);
     if(Object.values(state.traits).some(Boolean))throw new Error(`${vp.name}: new save started with specialist traits ${JSON.stringify(state.traits)}`);
+
+    const architecture=await page.evaluate(()=>window.__BRIAR_GLENDebug.getRuntimeArchitectureState());
+    if(JSON.stringify(architecture.wrappers)!==JSON.stringify(expectedWrappers))throw new Error(`${vp.name}: specialist layer replaced canonical wrappers ${JSON.stringify(architecture.wrappers)}`);
+    if(!architecture.hooks.beforeDamageEnemy?.some(h=>h.id==='build31-specialist-damage')||!architecture.hooks.afterUpdateUI?.some(h=>h.id==='build31-specialist-ui')){
+      throw new Error(`${vp.name}: specialist runtime hooks missing ${JSON.stringify(architecture.hooks)}`);
+    }
 
     const setup=await page.evaluate(()=>{
       const d=window.__BRIAR_GLENDebug;
@@ -62,25 +70,31 @@ try{
     const forceSword=await page.evaluate(()=>{
       const d=window.__BRIAR_GLENDebug;
       const ok=d.chooseSpecialistTrait('sword','forceful');
-      return {ok,state:d.getSpecialistCraftingState(),preview:d.previewSpecialistDamage(100,'sword')};
+      d.setThreat('wolf',{hp:52,dead:false,hurt:0});
+      d.damageIdentityThreat('wolf',10,'sword');
+      const wolf=d.getState().enemies.find(e=>e.type==='wolf');
+      return {ok,state:d.getSpecialistCraftingState(),preview:d.previewSpecialistDamage(100,'sword'),wolfHp:wolf?.hp};
     });
     if(!forceSword.ok||forceSword.state.traits.sword!=='forceful'||forceSword.state.materials.iron!==8||forceSword.state.materials.resin!==9){
       throw new Error(`${vp.name}: Quarry Edge crafting incorrect ${JSON.stringify(forceSword)}`);
     }
-    if(forceSword.preview!==130)throw new Error(`${vp.name}: forceful sword expected integrated preview 130, got ${forceSword.preview}`);
+    if(forceSword.preview!==130||forceSword.wolfHp!==41)throw new Error(`${vp.name}: forceful sword damage hook incorrect ${JSON.stringify(forceSword)}`);
 
     const swiftSword=await page.evaluate(()=>{
       const d=window.__BRIAR_GLENDebug;
       const ok=d.chooseSpecialistTrait('sword','swift');
       const preview=d.previewSpecialistDamage(100,'sword');
+      d.setThreat('wolf',{hp:52,dead:false,hurt:0});
+      d.damageIdentityThreat('wolf',10,'sword');
+      const wolfHp=d.getState().enemies.find(e=>e.type==='wolf')?.hp;
       d.toggleCrafting?.(false);
       d.attack();
-      return {ok,state:d.getSpecialistCraftingState(),preview};
+      return {ok,state:d.getSpecialistCraftingState(),preview,wolfHp};
     });
     if(!swiftSword.ok||swiftSword.state.traits.sword!=='swift'||swiftSword.state.materials.hide!==8||swiftSword.state.materials.binding!==9){
       throw new Error(`${vp.name}: Warden Grip reforging incorrect ${JSON.stringify(swiftSword)}`);
     }
-    if(swiftSword.preview!==118)throw new Error(`${vp.name}: swift sword should preserve masterwork damage 118, got ${swiftSword.preview}`);
+    if(swiftSword.preview!==118||swiftSword.wolfHp!==42)throw new Error(`${vp.name}: swift sword should preserve baseline damage ${JSON.stringify(swiftSword)}`);
     if(!(swiftSword.state.attackCd>0&&swiftSword.state.attackCd<.39))throw new Error(`${vp.name}: swift attack recovery not applied ${JSON.stringify(swiftSword.state)}`);
 
     const otherTraits=await page.evaluate(()=>{
@@ -106,11 +120,13 @@ try{
     state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getSpecialistCraftingState());
     if(state.traits.sword!=='swift'||state.traits.bow!=='forceful'||state.traits.staff!=='swift')throw new Error(`${vp.name}: specialist traits did not persist ${JSON.stringify(state.traits)}`);
     if(JSON.stringify(state.entityCounts)!==JSON.stringify(state.baselineEntities))throw new Error(`${vp.name}: persisted specialist state mutated entities`);
+    const architectureAfter=await page.evaluate(()=>window.__BRIAR_GLENDebug.getRuntimeArchitectureState());
+    if(JSON.stringify(architectureAfter.wrappers)!==JSON.stringify(expectedWrappers))throw new Error(`${vp.name}: persisted specialist layer replaced canonical wrappers ${JSON.stringify(architectureAfter.wrappers)}`);
 
     const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));
     if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: specialist crafting caused browser overflow ${JSON.stringify(overflow)}`);
     if(errors.length)throw new Error(`${vp.name}: runtime errors:\n${errors.join('\n')}`);
-    console.log(`PASS ${vp.name}: Build 31 specialist weapon finishing is material-driven, mutually exclusive, effective and persistent`);
+    console.log(`PASS ${vp.name}: Build 31 specialist finishing uses canonical hooks, material choices, real damage/recovery effects and persistence`);
     await context.close();
   }
 }finally{await browser.close();}
