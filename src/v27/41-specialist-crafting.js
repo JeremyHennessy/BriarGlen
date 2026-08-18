@@ -6,7 +6,8 @@
   // Existing masterwork, combat identity, economy and save systems remain authoritative underneath it.
 
   const debug = window.__BRIAR_GLENDebug;
-  if (!debug) throw new Error('Build 31 specialist crafting requires the canonical debug/runtime surface');
+  const runtime = window.__BRIAR_GLEN_RUNTIME;
+  if (!debug || !runtime) throw new Error('Build 31 specialist crafting requires the canonical runtime surface');
 
   if (!progress.specialistTraits || typeof progress.specialistTraits !== 'object') progress.specialistTraits = {};
   for (const weapon of ['sword','bow','staff']) {
@@ -150,12 +151,13 @@
     chooseTrait(button.dataset.specialistWeapon, button.dataset.specialistTrait);
   });
 
-  const priorDamageEnemy = damageEnemy;
-  damageEnemy = function build31SpecialistDamageEnemy(enemy, amountValue, opts = {}) {
-    const adjusted = Math.max(1, Math.round(amountValue * damageTraitMultiplier(player.weaponType)));
-    return priorDamageEnemy(enemy, adjusted, opts);
-  };
+  // Canonical damageEnemy remains the runtime-owned wrapper. The trait changes only the mutable hook payload.
+  runtime.registerHook('beforeDamageEnemy','build31-specialist-damage',payload=>{
+    if (!payload || payload.cancel || !Number.isFinite(payload.amount)) return;
+    payload.amount = Math.max(1, Math.round(payload.amount * damageTraitMultiplier(player.weaponType)));
+  },25);
 
+  // Attack is not a canonical runtime wrapper. Keep the late attack-layer adjustment narrow to recovery only.
   const priorAttack = attack;
   attack = function build31SpecialistAttack() {
     const type = player.weaponType;
@@ -167,16 +169,15 @@
     return result;
   };
 
-  const priorUpdateUI = updateUI;
-  updateUI = function build31SpecialistUpdateUI() {
-    priorUpdateUI();
+  // UI decoration also stays inside the canonical updateUI wrapper via its post-render hook.
+  runtime.registerHook('afterUpdateUI','build31-specialist-ui',()=>{
     render();
     const current = traitFor(player.weaponType);
     if (current && ui.weapon) {
       const def = TRAITS[player.weaponType]?.[current];
       if (def && !ui.weapon.textContent.includes(def.label)) ui.weapon.textContent = `${ui.weapon.textContent} • ${def.label}`;
     }
-  };
+  },1200);
 
   const basePreviewDamage = typeof debug.previewDamage === 'function' ? debug.previewDamage : (value => value);
   debug.chooseSpecialistTrait = (weapon, trait) => chooseTrait(weapon, trait);
