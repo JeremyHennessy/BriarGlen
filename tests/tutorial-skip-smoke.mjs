@@ -14,9 +14,11 @@ try {
   for (const vp of viewports) {
     const context = await browser.newContext({ viewport:{width:vp.width,height:vp.height}, hasTouch:true });
     await context.addInitScript(() => {
+      if (sessionStorage.getItem('briar-glen-tutorial-skip-test-clean') === '1') return;
       localStorage.removeItem('briar-glen-vslice-v1');
       localStorage.removeItem('briar-glen-onboarding-v1');
       localStorage.removeItem('briar-glen-context-guide-v37');
+      sessionStorage.setItem('briar-glen-tutorial-skip-test-clean','1');
     });
     const page = await context.newPage();
     await page.goto(`${target}${target.includes('?')?'&':'?'}onboarding37=1&build40=${Date.now()}-${vp.name}`, { waitUntil:'domcontentloaded', timeout:15000 });
