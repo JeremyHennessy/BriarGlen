@@ -1,0 +1,29 @@
+name: Build 31 cast raster-cache experiment
+
+on:
+  pull_request:
+    paths:
+      - 'src/v27/41-living-cast.js'
+      - 'tests/stonepine-scree-raster-cache-probe.mjs'
+      - '.github/workflows/build31-cast-raster-cache-experiment.yml'
+  workflow_dispatch:
+
+jobs:
+  raster-cache-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-raster-cache-probe.log 2>&1 &
+          sleep 2
+      - name: Measure scree cadence with raster-cached cast
+        run: node tests/stonepine-scree-raster-cache-probe.mjs http://127.0.0.1:4173/
