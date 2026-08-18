@@ -37,8 +37,8 @@ try{
     ),{timeout:7000});
 
     const build=await page.evaluate(()=>window.__BRIAR_GLENDebug.getBuildInfo());
-    if(build.version!=='31'||build.label!=='Specialist Crafting'||build.saveKey!=='briar-glen-vslice-v1'||build.schema!==1){
-      throw new Error(`${vp.name}: incorrect Build 31 metadata ${JSON.stringify(build)}`);
+    if(Number.parseFloat(build.version)<31||build.saveKey!=='briar-glen-vslice-v1'||build.schema!==1||build.runtime!=='canonical-manifest-hooks-v1'){
+      throw new Error(`${vp.name}: incorrect Build 31+ metadata ${JSON.stringify(build)}`);
     }
 
     let state=await page.evaluate(()=>window.__BRIAR_GLENDebug.getSpecialistCraftingState());
