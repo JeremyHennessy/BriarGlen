@@ -14,6 +14,9 @@
 #game-shell:has(#onboarding37-prompt:not([hidden])) :is(#hud33-notification,#rotate-note) {
   display: none !important;
 }
+#game-shell:has(#onboarding21-guide:not([hidden])) #hud33-notification {
+  display: none !important;
+}
 
 @media (orientation: landscape) and (max-width: 900px) and (max-height: 520px) {
   #rotate-note { display: none !important; }
@@ -74,6 +77,9 @@
   }
   #context-prompt {
     bottom: max(365px, calc(env(safe-area-inset-bottom) + 350px));
+  }
+  html[data-onboarding-active="true"] #onboarding21-guide {
+    bottom: max(375px, calc(env(safe-area-inset-bottom) + 360px));
   }
 
   #inventory-panel.satchel34,
