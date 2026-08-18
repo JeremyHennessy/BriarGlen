@@ -69,7 +69,10 @@ try {
       const result=d.damageIdentityThreat('wolf',1,'sword');
       return {before,result};
     });
-    await sleep(180);
+    await page.waitForFunction(()=>{
+      const counts=window.__runtimeTestCounts;
+      return counts?.beforeUpdate>=2&&counts?.afterUpdate>=2&&counts?.afterUI>=2;
+    },{timeout:3000});
     const hookAfter=await page.evaluate(()=>({counts:{...window.__runtimeTestCounts},runtime:window.__BRIAR_GLENDebug.getRuntimeArchitectureState(),wolf:window.__BRIAR_GLENDebug.getState().enemies.find(e=>e.type==='wolf')}));
     if(hookProbe.result.before-hookProbe.result.after!==1||hookAfter.counts.beforeDamage!==1||hookAfter.counts.afterDamage!==1||hookAfter.counts.beforeUpdate<2||hookAfter.counts.afterUpdate<2||hookAfter.counts.afterUI<2){
       throw new Error(`${vp.name}: runtime hook dispatch/parity incorrect ${JSON.stringify({hookProbe,hookAfter})}`);
