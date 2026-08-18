@@ -45,6 +45,7 @@
     'src/v31/45-map-journal-restructure.js',
     'src/v32/46-combat-quality.js',
     'src/v33/47-onboarding-context.js',
+    'src/v34/48-specialist-economy.js',
     'src/runtime/release-info.js',
   ];
 

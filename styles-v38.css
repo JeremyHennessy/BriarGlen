@@ -1,0 +1,2 @@
+/* Build 38: depth inside the existing Rowan response card. */
+.response32-paths{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:7px 0}.response32-path{display:grid;gap:4px;padding:6px;border:1px solid rgba(224,203,153,.16);border-radius:8px;background:rgba(30,42,31,.38)}.response32-path small{display:block}.response32-trait{color:#c9dba9!important}@media(max-width:520px){.response32-paths{grid-template-columns:1fr}}

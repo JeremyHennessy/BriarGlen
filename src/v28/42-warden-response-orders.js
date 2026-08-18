@@ -42,7 +42,11 @@
   const initialBoard = debug.getBoardState();
   if (!Number.isFinite(state.lastSeenCompleted)) state.lastSeenCompleted = initialBoard.completed || 0;
   if (!Number.isFinite(state.fulfilled)) state.fulfilled = 0;
+  if (!state.completedBySource || typeof state.completedBySource !== 'object') state.completedBySource = {};
   if (state.active && (!state.active.key || !state.active.sourceId)) state.active = null;
+  if (state.fulfilled > 0 && state.active?.done && !Object.keys(state.completedBySource).length) {
+    state.completedBySource[state.active.sourceId] = state.fulfilled;
+  }
 
   let observedActiveId = initialBoard.active?.id || null;
   const baselineEntities = (() => {
@@ -69,6 +73,11 @@
     if (reward.coins) parts.push(`${reward.coins} coins`);
     for (const [key,qty] of Object.entries(reward)) if (key !== 'coins' && qty) parts.push(`${qty} ${NAMES[key] || key}`);
     return parts.join(' + ');
+  }
+  function responsePlan(active, def) {
+    const base = {advanced:false,family:null,title:def.title,note:def.note,options:[{id:'standard',label:'Standard delivery',req:def.req,reward:def.reward,traitNote:null}]};
+    const policy = window.__BRIAR_GLEN_SPECIALIST_ECONOMY38;
+    return policy?.plan?.({sourceId:active.sourceId,base,completed:Number(state.completedBySource[active.sourceId]||0),traits:{...(progress.specialistTraits||{})}}) || base;
   }
 
   function createResponse(sourceId, completed) {
@@ -107,43 +116,47 @@
     if (!body) return;
     const active = state.active;
     const def = active ? ORDERS[active.sourceId] : null;
-    const signature = JSON.stringify({active,coins:player.coins,inv:Object.fromEntries(Object.keys(NAMES).map(k => [k,amount(k)]))});
+    const plan = active && def ? responsePlan(active,def) : null;
+    const signature = JSON.stringify({active,plan,history:state.completedBySource,coins:player.coins,inv:Object.fromEntries(Object.keys(NAMES).map(k => [k,amount(k)]))});
     if (!force && signature === renderSignature) return;
     renderSignature = signature;
     if (!active || !def) {
       body.innerHTML = '<article class="market14-commission"><div><strong>No response order posted</strong><p>Finish a Contract Board job and Rowan will prepare a related supply request.</p></div></article>';
       return;
     }
-    const ready = !active.done && has(def.req);
+    const options = plan.options.map(option=>({...option,ready:!active.done&&has(option.req)}));
     body.innerHTML = `
       <article class="market14-commission ${active.done ? 'complete' : ''}">
         <span class="market14-commission-icon">▣</span>
         <div>
-          <div class="eyebrow">AFTER • ${active.source.toUpperCase()}</div>
-          <strong>${def.title}</strong>
-          <p>${def.note}</p>
-          <small>Deliver • ${itemText(def.req)}</small>
-          <small>Reward • ${rewardText(def.reward)}</small>
+          <div class="eyebrow">${plan.advanced?'REPEAT CLIENT':'AFTER'} • ${active.source.toUpperCase()}</div>
+          <strong>${plan.title}</strong>
+          <p>${plan.note}</p>
+          <div class="response32-paths">${options.map(option=>`<div class="response32-path"><small><b>${option.label}</b> • ${itemText(option.req)}</small>${option.traitNote?`<small class="response32-trait">${option.traitNote}</small>`:''}<button type="button" data-warden-response32="${option.id}" ${option.ready?'':'disabled'}>${active.done?'Order fulfilled':option.ready?'Deliver supplies':'Materials needed'}</button></div>`).join('')}</div>
+          <small>Reward • ${rewardText(options[0].reward)}</small>
         </div>
-        <button type="button" data-warden-response32 ${ready ? '' : 'disabled'}>${active.done ? 'Order fulfilled' : ready ? 'Fulfill Response Order' : 'Crafted Supplies Needed'}</button>
       </article>`;
   }
 
-  function fulfill() {
+  function fulfill(pathId = 'standard') {
     const active = state.active;
     const def = active ? ORDERS[active.sourceId] : null;
     if (!active || !def || active.done) return false;
-    if (!has(def.req)) {
-      toast(`Response order needs ${itemText(def.req)}`);
+    const plan = responsePlan(active,def);
+    const option = plan.options.find(entry=>entry.id===pathId) || plan.options[0];
+    if (!has(option.req)) {
+      toast(`Response order needs ${itemText(option.req)}`);
       return false;
     }
-    if (!consume(def.req)) return false;
-    grant(def.reward);
+    if (!consume(option.req)) return false;
+    grant(option.reward);
     active.done = true;
+    active.deliveryPath = option.id;
     state.fulfilled += 1;
+    state.completedBySource[active.sourceId] = Number(state.completedBySource[active.sourceId]||0) + 1;
     spawnParticles(player.x,player.y,'#d8bc78',14,.55);
-    addFloater(player.x,player.y-18,rewardText(def.reward).toUpperCase(),'#f0d89a');
-    toast(`Warden response fulfilled — ${def.title}`);
+    addFloater(player.x,player.y-18,rewardText(option.reward).toUpperCase(),'#f0d89a');
+    toast(`Warden response fulfilled — ${plan.title}`);
     saveGame();
     render(true);
     updateUI();
@@ -151,7 +164,8 @@
   }
 
   section.addEventListener('click', event => {
-    if (event.target.closest?.('[data-warden-response32]')) fulfill();
+    const button=event.target.closest?.('[data-warden-response32]');
+    if (button) fulfill(button.dataset.wardenResponse32||'standard');
   });
 
   runtime.registerHook('afterUpdate','build32-board-response',()=>{
@@ -166,14 +180,15 @@
     if (tradePanel && !tradePanel.hidden) render();
   },1250);
 
-  debug.turnInWardenResponseOrder = fulfill;
+  debug.turnInWardenResponseOrder = pathId => fulfill(pathId);
   debug.getWardenResponseState = () => {
     const active = state.active;
     const def = active ? ORDERS[active.sourceId] : null;
     return {
       lastSeenCompleted:state.lastSeenCompleted,
       fulfilled:state.fulfilled,
-      active:active && def ? {...active, ready:!active.done && has(def.req), req:{...def.req}, reward:{...def.reward}} : null,
+      completedBySource:{...state.completedBySource},
+      active:active && def ? (()=>{const plan=responsePlan(active,def),options=plan.options.map(option=>({...option,req:{...option.req},reward:{...option.reward},ready:!active.done&&has(option.req)}));return{...active,advanced:plan.advanced,family:plan.family,title:plan.title,ready:options.some(option=>option.ready),req:{...options[0].req},reward:{...options[0].reward},options};})() : null,
       board:debug.getBoardState(),
       market:debug.getMarketState(),
       specialist:debug.getSpecialistCraftingState?.() || null,
