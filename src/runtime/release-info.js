@@ -1,8 +1,8 @@
 (() => {
   'use strict';
   const BUILD_INFO = Object.freeze({
-    version:'39',
-    label:'Phone UI Collision Fix',
+    version:'40',
+    label:'Tutorial Visibility Recovery',
     saveKey:'briar-glen-vslice-v1',
     schema:1,
     runtime:'canonical-manifest-hooks-v1',
