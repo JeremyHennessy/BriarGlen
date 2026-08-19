@@ -6,22 +6,26 @@ Briar Glen is a mobile-first browser RPG vertical slice built with plain HTML, C
 
 The slice now includes:
 
-- Briar Glen settlement, Meadow Road, Copper Hollow, Emberback Den, Mooncap Grove, the Rootway and Mosswater Fen / Old Warden Crossing
+- Briar Glen settlement, Meadow Road, Copper Hollow, Emberback Den, Mooncap Grove, the Rootway, Mosswater Fen / Old Warden Crossing and Stonepine Reach
 - three weapon paths: Sword, Briar Bow and Glen Staff
 - mobile aim assist and desktop mouse aiming
 - weapon skills: Cleave, Pierce and Root
 - dodge, enemy windups, boss encounters and persistent health/equipment progression
-- Briarleaf, Mooncap, Copper, Deepvein Iron, Mossglass and field loot
+- Briarleaf, Mooncap, Copper, Deepvein Iron, Mossglass, Ironpine Resin and field loot
 - alchemy, Healing Tonics and Warden Oil
 - Reinforced Pickaxe plus Tempered Sword, Briarstring Bow and Moonroot Staff masterwork upgrades
 - Rowan's trader, permanent equipment and Beast Hide sales
-- Grovekeeper and Drowned Warden progression encounters with named rewards
+- Grovekeeper, Drowned Warden and Quarry Sentinel progression encounters with named rewards
 - discovery-based world map and Warden Journal
-- Contract Board 2.0 with repeatable hunt, delivery and Fen survey work
+- Contract Board 2.0 with repeatable hunt, delivery and regional survey work
 - persistent local saves
-- Build 25 authored Briar Glen presentation: the approved Warden House cottage + two-tree hero cluster is active by default, with `?canvasArt=1` available for direct rollback/A-B comparison
+- generated Briar Glen environment/character/resource sprites with historical Canvas/art-scope rollback support
 
-The authored progression runs from Briar Glen through Emberback, Mooncap Grove and Mosswater Fen, then opens into repeatable Warden contracts and continued exploration/crafting.
+The authored progression runs from Briar Glen through Emberback, Mooncap Grove, Mosswater Fen and Stonepine Reach, then opens into repeatable Warden contracts and continued exploration/crafting.
+
+## Design references
+
+The canonical spatial-design reference is [`docs/WORLD_LAYOUT_AND_LIVING_MAP_RULES.md`](docs/WORLD_LAYOUT_AND_LIVING_MAP_RULES.md). It defines route hierarchy, mobile spacing metrics, village districts, biome terrain language, gates/borders, resource and enemy respawn cadence, ambient-life rules, asset-density limits and verification gates. Future map changes should treat those rules as the default unless the user explicitly approves a new baseline.
 
 ## Controls
 
@@ -67,9 +71,9 @@ Then open `http://localhost:8000`.
 
 The game uses resolution-independent world coordinates and a responsive Canvas/HUD layer. Runtime functionality has been added in versioned, additive layers so previously verified releases remain recoverable while the prototype evolves.
 
-The production release is protected by GitHub Actions browser regression tests. Every gameplay suite runs in Chromium at phone landscape, phone portrait and desktop sizes. On pushes to `main`, the same suites are repeated against the deployed GitHub Pages URL. Build 25 also has a production-specific hosted smoke that requires exact Build 25 metadata, verifies the authored Warden cluster is the default, and verifies `?canvasArt=1` restores the prior Canvas presentation.
+The production release is protected by GitHub Actions browser regression tests. Every gameplay suite runs in Chromium at phone landscape, phone portrait and desktop sizes. On pushes to `main`, the same suites are repeated against the deployed GitHub Pages URL. Historical art scopes and `?canvasArt=1` remain available as recovery paths while newer presentation layers are developed.
 
-Build 12.1 adds a fast static integrity/syntax gate ahead of Chromium so missing, empty or truncated runtime assets fail before the slower browser stage.
+A fast static integrity/syntax gate runs ahead of Chromium so missing, empty or truncated runtime assets fail before the slower browser stage.
 
 ## Save compatibility
 
