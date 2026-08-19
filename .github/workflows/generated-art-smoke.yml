@@ -1,0 +1,59 @@
+name: Generated art proof
+
+on:
+  pull_request:
+    paths:
+      - 'src/v36/**'
+      - 'src/runtime/boot.js'
+      - 'tests/generated-art-smoke.mjs'
+      - '.github/workflows/generated-art-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/v36/**'
+      - 'src/runtime/boot.js'
+      - 'tests/generated-art-smoke.mjs'
+      - '.github/workflows/generated-art-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  generated-art-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-generated-art-http.log 2>&1 &
+          echo $! > /tmp/briarglen-generated-art-http.pid
+          sleep 2
+      - name: Run generated art integration proof
+        run: node tests/generated-art-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload generated art screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build41-generated-art-proof
+          path: artifacts/generated-art-*.png
+          if-no-files-found: warn
+      - name: Verify deployed GitHub Pages generated art
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          run_live() {
+            local attempt
+            for attempt in 1 2 3 4 5 6; do
+              "$@" && return 0
+              [ "$attempt" -lt 6 ] && sleep $((attempt * 10))
+            done
+            return 1
+          }
+          run_live node tests/generated-art-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
