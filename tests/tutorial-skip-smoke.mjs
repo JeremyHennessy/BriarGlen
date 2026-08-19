@@ -40,6 +40,27 @@ try {
     if (!state.skipped || state.active || await prompt.isVisible()) throw new Error(`${vp.name}: skipped tutorial returned after reload ${JSON.stringify(state)}`);
     console.log(`PASS ${vp.name}: tutorial visible, Skip tips reachable, dismissal persists`);
     await context.close();
+
+    const returning = await browser.newContext({ viewport:{width:vp.width,height:vp.height}, hasTouch:true });
+    await returning.addInitScript(() => {
+      localStorage.setItem('briar-glen-vslice-v1',JSON.stringify({player:{x:-720,y:30,hp:100,coins:100,inventory:{}},progress:{step:1}}));
+      localStorage.setItem('briar-glen-onboarding-v1',JSON.stringify({stage:'done',complete:true,skipped:false}));
+      localStorage.setItem('briar-glen-context-guide-v37',JSON.stringify({move:true,dodge:true}));
+    });
+    const returningPage = await returning.newPage();
+    await returningPage.goto(`${target}${target.includes('?')?'&':'?'}onboarding=1&onboarding37=1&returning41=${Date.now()}-${vp.name}`, { waitUntil:'domcontentloaded', timeout:15000 });
+    await returningPage.waitForFunction(() => window.__BRIAR_GLENDebug?.getOnboardingState?.().startOpen === true, null, { timeout:7000 });
+    await returningPage.locator('#onboarding21-continue').click();
+    await returningPage.waitForFunction(() => window.__BRIAR_GLENDebug?.getContextualOnboardingState?.().active === 'idle');
+    const idlePrompt = returningPage.locator('#onboarding37-prompt');
+    const idleSkip = returningPage.locator('#onboarding37-skip');
+    if (!(await idlePrompt.isVisible()) || !(await idleSkip.isVisible())) throw new Error(`${vp.name}: returning-player tutorial control is absent`);
+    if (!inside(await idlePrompt.boundingBox(), vp) || !inside(await idleSkip.boundingBox(), vp)) throw new Error(`${vp.name}: returning-player tutorial control is outside viewport`);
+    await idleSkip.click();
+    await returningPage.waitForFunction(() => window.__BRIAR_GLENDebug.getContextualOnboardingState().skipped === true);
+    if (await idlePrompt.isVisible()) throw new Error(`${vp.name}: returning-player Skip tips did not close the tutorial`);
+    console.log(`PASS ${vp.name}: returning-player window and Skip tips remain reachable without an active lesson`);
+    await returning.close();
   }
 } finally {
   await browser.close();
