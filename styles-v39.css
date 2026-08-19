@@ -43,7 +43,7 @@
     right: max(8px, env(safe-area-inset-right));
     transform: none;
     margin-inline: auto;
-    top: max(82px, calc(env(safe-area-inset-top) + 76px));
+    top: max(98px, calc(env(safe-area-inset-top) + 92px));
     width: auto;
     max-width: 360px;
     max-height: 58px;
