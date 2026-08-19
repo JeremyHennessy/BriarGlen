@@ -6,11 +6,18 @@
   const pack=window.__BRIAR_GLEN_GENERATED_ART,debug=window.__BRIAR_GLENDebug;
   if(!pack?.atlas||!pack?.sprites||!debug)return;
 
-  const state={version:'build43-regional-props-v1',requested,ready:false,failed:false,frameDraws:0,totalDraws:0,clusters:{},assets:{},baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}};
+  const state={version:'build43-regional-props-v2',requested,ready:false,failed:false,frameDraws:0,totalDraws:0,clusters:{},assets:{},baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}};
   const atlas=new Image();atlas.decoding='async';atlas.onload=()=>{state.ready=true};atlas.onerror=()=>{state.failed=true;state.ready=false};atlas.src=pack.atlas;
+  const hashCache=new WeakMap();
+  const eligible=new Set(['forge','alchemy','merchant','tavern','board','well','cottage','groveCache','fenCache','stonepineCache','stonepineCamp','ruin','fenRuin','stonepineRuin','quarryRock','stonepineTree']);
 
   function enabled(){const g=debug.getGeneratedArtState?.();return Boolean(requested&&state.ready&&!state.failed&&g?.enabled&&g?.ready);}
-  function hash(o,salt=0){const t=`${o?.type||''}|${o?.name||''}|${Math.round(o?.x||0)}|${Math.round(o?.y||0)}|${salt}`;let h=2166136261>>>0;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h>>>0;}
+  function hash(o){
+    if(hashCache.has(o))return hashCache.get(o);
+    const t=`${o?.type||''}|${o?.name||''}|${Math.round(o?.x||0)}|${Math.round(o?.y||0)}`;let h=2166136261>>>0;
+    for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
+    hashCache.set(o,h>>>0);return h>>>0;
+  }
 
   function prop(name,o,{dx=0,dy=0,scale=1,alpha=1,filter=null,rotation=0,flipX=false}={}){
     if(!enabled())return false;const f=pack.sprites[name];if(!f)return false;
@@ -24,8 +31,7 @@
   function mark(cluster){state.clusters[cluster]=(state.clusters[cluster]||0)+1;}
 
   function dress(o){
-    if(!enabled())return;
-    const h=hash(o,7);
+    if(!enabled()||!eligible.has(o.type))return;
     if(o.type==='forge'){
       prop('wagon',o,{dx:93,dy:23,scale:.42,flipX:true,filter:'saturate(.78) brightness(.86)'});
       prop('path_stones',o,{dx:-10,dy:16,scale:.56,alpha:.52});mark('workyard');
@@ -41,9 +47,9 @@
     }else if(o.type==='board'){
       prop('path_stones',o,{dy:15,scale:.55,alpha:.5});mark('village-green');
     }else if(o.type==='well'){
-      if(h%2===0)prop('flower_clump',o,{dx:48,dy:13,scale:.38,alpha:.82});mark('village-green');
+      const h=hash(o);if(h%2===0)prop('flower_clump',o,{dx:48,dy:13,scale:.38,alpha:.82});mark('village-green');
     }else if(o.type==='cottage'){
-      const v=h%4;
+      const v=hash(o)%4;
       if(v===0){prop('flower_clump',o,{dx:-62,dy:14,scale:.46});prop('crate',o,{dx:60,dy:13,scale:.42});}
       else if(v===1){prop('barrel',o,{dx:62,dy:13,scale:.42});prop('sack',o,{dx:43,dy:13,scale:.38});}
       else if(v===2){prop('bench',o,{dx:-66,dy:14,scale:.46});prop('flower_clump',o,{dx:58,dy:14,scale:.38});}
@@ -62,16 +68,13 @@
       prop('bench',o,{dx:-48,dy:15,scale:.5,filter:'saturate(.55) brightness(.74)'});
       prop('crate',o,{dx:49,dy:13,scale:.42,filter:'saturate(.58) brightness(.76)'});
       prop('sack',o,{dx:66,dy:14,scale:.34,filter:'saturate(.52) brightness(.75)'});mark('stonepine-camp');
-    }else if(o.type==='ruin'&&h%3===0){
-      prop('stump',o,{dx:(h%2?34:-34),dy:13,scale:.36,filter:'saturate(.6) brightness(.7)'});mark('grove-ruin');
-    }else if(o.type==='fenRuin'&&h%2===0){
-      prop('stump',o,{dx:34,dy:13,scale:.34,filter:'hue-rotate(38deg) saturate(.38) brightness(.62)'});mark('fen-ruin');
-    }else if(o.type==='stonepineRuin'&&h%2===0){
-      prop('crate',o,{dx:-34,dy:13,scale:.34,filter:'saturate(.48) brightness(.68)'});mark('stonepine-ruin');
-    }else if(o.type==='quarryRock'&&h%5===0){
-      prop(h%2?'crate':'barrel',o,{dx:h%2?32:-32,dy:14,scale:.34,filter:'saturate(.48) brightness(.68)'});mark('quarry-work');
-    }else if(o.type==='stonepineTree'&&h%6===0){
-      prop('stump',o,{dx:30,dy:14,scale:.34,filter:'saturate(.45) brightness(.62)'});mark('stonepine-forest');
+    }else{
+      const h=hash(o);
+      if(o.type==='ruin'&&h%3===0){prop('stump',o,{dx:(h%2?34:-34),dy:13,scale:.36,filter:'saturate(.6) brightness(.7)'});mark('grove-ruin');}
+      else if(o.type==='fenRuin'&&h%2===0){prop('stump',o,{dx:34,dy:13,scale:.34,filter:'hue-rotate(38deg) saturate(.38) brightness(.62)'});mark('fen-ruin');}
+      else if(o.type==='stonepineRuin'&&h%2===0){prop('crate',o,{dx:-34,dy:13,scale:.34,filter:'saturate(.48) brightness(.68)'});mark('stonepine-ruin');}
+      else if(o.type==='quarryRock'&&h%5===0){prop(h%2?'crate':'barrel',o,{dx:h%2?32:-32,dy:14,scale:.34,filter:'saturate(.48) brightness(.68)'});mark('quarry-work');}
+      else if(o.type==='stonepineTree'&&h%6===0){prop('stump',o,{dx:30,dy:14,scale:.34,filter:'saturate(.45) brightness(.62)'});mark('stonepine-forest');}
     }
   }
 
