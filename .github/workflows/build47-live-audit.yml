@@ -1,0 +1,75 @@
+name: Build 47 live Pages audit
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  live-pages-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity
+        run: node tests/static-sanity.mjs
+      - name: Wait for merged Build 47 on GitHub Pages
+        env:
+          MERGE_SHA: a18dc8f8e8c5de1e4f347b744997d682ae1a0d54
+        run: |
+          set -euo pipefail
+          ROOT="https://jeremyhennessy.github.io/BriarGlen"
+          ready=0
+          for attempt in $(seq 1 60); do
+            boot="$(curl -fsSL --retry 2 "$ROOT/src/runtime/boot.js?sha=$MERGE_SHA&attempt=$attempt" || true)"
+            if printf '%s' "$boot" | grep -q 'src/v44/65-source-ground47-owner.js' \
+              && printf '%s' "$boot" | grep -q 'src/v44/63-source-art47-runtime.js' \
+              && curl -fsSL --retry 2 "$ROOT/assets/v47/terrain-materials.svg?sha=$MERGE_SHA&attempt=$attempt" | grep -q '<svg'; then
+              echo "PASS Pages is serving merged Build 47 source terrain/runtime"
+              ready=1
+              break
+            fi
+            sleep 5
+          done
+          test "$ready" = 1
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Live Build 47 visual and performance proof
+        env:
+          URL: https://jeremyhennessy.github.io/BriarGlen/?sha=a18dc8f8e8c5de1e4f347b744997d682ae1a0d54
+        run: |
+          node tests/build47-visual-rebuild-smoke.mjs "$URL"
+          node tests/build47-source-performance-smoke.mjs "$URL"
+          node tests/ground-v2-smoke.mjs "$URL"
+          node tests/ground-v2-performance-smoke.mjs "$URL"
+          node tests/render-performance-smoke.mjs "$URL"
+      - name: Full live vertical-slice browser matrix
+        env:
+          URL: https://jeremyhennessy.github.io/BriarGlen/?sha=a18dc8f8e8c5de1e4f347b744997d682ae1a0d54
+        run: |
+          set -euo pipefail
+          tests=(
+            smoke world-smoke controls-smoke aiming-gear-smoke skills-smoke crafting-smoke
+            specialist-crafting-smoke warden-response-smoke specialist-economy38-smoke
+            phone-ui-collision-smoke tutorial-skip-smoke hud-notifications-smoke satchel-character-smoke
+            map-journal-smoke map-journal35-smoke fen-smoke contracts-smoke stability-smoke game-feel-smoke
+            economy2-smoke combat-identity-smoke combat-quality-smoke art-direction-smoke feedback-tuning-smoke
+            stonepine-smoke stonepine-integration-smoke biome-art-smoke hollow-den-art-smoke
+            runtime-architecture-smoke onboarding-smoke contextual-onboarding-smoke balance-pacing-smoke final-polish-smoke
+            build25-production-smoke build26-production-smoke build27-production-smoke build28-production-smoke
+            build29-production-smoke build30-production-smoke
+          )
+          for test_name in "${tests[@]}"; do
+            echo "=== LIVE $test_name ==="
+            node "tests/${test_name}.mjs" "$URL"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build47-live-pages-${{ github.sha }}
+          path: artifacts/build47-rebuild-*.png
+          if-no-files-found: ignore
