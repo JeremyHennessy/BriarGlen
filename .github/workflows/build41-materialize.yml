@@ -1,0 +1,62 @@
+name: Build 41 materialize
+
+on:
+  push:
+    branches: [agent/build41-generated-art-integration]
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Materialize verified generated-art tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, sys
+          repo=os.environ['REPO']; token=os.environ['GH_TOKEN']
+          expected_parent='77ccb6ebfcb6157290cf5f998f14f80f32f46970'
+          expected_tree='c3f4af4ada144af68b80e16a3f5843d87051b85f'
+          api='https://api.github.com'
+          headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'}
+          def req(method,path,data=None):
+              body=None if data is None else json.dumps(data).encode()
+              r=urllib.request.Request(api+path,data=body,headers=headers,method=method)
+              with urllib.request.urlopen(r) as resp: return json.load(resp)
+          main=req('GET',f'/repos/{repo}/branches/main')
+          parent=main['commit']['sha']
+          commit=req('GET',f'/repos/{repo}/git/commits/{parent}')
+          base_tree=commit['tree']['sha']
+          if parent!=expected_parent or base_tree!=expected_tree:
+              raise SystemExit(f'Main moved; refusing stale art materialization: {parent} tree {base_tree}')
+          entries=[
+            ('src/runtime/release-info.js','afc77ce433389fd9317ec51089d54baff20fafb7'),
+            ('src/v36/50-generated-art-chunk-00.js','f0ad4646ceeb8f031ace4c8121c5373fea6846d6'),
+            ('src/v36/50-generated-art-chunk-01.js','e7e8d3b0c0c9a49a21af02d6014aaa41b63499fb'),
+            ('src/v36/50-generated-art-chunk-02.js','57e12b999958ab1959a238b4c5b1cbfd124398ac'),
+            ('src/v36/50-generated-art-chunk-03.js','d06af47ffc0f7bb1b4ea708616e995230e792fdb'),
+            ('src/v36/50-generated-art-chunk-04.js','d06c9093774870ac4fab7a4f921620d74c80de5e'),
+            ('src/v36/50-generated-art-chunk-05.js','b46d7d78f2ca620c5322b8e2409dea5d222b82d6'),
+            ('src/v36/50-generated-art-chunk-06.js','c450c32949991990625dc788a6e092f1bd63af60'),
+            ('src/v36/50-generated-art-chunk-07.js','d481f11235e12ef8a1ee6d6680fb88622ad6e516'),
+            ('src/v36/50-generated-art-chunk-08.js','c77cb461cabd821bf5b3ef7ab2b57f9683c90430'),
+            ('src/v36/50-generated-art-chunk-09.js','34f3b5155616c0e10901cbc6343a1c82992cce91'),
+            ('src/v36/50-generated-art-chunk-10.js','5b150367e434ddf443c4226190c966ff1307f4a4'),
+            ('src/v36/50-generated-art-chunk-11.js','a98a2c789723825792a895a633eeb0e0af2a047f'),
+            ('src/v36/50-generated-art-chunk-12.js','b2edf77eb54c869eca57cc5608eadb40863341ad'),
+            ('src/v36/50-generated-art-data.js','1e940161980187d5ee44190d99df25eff958a131'),
+            ('src/v36/51-generated-art-runtime.js','8478729f4be515c09304b5e5b0703d2c712aa2d1'),
+            ('tests/generated-art-smoke.mjs','a044f4ebeff48680d284b55609398c763ac7f0de'),
+            ('tests/phone-ui-collision-smoke.mjs','8b312c3441f29f8d639a65c826d4f1109dc2664f'),
+            ('.github/workflows/generated-art-smoke.yml','cb861ee7eeb5ad373cb5d3e0107089ea3a818718'),
+          ]
+          tree=req('POST',f'/repos/{repo}/git/trees',{'base_tree':base_tree,'tree':[{'path':p,'mode':'100644','type':'blob','sha':s} for p,s in entries]})
+          new=req('POST',f'/repos/{repo}/git/commits',{'message':'Build 41 — generated art integration','tree':tree['sha'],'parents':[parent]})
+          req('PATCH',f'/repos/{repo}/git/refs/heads/agent/build41-generated-art-integration',{'sha':new['sha'],'force':True})
+          print(new['sha'])
+          PY
