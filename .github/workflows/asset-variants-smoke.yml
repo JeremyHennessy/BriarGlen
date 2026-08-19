@@ -1,0 +1,61 @@
+name: Asset variants proof
+
+on:
+  pull_request:
+    paths:
+      - 'src/v38/**'
+      - 'src/runtime/boot.js'
+      - 'tests/asset-variants-smoke.mjs'
+      - '.github/workflows/asset-variants-smoke.yml'
+      - 'docs/ASSET_VARIATION_RULES.md'
+  push:
+    branches: [main]
+    paths:
+      - 'src/v38/**'
+      - 'src/runtime/boot.js'
+      - 'tests/asset-variants-smoke.mjs'
+      - '.github/workflows/asset-variants-smoke.yml'
+      - 'docs/ASSET_VARIATION_RULES.md'
+  workflow_dispatch:
+
+jobs:
+  asset-variants-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-asset-variants-http.log 2>&1 &
+          echo $! > /tmp/briarglen-asset-variants-http.pid
+          sleep 2
+      - name: Run asset variation proof
+        run: node tests/asset-variants-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload asset variation screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build43-asset-variants-proof
+          path: artifacts/asset-variants-*.png
+          if-no-files-found: warn
+      - name: Verify deployed GitHub Pages asset variants
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          run_live() {
+            local attempt
+            for attempt in 1 2 3 4 5 6; do
+              "$@" && return 0
+              [ "$attempt" -lt 6 ] && sleep $((attempt * 10))
+            done
+            return 1
+          }
+          run_live node tests/asset-variants-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live

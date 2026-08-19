@@ -25,7 +25,9 @@ The authored progression runs from Briar Glen through Emberback, Mooncap Grove, 
 
 ## Design references
 
-The canonical spatial-design reference is [`docs/WORLD_LAYOUT_AND_LIVING_MAP_RULES.md`](docs/WORLD_LAYOUT_AND_LIVING_MAP_RULES.md). It defines route hierarchy, mobile spacing metrics, village districts, biome terrain language, gates/borders, resource and enemy respawn cadence, ambient-life rules, asset-density limits and verification gates. Future map changes should treat those rules as the default unless the user explicitly approves a new baseline.
+The canonical spatial-design reference is [`docs/WORLD_LAYOUT_AND_LIVING_MAP_RULES.md`](docs/WORLD_LAYOUT_AND_LIVING_MAP_RULES.md). It defines route hierarchy, mobile spacing metrics, village districts, biome terrain language, gates/borders, resource and enemy respawn cadence, ambient-life rules, asset-density limits and verification gates.
+
+The canonical repetition/variant reference is [`docs/ASSET_VARIATION_RULES.md`](docs/ASSET_VARIATION_RULES.md). It defines which families may vary, deterministic runtime variants, regional treatment, prop-cluster rules, stateful cache/gate graphics, collision constraints and when a family needs new source art instead of more filtering. Future art/map changes should treat both documents as defaults unless the user explicitly approves a new baseline.
 
 ## Controls
 

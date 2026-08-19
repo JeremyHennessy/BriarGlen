@@ -64,8 +64,11 @@
     'src/v36/49-generated-art-compat-pre.js',
     'src/v36/50-generated-art-runtime.js',
     'src/v36/51-generated-art-compat-post.js',
+    'src/v38/55-asset-variants.js',
     'src/v36/52-generated-art-dressing.js',
+    'src/v38/56-regional-prop-clusters.js',
     'src/v37/54-world-layout-v2-canonical.js',
+    'src/v38/57-npc-idle-stagger.js',
     'src/runtime/release-info.js',
   ];
 

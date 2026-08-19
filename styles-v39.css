@@ -22,6 +22,15 @@
   display: none !important;
 }
 
+/* Notification content is asynchronous. Its final border box must be intrinsically phone-safe,
+   regardless of queued copy length or the game-shell's internal coordinate box. */
+#hud33-notification {
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 @media (orientation: landscape) and (max-width: 900px) and (max-height: 520px) {
   #rotate-note { display: none !important; }
   #onboarding37-prompt {
@@ -29,8 +38,17 @@
     width: min(280px, calc(100vw - 28px));
   }
   #hud33-notification {
+    position: fixed;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    transform: none;
+    margin-inline: auto;
     top: max(98px, calc(env(safe-area-inset-top) + 92px));
-    width: min(360px, 64vw);
+    width: auto;
+    max-width: 360px;
+    max-height: 58px;
+    overflow: hidden;
+    padding: 6px 11px;
   }
   #warden-map-btn {
     left: 50%;
@@ -63,8 +81,16 @@
     width: min(320px, calc(100vw - 24px));
   }
   #hud33-notification {
+    position: fixed;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    transform: none;
+    margin-inline: auto;
     top: max(180px, calc(env(safe-area-inset-top) + 174px));
-    width: min(340px, calc(100vw - 24px));
+    width: auto;
+    max-width: 340px;
+    max-height: min(92px, calc(100vh - 390px));
+    overflow: hidden;
   }
   .inventory-strip {
     bottom: max(205px, calc(env(safe-area-inset-bottom) + 190px));

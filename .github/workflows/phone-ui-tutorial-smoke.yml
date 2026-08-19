@@ -1,0 +1,46 @@
+name: Phone UI and tutorial proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  phone-ui-tutorial-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-phone-ui-http.log 2>&1 &
+          echo $! > /tmp/briarglen-phone-ui-http.pid
+          sleep 2
+      - name: Verify phone UI collision contract
+        run: node tests/phone-ui-collision-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify returning-player tutorial and Skip tips
+        run: node tests/tutorial-skip-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify deployed GitHub Pages phone UI and tutorial
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          run_live() {
+            local attempt
+            for attempt in 1 2 3 4 5 6; do
+              "$@" && return 0
+              [ "$attempt" -lt 6 ] && sleep $((attempt * 5))
+            done
+            return 1
+          }
+          base="https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
+          run_live node tests/phone-ui-collision-smoke.mjs "$base"
+          run_live node tests/tutorial-skip-smoke.mjs "$base"

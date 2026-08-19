@@ -18,19 +18,24 @@ const chromeSelectors = [
 ];
 
 async function visibleBoxes(page) {
-  const boxes = [];
-  for (const selector of chromeSelectors) {
-    const locator = page.locator(selector);
-    if (await locator.count() && await locator.isVisible()) boxes.push({ selector, box:await locator.boundingBox() });
-  }
-  return boxes;
+  // Snapshot visibility and geometry in one browser task. This avoids a race where an
+  // asynchronous notification expires between Playwright isVisible() and boundingBox().
+  return page.evaluate(selectors => selectors.flatMap(selector => {
+    const el = document.querySelector(selector);
+    if (!el) return [];
+    const style = getComputedStyle(el);
+    const visible = !el.hidden && style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) !== 0 && el.getClientRects().length > 0;
+    if (!visible) return [];
+    const rect = el.getBoundingClientRect();
+    return [{ selector, box:{ x:rect.x, y:rect.y, width:rect.width, height:rect.height } }];
+  }), chromeSelectors);
 }
 
 async function assertNoChromeCollisions(page, vp, phase) {
   const boxes = await visibleBoxes(page);
-  for (const item of boxes) if (!inside(item.box, vp)) throw new Error(`${vp.name} ${phase}: ${item.selector} outside viewport`);
+  for (const item of boxes) if (!inside(item.box, vp)) throw new Error(`${vp.name} ${phase}: ${item.selector} outside viewport; box=${JSON.stringify(item.box)} viewport=${JSON.stringify(vp)}`);
   for (let i=0; i<boxes.length; i++) for (let j=i+1; j<boxes.length; j++) {
-    if (overlaps(boxes[i].box, boxes[j].box)) throw new Error(`${vp.name} ${phase}: ${boxes[i].selector} overlaps ${boxes[j].selector}`);
+    if (overlaps(boxes[i].box, boxes[j].box)) throw new Error(`${vp.name} ${phase}: ${boxes[i].selector} overlaps ${boxes[j].selector}; a=${JSON.stringify(boxes[i].box)} b=${JSON.stringify(boxes[j].box)}`);
   }
 }
 
@@ -38,7 +43,8 @@ async function assertBlockingPanel(page, vp, id, open, close) {
   await open();
   await page.waitForFunction(panelId => !document.getElementById(panelId)?.hidden, id, { timeout:2000 });
   const panel = page.locator(`#${id}`);
-  if (!inside(await panel.boundingBox(), vp)) throw new Error(`${vp.name}: #${id} outside safe viewport`);
+  const panelBox = await panel.boundingBox();
+  if (!inside(panelBox, vp)) throw new Error(`${vp.name}: #${id} outside safe viewport; box=${JSON.stringify(panelBox)} viewport=${JSON.stringify(vp)}`);
   const state = await page.evaluate(() => window.__BRIAR_GLENDebug.getPhoneUi39State());
   if (!state.oneBlockingWindow || state.openPanels.length !== 1) throw new Error(`${vp.name}: stacked blocking windows ${JSON.stringify(state.openPanels)}`);
   for (const selector of ['#hud','#touch-controls','#warden-map-btn','#hud33-combat','#combat36-readiness','#onboarding37-prompt','#reset-btn']) {
@@ -72,7 +78,8 @@ try {
       d.teleport(player.x+80, player.y);
     });
     await page.waitForFunction(() => window.__BRIAR_GLENDebug.getContextualOnboardingState().active !== 'move', null, { timeout:2000 });
-    await page.evaluate(() => window.__BRIAR_GLENDebug.enqueueNotification33('Field notice','area',{duration:5000}));
+    // Keep the test notice alive comfortably past slow/loaded CI runners so geometry is actually tested.
+    await page.evaluate(() => window.__BRIAR_GLENDebug.enqueueNotification33('Field notice','area',{duration:15000}));
     await page.waitForFunction(() => !document.getElementById('hud33-notification').hidden);
     await page.evaluate(() => {
       const prompt=document.getElementById('context-prompt');
