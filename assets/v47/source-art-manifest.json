@@ -1,0 +1,167 @@
+{
+  "version": "build47-source-art-v2",
+  "terrain": {
+    "atlas": "assets/v47/terrain-atlas.webp",
+    "tileSize": 256,
+    "regions": {
+      "village": {
+        "base": [
+          0,
+          0,
+          256,
+          256
+        ],
+        "functional": [
+          256,
+          0,
+          256,
+          256
+        ],
+        "decal": [
+          512,
+          0,
+          256,
+          256
+        ]
+      },
+      "meadow": {
+        "base": [
+          0,
+          256,
+          256,
+          256
+        ],
+        "functional": [
+          256,
+          256,
+          256,
+          256
+        ],
+        "decal": [
+          512,
+          256,
+          256,
+          256
+        ]
+      },
+      "grove": {
+        "base": [
+          0,
+          512,
+          256,
+          256
+        ],
+        "functional": [
+          256,
+          512,
+          256,
+          256
+        ],
+        "decal": [
+          512,
+          512,
+          256,
+          256
+        ]
+      },
+      "fen": {
+        "base": [
+          0,
+          768,
+          256,
+          256
+        ],
+        "functional": [
+          256,
+          768,
+          256,
+          256
+        ],
+        "decal": [
+          512,
+          768,
+          256,
+          256
+        ]
+      },
+      "copper": {
+        "base": [
+          0,
+          1024,
+          256,
+          256
+        ],
+        "functional": [
+          256,
+          1024,
+          256,
+          256
+        ],
+        "decal": [
+          512,
+          1024,
+          256,
+          256
+        ]
+      },
+      "stonepine": {
+        "base": [
+          0,
+          1280,
+          256,
+          256
+        ],
+        "functional": [
+          256,
+          1280,
+          256,
+          256
+        ],
+        "decal": [
+          512,
+          1280,
+          256,
+          256
+        ]
+      },
+      "den": {
+        "base": [
+          0,
+          1536,
+          256,
+          256
+        ],
+        "functional": [
+          256,
+          1536,
+          256,
+          256
+        ],
+        "decal": [
+          512,
+          1536,
+          256,
+          256
+        ]
+      }
+    }
+  },
+  "sprites": {
+    "cottage": "assets/v24/cottage-authored.webp",
+    "tree_deciduous": "assets/v24/tall-tree-authored.webp",
+    "tree_pine": "assets/v24/pine-tree-authored.webp",
+    "rock": "assets/v47/rock-cluster-authored.svg",
+    "utility": "assets/v47/utility-crates-authored.svg",
+    "ore": "assets/v47/ore-node-authored.svg",
+    "fence_sign": "assets/v47/fence-sign-lantern-authored.svg",
+    "hollow_rock": "assets/v30/hollow-rock-authored.svg",
+    "den_rock": "assets/v30/den-rock-authored.svg",
+    "dead_tree": "assets/v30/dead-tree-authored.svg",
+    "ember": "assets/v30/ember-cluster-authored.svg"
+  },
+  "rollback": "?sourceArt47=0",
+  "runtime": [
+    "src/v44/63-source-sprite-runtime.js",
+    "src/v44/64-source-terrain-runtime.js"
+  ]
+}

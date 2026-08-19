@@ -1,0 +1,51 @@
+name: Build 47 real source-art proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build47-source-art:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+      - name: Verify source files exist
+        run: |
+          test -s assets/v47/terrain-atlas.webp
+          test -s assets/v47/rock-cluster-authored.svg
+          test -s assets/v47/utility-crates-authored.svg
+          test -s assets/v47/ore-node-authored.svg
+          test -s assets/v47/fence-sign-lantern-authored.svg
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-build47-http.log 2>&1 &
+          echo $! > /tmp/briarglen-build47-http.pid
+          sleep 2
+      - name: Verify real terrain tiles and source sprites
+        run: node tests/build47-source-art-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify render performance baseline
+        run: node tests/render-performance-smoke.mjs http://127.0.0.1:4173/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build47-real-source-art-${{ github.sha }}
+          path: artifacts/build47-source-*.png
+          if-no-files-found: ignore
+      - name: Verify deployed GitHub Pages Build 47 source art
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
+          node tests/build47-source-art-smoke.mjs "$URL"
+          node tests/render-performance-smoke.mjs "$URL"
