@@ -68,6 +68,7 @@
     'src/v36/52-generated-art-dressing.js',
     'src/v38/56-regional-prop-clusters.js',
     'src/v37/54-world-layout-v2-canonical.js',
+    'src/v38/57-npc-idle-stagger.js',
     'src/runtime/release-info.js',
   ];
 
