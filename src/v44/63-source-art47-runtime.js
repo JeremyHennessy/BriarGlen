@@ -4,6 +4,7 @@
   const requested=params.get('sourceArt47')!=='0'&&!params.get('artScope')&&params.get('canvasArt')!=='1'&&params.get('generatedArt')!=='0';
   const pack=window.__BRIAR_GLEN_GENERATED_ART,debug=window.__BRIAR_GLENDebug;
   if(!pack?.atlas||!pack?.sprites||!debug)return;
+  const baseGeneratedEnabled=debug.isGeneratedArtEnabled?.bind(debug);
   const state={version:'build47-visual-rebuild-v1',requested,ready:!requested,failed:false,frameDraws:0,totalDraws:0,terrainMode:'physical-ground-v2',sources:{},draws:{},baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}};
   const generatedAtlas=new Image();generatedAtlas.decoding='async';
   const external={
@@ -19,7 +20,7 @@
   function done(){pending--;if(pending>0)return;if(failures.length){state.failed=true;state.ready=false;state.failure=failures.join('; ');}else state.ready=true;}
   generatedAtlas.onload=done;generatedAtlas.onerror=()=>{failures.push('generated atlas');done();};generatedAtlas.src=pack.atlas;
   for(const[name,def]of Object.entries(external)){const image=new Image();image.decoding='async';image.onload=()=>{images[name]=image;state.sources[name]=def.src;done();};image.onerror=()=>{failures.push(def.src);done();};image.src=`${def.src}?v=47r1`;}
-  function enabled(){return Boolean(requested&&state.ready&&!state.failed&&debug.isGeneratedArtEnabled?.());}
+  function enabled(){return Boolean(requested&&state.ready&&!state.failed&&baseGeneratedEnabled?.());}
   function visible(p,w,h,margin=100){return p.x+w/2>-margin&&p.x-w/2<viewport.w+margin&&p.y>-margin&&p.y-h<viewport.h+margin;}
   function entityScale(o){const s=Number.isFinite(o?.s)?o.s:1;return Math.max(.94,Math.min(1.06,.99+(s-1)*.12));}
   function record(name){state.frameDraws++;state.totalDraws++;state.draws[name]=(state.draws[name]||0)+1;}
