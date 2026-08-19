@@ -110,11 +110,22 @@
   // This module intentionally loads immediately after the generated-art base renderer and before
   // Build 43/44 variation + landmark wrappers. That preserves their approved annex/state overlays
   // while replacing the base object/resource silhouette with physical source files.
+  function preserveLegacyObjectLayer(o){
+    const inHollow=o.x>=650&&o.x<1420&&o.y>=-620&&o.y<=620;
+    const inDen=o.x>=1420&&o.x<=2200&&o.y>=-620&&o.y<=620;
+    return (inHollow&&(o.type==='rock'||o.type==='deadTree'))||(inDen&&(o.type==='denRock'||o.type==='ember'));
+  }
+
   const priorObject=drawObject;
   drawObject=function build47SourceObject(o){
     if(!enabled())return priorObject(o);
     const spec=objectSpec(o);
-    if(spec&&drawSprite(spec.name,o,{...spec,flipX:Number(o.facingX||1)<0,kind:'object'}))return;
+    if(spec){
+      const preserve=preserveLegacyObjectLayer(o);
+      const legacyResult=preserve?priorObject(o):undefined;
+      if(drawSprite(spec.name,o,{...spec,flipX:Number(o.facingX||1)<0,kind:'object'}))return legacyResult;
+      if(preserve)return legacyResult;
+    }
     const result=priorObject(o);
     if(o.type==='forge')drawSprite('utility',{x:o.x+62,y:o.y+28},{scale:.63,alpha:.94,kind:'utility'});
     else if(o.type==='merchant')drawSprite('utility',{x:o.x-56,y:o.y+24},{scale:.56,alpha:.92,flipX:true,kind:'utility'});
