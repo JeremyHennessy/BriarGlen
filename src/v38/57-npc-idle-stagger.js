@@ -7,13 +7,12 @@
   const states=new WeakMap();
   let engagements=0;
 
-  function hash(npc){
-    const text=`${npc?.name||npc?.type||'npc'}|${Math.round(npc?.x||0)}|${Math.round(npc?.y||0)}`;
-    let h=2166136261>>>0;for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h>>>0;
-  }
-  function stateFor(npc){
+  function stateFor(npc,index){
     if(states.has(npc))return states.get(npc);
-    const s={releaseAt:start+.35+(hash(npc)%6)*.27,counted:false};states.set(npc,s);return s;
+    // Keep one lead villager moving immediately so the settlement never presents as frozen.
+    // Remaining villagers enter short staggered pauses, avoiding synchronized first-step motion.
+    const releaseAt=index===0?start:start+.34+(index-1)*.24;
+    const s={releaseAt,counted:false};states.set(npc,s);return s;
   }
 
   // Runs just after World Layout V2's own beforeUpdate hook. That hook restores each NPC's
@@ -22,13 +21,14 @@
     const layout=debug.getWorldLayoutV2State?.();
     if(!layout?.enabled)return;
     const now=performance.now()/1000;
-    for(const npc of worldObjects.filter(o=>o.type==='npc')){
-      const s=stateFor(npc);
+    const npcs=worldObjects.filter(o=>o.type==='npc');
+    npcs.forEach((npc,index)=>{
+      const s=stateFor(npc,index);
       if(now<s.releaseAt){
         npc.speed=0;
         if(!s.counted){s.counted=true;engagements++;}
       }
-    }
+    });
   },2460);
 
   const priorGet=debug.getWorldLayoutV2State;
@@ -36,5 +36,5 @@
     const value=priorGet();
     return {...value,npcIdles:(value.npcIdles||0)+engagements,initialNpcIdles:engagements};
   };
-  debug.getNpcInitialStaggerState=()=>({engagements,npcs:worldObjects.filter(o=>o.type==='npc').length});
+  debug.getNpcInitialStaggerState=()=>({engagements,npcs:worldObjects.filter(o=>o.type==='npc').length,leadMovesImmediately:true});
 })();
