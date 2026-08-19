@@ -18,12 +18,17 @@ const chromeSelectors = [
 ];
 
 async function visibleBoxes(page) {
-  const boxes = [];
-  for (const selector of chromeSelectors) {
-    const locator = page.locator(selector);
-    if (await locator.count() && await locator.isVisible()) boxes.push({ selector, box:await locator.boundingBox() });
-  }
-  return boxes;
+  // Snapshot visibility and geometry in one browser task. This avoids a race where an
+  // asynchronous notification expires between Playwright isVisible() and boundingBox().
+  return page.evaluate(selectors => selectors.flatMap(selector => {
+    const el = document.querySelector(selector);
+    if (!el) return [];
+    const style = getComputedStyle(el);
+    const visible = !el.hidden && style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) !== 0 && el.getClientRects().length > 0;
+    if (!visible) return [];
+    const rect = el.getBoundingClientRect();
+    return [{ selector, box:{ x:rect.x, y:rect.y, width:rect.width, height:rect.height } }];
+  }), chromeSelectors);
 }
 
 async function assertNoChromeCollisions(page, vp, phase) {
@@ -73,7 +78,8 @@ try {
       d.teleport(player.x+80, player.y);
     });
     await page.waitForFunction(() => window.__BRIAR_GLENDebug.getContextualOnboardingState().active !== 'move', null, { timeout:2000 });
-    await page.evaluate(() => window.__BRIAR_GLENDebug.enqueueNotification33('Field notice','area',{duration:5000}));
+    // Keep the test notice alive comfortably past slow/loaded CI runners so geometry is actually tested.
+    await page.evaluate(() => window.__BRIAR_GLENDebug.enqueueNotification33('Field notice','area',{duration:15000}));
     await page.waitForFunction(() => !document.getElementById('hud33-notification').hidden);
     await page.evaluate(() => {
       const prompt=document.getElementById('context-prompt');
