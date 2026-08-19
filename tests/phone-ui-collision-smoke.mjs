@@ -28,9 +28,9 @@ async function visibleBoxes(page) {
 
 async function assertNoChromeCollisions(page, vp, phase) {
   const boxes = await visibleBoxes(page);
-  for (const item of boxes) if (!inside(item.box, vp)) throw new Error(`${vp.name} ${phase}: ${item.selector} outside viewport`);
+  for (const item of boxes) if (!inside(item.box, vp)) throw new Error(`${vp.name} ${phase}: ${item.selector} outside viewport; box=${JSON.stringify(item.box)} viewport=${JSON.stringify(vp)}`);
   for (let i=0; i<boxes.length; i++) for (let j=i+1; j<boxes.length; j++) {
-    if (overlaps(boxes[i].box, boxes[j].box)) throw new Error(`${vp.name} ${phase}: ${boxes[i].selector} overlaps ${boxes[j].selector}`);
+    if (overlaps(boxes[i].box, boxes[j].box)) throw new Error(`${vp.name} ${phase}: ${boxes[i].selector} overlaps ${boxes[j].selector}; a=${JSON.stringify(boxes[i].box)} b=${JSON.stringify(boxes[j].box)}`);
   }
 }
 
@@ -38,7 +38,8 @@ async function assertBlockingPanel(page, vp, id, open, close) {
   await open();
   await page.waitForFunction(panelId => !document.getElementById(panelId)?.hidden, id, { timeout:2000 });
   const panel = page.locator(`#${id}`);
-  if (!inside(await panel.boundingBox(), vp)) throw new Error(`${vp.name}: #${id} outside safe viewport`);
+  const panelBox = await panel.boundingBox();
+  if (!inside(panelBox, vp)) throw new Error(`${vp.name}: #${id} outside safe viewport; box=${JSON.stringify(panelBox)} viewport=${JSON.stringify(vp)}`);
   const state = await page.evaluate(() => window.__BRIAR_GLENDebug.getPhoneUi39State());
   if (!state.oneBlockingWindow || state.openPanels.length !== 1) throw new Error(`${vp.name}: stacked blocking windows ${JSON.stringify(state.openPanels)}`);
   for (const selector of ['#hud','#touch-controls','#warden-map-btn','#hud33-combat','#combat36-readiness','#onboarding37-prompt','#reset-btn']) {
