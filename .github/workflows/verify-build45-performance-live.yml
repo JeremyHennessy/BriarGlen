@@ -1,0 +1,34 @@
+name: Verify Build 45 live performance
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify-live-performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Wait for Build 45 Pages source
+        run: |
+          set -e
+          URL="https://jeremyhennessy.github.io/BriarGlen/src/v36/50-generated-art-runtime.js?sha=f250802b0bd5f1238654e88c91a5abc290319afa"
+          for i in 1 2 3 4 5 6; do
+            if curl -fsSL "$URL" | grep -q "isGeneratedArtEnabled"; then
+              echo "Build 45 source is live"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Build 45 source not yet live" >&2
+          exit 1
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Measure deployed GitHub Pages build
+        run: node tests/render-performance-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=f250802b0bd5f1238654e88c91a5abc290319afa"
