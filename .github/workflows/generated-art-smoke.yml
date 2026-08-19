@@ -1,0 +1,197 @@
+name: Build 41 generated art proof
+
+on:
+  pull_request:
+    paths:
+      - 'src/v36/**'
+      - 'src/runtime/release-info.js'
+      - 'tests/generated-art-smoke.mjs'
+      - 'tests/phone-ui-collision-smoke.mjs'
+      - '.github/workflows/generated-art-smoke.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generated-art-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-build41-http.log 2>&1 &
+          echo $! > /tmp/briarglen-build41-http.pid
+          sleep 2
+
+      - name: Full Build 41 browser regression
+        run: |
+          tests=(
+            tests/build25-production-smoke.mjs
+            tests/build26-production-smoke.mjs
+            tests/build27-production-smoke.mjs
+            tests/build28-production-smoke.mjs
+            tests/build29-production-smoke.mjs
+            tests/build30-production-smoke.mjs
+            tests/smoke.mjs
+            tests/world-smoke.mjs
+            tests/controls-smoke.mjs
+            tests/aiming-gear-smoke.mjs
+            tests/skills-smoke.mjs
+            tests/crafting-smoke.mjs
+            tests/specialist-crafting-smoke.mjs
+            tests/warden-response-smoke.mjs
+            tests/specialist-economy38-smoke.mjs
+            tests/phone-ui-collision-smoke.mjs
+            tests/tutorial-skip-smoke.mjs
+            tests/hud-notifications-smoke.mjs
+            tests/satchel-character-smoke.mjs
+            tests/map-journal-smoke.mjs
+            tests/map-journal35-smoke.mjs
+            tests/fen-smoke.mjs
+            tests/contracts-smoke.mjs
+            tests/stability-smoke.mjs
+            tests/game-feel-smoke.mjs
+            tests/economy2-smoke.mjs
+            tests/combat-identity-smoke.mjs
+            tests/combat-quality-smoke.mjs
+            tests/art-direction-smoke.mjs
+            tests/feedback-tuning-smoke.mjs
+            tests/stonepine-smoke.mjs
+            tests/stonepine-integration-smoke.mjs
+            tests/biome-art-smoke.mjs
+            tests/hollow-den-art-smoke.mjs
+            tests/runtime-architecture-smoke.mjs
+            tests/onboarding-smoke.mjs
+            tests/contextual-onboarding-smoke.mjs
+            tests/balance-pacing-smoke.mjs
+            tests/final-polish-smoke.mjs
+            tests/generated-art-smoke.mjs
+          )
+          for test_file in "${tests[@]}"; do
+            echo "=== ${test_file} ==="
+            node "$test_file" http://127.0.0.1:4173/
+          done
+
+      - name: Mark verified candidate
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TESTED_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.error, urllib.request
+
+          repo = os.environ['REPO']
+          token = os.environ['GH_TOKEN']
+          tested_sha = os.environ['TESTED_SHA']
+          expected_main = '77ccb6ebfcb6157290cf5f998f14f80f32f46970'
+          api = 'https://api.github.com'
+          headers = {
+              'Authorization': f'Bearer {token}',
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type': 'application/json',
+          }
+
+          def request(method, path, data=None):
+              body = None if data is None else json.dumps(data).encode()
+              req = urllib.request.Request(api + path, data=body, headers=headers, method=method)
+              with urllib.request.urlopen(req) as response:
+                  return json.load(response)
+
+          main = request('GET', f'/repos/{repo}/branches/main')['commit']['sha']
+          if main != expected_main:
+              raise SystemExit(f'main moved after Build 41 validation started: {main}; expected {expected_main}')
+
+          ref_path = f'/repos/{repo}/git/refs/heads/ci/build41-generated-art-green'
+          try:
+              request('PATCH', ref_path, {'sha': tested_sha, 'force': True})
+          except urllib.error.HTTPError as error:
+              if error.code not in (404, 422):
+                  raise
+              request('POST', f'/repos/{repo}/git/refs', {
+                  'ref': 'refs/heads/ci/build41-generated-art-green',
+                  'sha': tested_sha,
+              })
+          print(f'Build 41 candidate verified at {tested_sha}; main still {main}')
+          PY
+
+      - name: Verify deployed GitHub Pages generated art
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          LIVE_URL: https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}
+        run: |
+          for attempt in $(seq 1 30); do
+            echo "Live Build 41 verification attempt ${attempt}/30"
+            if node tests/generated-art-smoke.mjs "$LIVE_URL"; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'GitHub Pages did not pass the Build 41 generated-art proof within the deployment window.' >&2
+          exit 1
+
+      - name: Mark deployed Build 41
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DEPLOYED_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.error, urllib.request
+
+          repo = os.environ['REPO']
+          token = os.environ['GH_TOKEN']
+          deployed_sha = os.environ['DEPLOYED_SHA']
+          api = 'https://api.github.com'
+          headers = {
+              'Authorization': f'Bearer {token}',
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type': 'application/json',
+          }
+
+          def request(method, path, data=None):
+              body = None if data is None else json.dumps(data).encode()
+              req = urllib.request.Request(api + path, data=body, headers=headers, method=method)
+              with urllib.request.urlopen(req) as response:
+                  return json.load(response)
+
+          ref_path = f'/repos/{repo}/git/refs/heads/ci/build41-generated-art-deployed'
+          try:
+              request('PATCH', ref_path, {'sha': deployed_sha, 'force': True})
+          except urllib.error.HTTPError as error:
+              if error.code not in (404, 422):
+                  raise
+              request('POST', f'/repos/{repo}/git/refs', {
+                  'ref': 'refs/heads/ci/build41-generated-art-deployed',
+                  'sha': deployed_sha,
+              })
+          print(f'Build 41 deployed proof passed at {deployed_sha}')
+          PY
+
+      - name: Upload generated art screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build41-generated-art-proof
+          path: artifacts/generated-art-*.png
+          if-no-files-found: warn
