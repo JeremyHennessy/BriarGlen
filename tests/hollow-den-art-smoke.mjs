@@ -37,7 +37,7 @@ try {
     for(let attempt=1;attempt<=(live?48:1);attempt++){
       try{
         const sep=target.includes('?')?'&':'?';
-        await page.goto(`${target}${sep}art20=${Date.now()}-${attempt}`,{waitUntil:'domcontentloaded',timeout:15000});
+        await page.goto(`${target}${sep}sourceArt47=0&art20=${Date.now()}-${attempt}`,{waitUntil:'domcontentloaded',timeout:15000});
         await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getHollowDenArtState&&window.__BRIAR_GLENDebug?.getBuildInfo),{timeout:7000});
         loaded=true;break;
       }catch(error){lastError=error;if(live&&attempt<48)await sleep(5000);}
