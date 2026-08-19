@@ -33,7 +33,9 @@ jobs:
           sleep 2
       - name: Verify actual Build 47 gameplay screens
         run: node tests/build47-visual-rebuild-smoke.mjs http://127.0.0.1:4173/
-      - name: Verify ground cache and performance
+      - name: Verify Build 47 source-layer performance
+        run: node tests/build47-source-performance-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify ground cache and historical performance guards
         run: |
           node tests/ground-v2-smoke.mjs http://127.0.0.1:4173/
           node tests/ground-v2-performance-smoke.mjs http://127.0.0.1:4173/
@@ -49,5 +51,6 @@ jobs:
         run: |
           URL="https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
           node tests/build47-visual-rebuild-smoke.mjs "$URL"
+          node tests/build47-source-performance-smoke.mjs "$URL"
           node tests/ground-v2-performance-smoke.mjs "$URL"
           node tests/render-performance-smoke.mjs "$URL"
