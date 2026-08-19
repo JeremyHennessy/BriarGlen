@@ -1,0 +1,49 @@
+name: Verify Build 46 live
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/verify-build46-live.yml'
+  workflow_dispatch:
+
+jobs:
+  verify-live-build46:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Wait for complete Build 46 Pages source
+        run: |
+          set -e
+          BASE="https://jeremyhennessy.github.io/BriarGlen"
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            GROUND=$(curl -fsSL "$BASE/src/v41/60-ground-v2-runtime.js?sha=b8b37d01dd8ce3ef89a0333b5cb9a6ab1f016aee" || true)
+            ENV=$(curl -fsSL "$BASE/src/v42/61-environment-variation.js?sha=b8b37d01dd8ce3ef89a0333b5cb9a6ab1f016aee" || true)
+            TERRAIN=$(curl -fsSL "$BASE/src/v43/62-terrain-polish.js?sha=b8b37d01dd8ce3ef89a0333b5cb9a6ab1f016aee" || true)
+            if echo "$GROUND" | grep -q "build46a-ground-v2-v3" && echo "$ENV" | grep -q "build46b-environment-v1" && echo "$TERRAIN" | grep -q "build46c-terrain-polish-v1"; then
+              echo "Complete Build 46 source is live"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Complete Build 46 source not yet live" >&2
+          exit 1
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Verify complete deployed Build 46
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=b8b37d01dd8ce3ef89a0333b5cb9a6ab1f016aee"
+          node tests/ground-v2-smoke.mjs "$URL"
+          node tests/ground-v2-performance-smoke.mjs "$URL"
+          node tests/environment46-smoke.mjs "$URL"
+          node tests/environment46-performance-smoke.mjs "$URL"
+          node tests/terrain46-smoke.mjs "$URL"
+          node tests/terrain46-performance-smoke.mjs "$URL"
+          node tests/render-performance-smoke.mjs "$URL"
+          node tests/phone-ui-collision-smoke.mjs "$URL"
+          node tests/tutorial-skip-smoke.mjs "$URL"
