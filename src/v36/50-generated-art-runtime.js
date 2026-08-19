@@ -46,11 +46,30 @@
   const atlas = new Image();
   atlas.decoding = 'async';
   const iconCache = new Map();
+  const siteIds = new WeakMap();
+  let nextSiteId = 1;
 
   function frame(name) {
     return pack.sprites[name] || null;
   }
 
+  function isEnabledFast() {
+    return Boolean(proof.enabled && proof.ready && !proof.failed);
+  }
+
+  function stableSiteKey(kind, name, entity) {
+    if (!entity || !Number.isFinite(entity.x) || !Number.isFinite(entity.y)) return null;
+    let id = siteIds.get(entity);
+    if (!id) {
+      id = nextSiteId++;
+      siteIds.set(entity, id);
+    }
+    return `${kind}:${entity.type || name}:${id}`;
+  }
+
+  // Diagnostics are intentionally bounded by entity identity. The previous coordinate-based key
+  // created a new object every time a moving NPC crossed a rounded world coordinate, causing the
+  // debug map (and every deep state snapshot) to grow for the lifetime of the session.
   function record(kind, name, entity, screen, width, height) {
     proof.draws += 1;
     if (kind === 'object') proof.objectDraws += 1;
@@ -58,16 +77,28 @@
     else if (kind === 'enemy') proof.enemyDraws += 1;
     else if (kind === 'npc') proof.npcDraws += 1;
     proof.replacements[name] = (proof.replacements[name] || 0) + 1;
-    if (entity && Number.isFinite(entity.x) && Number.isFinite(entity.y)) {
-      const key = `${kind}:${entity.type || name}:${Math.round(entity.x)},${Math.round(entity.y)}`;
-      proof.drawSites[key] = {
+
+    const key = stableSiteKey(kind, name, entity);
+    if (!key) return;
+    let site = proof.drawSites[key];
+    if (!site) {
+      site = proof.drawSites[key] = {
         asset: name,
         world: { x: entity.x, y: entity.y },
         screen: { x: screen.x, y: screen.y },
         size: { width, height },
-        draws: (proof.drawSites[key]?.draws || 0) + 1,
+        draws: 0,
       };
+    } else {
+      site.asset = name;
+      site.world.x = entity.x;
+      site.world.y = entity.y;
+      site.screen.x = screen.x;
+      site.screen.y = screen.y;
+      site.size.width = width;
+      site.size.height = height;
     }
+    site.draws += 1;
   }
 
   function visible(p, margin = 220) {
@@ -76,7 +107,7 @@
 
   function sprite(name, entity, options = {}) {
     const f = frame(name);
-    if (!f || !proof.enabled || !proof.ready) return false;
+    if (!f || !isEnabledFast()) return false;
     const p = worldToScreen(entity.x, entity.y);
     if (!visible(p, options.margin || 240)) return false;
     const objectScale = Number.isFinite(entity.s)
@@ -90,8 +121,6 @@
     const offsetY = (options.offsetY || 0) * camera.zoom;
 
     ctx.save();
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
     ctx.globalAlpha = Number.isFinite(options.alpha) ? options.alpha : 1;
     if (options.filter) ctx.filter = options.filter;
     if (options.flipX) {
@@ -206,7 +235,7 @@
 
   const priorDrawObject = drawObject;
   drawObject = function build41GeneratedArtObject(o) {
-    if (!proof.enabled || !proof.ready) return priorDrawObject(o);
+    if (!isEnabledFast()) return priorDrawObject(o);
 
     const npc = npcAsset(o);
     if (npc) {
@@ -234,7 +263,7 @@
 
   const priorDrawResource = drawResource;
   drawResource = function build41GeneratedArtResource(r) {
-    if (!proof.enabled || !proof.ready || !r.active) return priorDrawResource(r);
+    if (!isEnabledFast() || !r.active) return priorDrawResource(r);
     const spec = resourceAsset(r);
     if (!spec) return priorDrawResource(r);
     if (!sprite(spec.name, r, { kind: 'resource', ...spec })) return priorDrawResource(r);
@@ -242,7 +271,7 @@
 
   const priorDrawEnemy = drawEnemy;
   drawEnemy = function build41GeneratedArtEnemy(e) {
-    if (!proof.enabled || !proof.ready || e.dead) return priorDrawEnemy(e);
+    if (!isEnabledFast() || e.dead) return priorDrawEnemy(e);
     const spec = enemyAsset(e);
     if (!spec) return priorDrawEnemy(e);
 
@@ -368,6 +397,7 @@
       npcDraws: proof.npcDraws,
       uiIcons: proof.uiIcons,
       replacements: { ...proof.replacements },
+      drawSiteCount: Object.keys(proof.drawSites).length,
       drawSites: Object.fromEntries(Object.entries(proof.drawSites).map(([key,value]) => [key, {
         asset: value.asset,
         world: { ...value.world },
@@ -378,8 +408,16 @@
     };
   }
 
+  if (window.__BRIAR_GLEN_RUNTIME?.registerHook) {
+    window.__BRIAR_GLEN_RUNTIME.registerHook('beforeDraw','build45-generated-art-smoothing',()=>{
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'medium';
+    },2020);
+  }
+
   if (debug) {
     debug.getGeneratedArtState = state;
+    debug.isGeneratedArtEnabled = isEnabledFast;
     debug.setGeneratedArtEnabled = setEnabled;
   }
 

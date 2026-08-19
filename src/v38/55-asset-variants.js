@@ -8,7 +8,7 @@
   if (!pack?.atlas || !pack?.sprites || !debug) return;
 
   const state = {
-    version:'build43-asset-variants-v3', requested, ready:false, failed:false,
+    version:'build43-asset-variants-v4', requested, ready:false, failed:false,
     applied:0, overlayDraws:0, families:{}, overlays:{},
     baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length},
   };
@@ -21,7 +21,7 @@
 
   const hashCache=new WeakMap(),objectCache=new WeakMap(),resourceCache=new WeakMap(),enemyCache=new WeakMap(),recorded=new WeakSet();
 
-  function enabled(){const generated=debug.getGeneratedArtState?.();return Boolean(requested&&state.ready&&!state.failed&&generated?.enabled&&generated?.ready);}
+  function enabled(){return Boolean(requested&&state.ready&&!state.failed&&debug.isGeneratedArtEnabled?.());}
   function baseHash(entity){
     if(hashCache.has(entity))return hashCache.get(entity);
     const text=`${entity?.type||''}|${entity?.name||''}|${Math.round(entity?.homeX??entity?.x??0)}|${Math.round(entity?.homeY??entity?.y??0)}`;
@@ -57,7 +57,7 @@
   }
 
   function drawRaw(name,anchor,{dx=0,dy=0,scale=1,alpha=1,rotation=0,flipX=false}={}){
-    if(!enabled())return false;const f=pack.sprites[name];if(!f)return false;
+    const f=pack.sprites[name];if(!f)return false;
     const p=worldToScreen(anchor.x,anchor.y),z=camera.zoom*scale,w=f.width*z,h=f.height*z,x=p.x+dx*camera.zoom,y=p.y+dy*camera.zoom;
     if(x+w/2<-140||x-w/2>viewport.w+140||y<-180||y-h>viewport.h+140)return false;
     ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);if(rotation)ctx.rotate(rotation);if(flipX)ctx.scale(-1,1);

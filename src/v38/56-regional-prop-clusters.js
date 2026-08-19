@@ -6,12 +6,12 @@
   const pack=window.__BRIAR_GLEN_GENERATED_ART,debug=window.__BRIAR_GLENDebug;
   if(!pack?.atlas||!pack?.sprites||!debug)return;
 
-  const state={version:'build43-regional-props-v3',requested,ready:false,failed:false,frameDraws:0,totalDraws:0,clusters:{},assets:{},baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}};
+  const state={version:'build43-regional-props-v4',requested,ready:false,failed:false,frameDraws:0,totalDraws:0,clusters:{},assets:{},baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}};
   const atlas=new Image();atlas.decoding='async';atlas.onload=()=>{state.ready=true};atlas.onerror=()=>{state.failed=true;state.ready=false};atlas.src=pack.atlas;
   const hashCache=new WeakMap();
   const eligible=new Set(['forge','alchemy','merchant','tavern','board','well','cottage','groveCache','fenCache','stonepineCache','stonepineCamp','ruin','fenRuin','stonepineRuin','quarryRock','stonepineTree']);
 
-  function enabled(){const g=debug.getGeneratedArtState?.();return Boolean(requested&&state.ready&&!state.failed&&g?.enabled&&g?.ready);}
+  function enabled(){return Boolean(requested&&state.ready&&!state.failed&&debug.isGeneratedArtEnabled?.());}
   function hash(o){
     if(hashCache.has(o))return hashCache.get(o);
     const t=`${o?.type||''}|${o?.name||''}|${Math.round(o?.x||0)}|${Math.round(o?.y||0)}`;let h=2166136261>>>0;
@@ -20,7 +20,7 @@
   }
 
   function prop(name,o,{dx=0,dy=0,scale=1,alpha=1,rotation=0,flipX=false}={}){
-    if(!enabled())return false;const f=pack.sprites[name];if(!f)return false;
+    const f=pack.sprites[name];if(!f)return false;
     const p=worldToScreen(o.x,o.y),z=camera.zoom*scale,w=f.width*z,h=f.height*z,x=p.x+dx*camera.zoom,y=p.y+dy*camera.zoom;
     if(x+w/2<-140||x-w/2>viewport.w+140||y<-180||y-h>viewport.h+140)return false;
     ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);if(rotation)ctx.rotate(rotation);if(flipX)ctx.scale(-1,1);

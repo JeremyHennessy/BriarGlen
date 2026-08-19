@@ -7,14 +7,14 @@
   if(!pack?.atlas||!pack?.sprites||!debug)return;
 
   const state={
-    version:'build44-landmark-state-v2',requested,ready:false,failed:false,
+    version:'build44-landmark-state-v3',requested,ready:false,failed:false,
     frameDraws:0,totalDraws:0,archetypes:{},landmarks:{},
     baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length},
   };
   const atlas=new Image();atlas.decoding='async';atlas.onload=()=>{state.ready=true;};atlas.onerror=()=>{state.failed=true;state.ready=false;};atlas.src=pack.atlas;
   const hashCache=new WeakMap();
 
-  function enabled(){const generated=debug.getGeneratedArtState?.();return Boolean(requested&&state.ready&&!state.failed&&generated?.enabled&&generated?.ready);}
+  function enabled(){return Boolean(requested&&state.ready&&!state.failed&&debug.isGeneratedArtEnabled?.());}
   function hash(o){
     if(hashCache.has(o))return hashCache.get(o);
     const text=`${o?.type||''}|${o?.name||o?.label||''}|${Math.round(o?.homeX??o?.x??0)}|${Math.round(o?.homeY??o?.y??0)}`;
@@ -23,7 +23,7 @@
   }
   function visible(p,margin=180){return p.x>-margin&&p.x<viewport.w+margin&&p.y>-margin&&p.y<viewport.h+margin;}
   function sprite(name,o,{dx=0,dy=0,scale=1,alpha=1,rotation=0,flipX=false}={}){
-    if(!enabled())return false;const f=pack.sprites[name];if(!f)return false;
+    const f=pack.sprites[name];if(!f)return false;
     const p=worldToScreen(o.x,o.y);if(!visible(p))return false;
     const z=camera.zoom*scale,w=f.width*z,h=f.height*z,x=p.x+dx*camera.zoom,y=p.y+dy*camera.zoom;
     ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);if(rotation)ctx.rotate(rotation);if(flipX)ctx.scale(-1,1);

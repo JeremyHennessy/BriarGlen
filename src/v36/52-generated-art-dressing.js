@@ -4,7 +4,7 @@
   const debug = window.__BRIAR_GLENDebug;
   const runtime = window.__BRIAR_GLEN_RUNTIME;
   const state = {
-    version:'build41-generated-dressing-v1',
+    version:'build41-generated-dressing-v2',
     ready:false,
     failed:false,
     frameDraws:0,
@@ -14,8 +14,7 @@
   };
 
   function enabled() {
-    const generated = debug?.getGeneratedArtState?.();
-    return Boolean(state.ready && !state.failed && generated?.enabled && generated?.ready);
+    return Boolean(state.ready && !state.failed && debug?.isGeneratedArtEnabled?.());
   }
 
   if (!pack?.atlas || !pack?.sprites) {
@@ -31,7 +30,6 @@
   atlas.src = pack.atlas;
 
   function drawProp(name, anchor, {dx=0,dy=0,scale=1,alpha=1,flipX=false}={}) {
-    if (!enabled()) return false;
     const f = pack.sprites[name];
     if (!f) return false;
     const p = worldToScreen(anchor.x, anchor.y);
@@ -42,8 +40,6 @@
     const y = p.y + dy * camera.zoom - height * f.anchor;
     if (x + width/2 < -120 || x - width/2 > viewport.w + 120 || y + height < -120 || y > viewport.h + 120) return false;
     ctx.save();
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
     ctx.globalAlpha = alpha;
     if (flipX) {
       ctx.translate(x,0); ctx.scale(-1,1);

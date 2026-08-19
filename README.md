@@ -29,6 +29,8 @@ The canonical spatial-design reference is [`docs/WORLD_LAYOUT_AND_LIVING_MAP_RUL
 
 The canonical repetition/variant reference is [`docs/ASSET_VARIATION_RULES.md`](docs/ASSET_VARIATION_RULES.md). It defines which families may vary, deterministic runtime variants, regional treatment, prop-cluster rules, stateful cache/gate graphics, collision constraints and when a family needs new source art instead of more filtering. Future art/map changes should treat both documents as defaults unless the user explicitly approves a new baseline.
 
+The canonical presentation-performance reference is [`docs/RENDER_PERFORMANCE_RULES.md`](docs/RENDER_PERFORMANCE_RULES.md). It defines hot-path constraints for generated art, bounded diagnostics, per-frame smoothing, culling and the render-performance proof that must pass before future asset expansions merge.
+
 ## Controls
 
 ### Desktop
