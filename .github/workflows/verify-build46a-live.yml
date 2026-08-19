@@ -1,0 +1,38 @@
+name: Verify Build 46A live
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/verify-build46a-live.yml'
+  workflow_dispatch:
+
+jobs:
+  verify-live-ground:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Wait for Build 46A Pages source
+        run: |
+          set -e
+          URL="https://jeremyhennessy.github.io/BriarGlen/src/v41/60-ground-v2-runtime.js?sha=8287866d89ee7160ad9437afe58187004018e728"
+          for i in 1 2 3 4 5 6 7 8; do
+            if curl -fsSL "$URL" | grep -q "build46a-ground-v2-v3"; then
+              echo "Build 46A source is live"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Build 46A source not yet live" >&2
+          exit 1
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Verify deployed Ground V2
+        run: |
+          node tests/ground-v2-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=8287866d89ee7160ad9437afe58187004018e728"
+          node tests/ground-v2-performance-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=8287866d89ee7160ad9437afe58187004018e728"
