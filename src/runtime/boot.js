@@ -65,7 +65,7 @@
     'src/v36/50-generated-art-runtime.js',
     'src/v36/51-generated-art-compat-post.js',
     'src/v36/52-generated-art-dressing.js',
-    'src/v37/53-world-layout-v2.js',
+    'src/v37/54-world-layout-v2-canonical.js',
     'src/runtime/release-info.js',
   ];
 
