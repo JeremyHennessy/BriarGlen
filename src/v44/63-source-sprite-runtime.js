@@ -126,8 +126,13 @@
   drawResource=function build47SourceResource(r){
     if(!enabled()||!r.active)return priorResource(r);
     const spec=resourceSpec(r);
-    if(spec&&drawSprite(spec.name,r,{...spec,kind:'resource'}))return;
-    return priorResource(r);
+    if(!spec)return priorResource(r);
+    // Preserve the approved Build 30 authored-resource renderer and its diagnostics underneath.
+    // The Build 47 physical source file is the final visible layer, but historical recovery proof
+    // must remain observable instead of being bypassed by the replacement wrapper.
+    const result=priorResource(r);
+    drawSprite(spec.name,r,{...spec,kind:'resource'});
+    return result;
   };
 
   const internal={state,atlas,tileRects,enabled,hash};
