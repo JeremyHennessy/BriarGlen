@@ -20,6 +20,36 @@
   function chunk(cx,cy){const k=`${cx},${cy}`;let e=cache.get(k);if(e){e.last=++clock;state.cacheHits++;return e;}state.cacheMisses++;e=buildChunk(cx,cy);cache.set(k,e);if(cache.size>CACHE_LIMIT){let oldest=null,t=Infinity;for(const[k,v]of cache)if(v.last<t){oldest=k;t=v.last;}if(oldest){cache.delete(oldest);state.evictions++;}}state.activeCache=cache.size;state.maxCache=CACHE_LIMIT;return e;}
   function visibleChunk(cx,cy){const p=worldToScreen(cx*CHUNK_WORLD+CHUNK_WORLD/2,cy*CHUNK_WORLD+CHUNK_WORLD/2),hw=CHUNK_WORLD*.78*camera.zoom,hh=CHUNK_WORLD*.39*camera.zoom;return p.x+hw>-120&&p.x-hw<viewport.w+120&&p.y+hh>-100&&p.y-hh<viewport.h+100;}
   function drawTerrain(){if(!enabled())return;state.frameChunks=0;const a=Math.floor(BOUNDS.minX/CHUNK_WORLD),b=Math.floor(BOUNDS.maxX/CHUNK_WORLD),c0=Math.floor(BOUNDS.minY/CHUNK_WORLD),d0=Math.floor(BOUNDS.maxY/CHUNK_WORLD);ctx.save();ctx.globalAlpha=1;for(let cy=c0;cy<=d0;cy++)for(let cx=a;cx<=b;cx++){if(!visibleChunk(cx,cy))continue;const e=chunk(cx,cy),p=worldToScreen(cx*CHUNK_WORLD,cy*CHUNK_WORLD),unit=PIXEL_WORLD;ctx.save();ctx.translate(p.x,p.y);ctx.transform(.78*camera.zoom*unit,.39*camera.zoom*unit,-.78*camera.zoom*unit,.39*camera.zoom*unit,0,0);ctx.drawImage(e.canvas,0,0);ctx.restore();state.frameChunks++;state.terrainDraws++;}ctx.restore();}
+
+  // Build 47 source terrain is a true replacement layer, not another translucent pass.
+  // When enabled, avoid drawing the older Canvas/procedural ground stack underneath it.
+  // `sourceArt47=0` restores the exact Build 46 drawGround chain.
   const priorGround=drawGround;
-  drawGround=function build47SourceTerrain(zone){const result=priorGround(zone);drawTerrain();return result;};
+  drawGround=function build47SourceTerrain(zone){
+    if(!enabled())return priorGround(zone);
+    drawTerrain();
+  };
+
+  // Keep the historical Ground V2 proof meaningful while Build 47 owns the visible terrain.
+  // The original requested/enabled/rollback fields remain authoritative; only render/cache
+  // counters are bridged to the replacement source layer when Ground V2 is requested.
+  const priorGroundState=typeof debug.getGroundV2State==='function'?debug.getGroundV2State.bind(debug):null;
+  if(priorGroundState){
+    debug.getGroundV2State=()=>{
+      const base=priorGroundState();
+      if(!enabled()||!base?.requested)return base;
+      return {
+        ...base,
+        frameChunks:state.frameChunks,
+        frameCells:state.frameChunks*64,
+        cacheBuilds:state.chunkBuilds,
+        cacheHits:state.cacheHits,
+        cacheMisses:state.cacheMisses,
+        evictions:state.evictions,
+        activeCache:state.activeCache||0,
+        maxCache:state.maxCache||CACHE_LIMIT,
+        lastDecal:'build47-source-atlas',
+      };
+    };
+  }
 })();
