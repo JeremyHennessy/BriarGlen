@@ -1,0 +1,61 @@
+name: World Layout V2 proof
+
+on:
+  pull_request:
+    paths:
+      - 'src/v37/**'
+      - 'src/runtime/boot.js'
+      - 'tests/world-layout-v2-smoke.mjs'
+      - 'docs/WORLD_LAYOUT_AND_LIVING_MAP_RULES.md'
+      - '.github/workflows/world-layout-v2-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/v37/**'
+      - 'src/runtime/boot.js'
+      - 'tests/world-layout-v2-smoke.mjs'
+      - 'docs/WORLD_LAYOUT_AND_LIVING_MAP_RULES.md'
+      - '.github/workflows/world-layout-v2-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  world-layout-v2-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-world-layout-http.log 2>&1 &
+          echo $! > /tmp/briarglen-world-layout-http.pid
+          sleep 2
+      - name: Run World Layout V2 proof
+        run: node tests/world-layout-v2-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload World Layout V2 screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-layout-v2-proof
+          path: artifacts/world-layout-v2-*.png
+          if-no-files-found: warn
+      - name: Verify deployed GitHub Pages World Layout V2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          run_live() {
+            local attempt
+            for attempt in 1 2 3 4 5 6; do
+              "$@" && return 0
+              [ "$attempt" -lt 6 ] && sleep $((attempt * 10))
+            done
+            return 1
+          }
+          run_live node tests/world-layout-v2-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
