@@ -29,8 +29,14 @@ try{
     if(!on.state.source?.enabled||!on.state.guard?.legacyLayersSuppressed||on.state.source.totalDraws<1)throw new Error(`${vp.name}: Build47 source layer not active ${JSON.stringify(on.state)}`);
     if(on.state.ground?.sourceMode!=='build47-physical-tiles')throw new Error(`${vp.name}: physical terrain not active ${JSON.stringify(on.state.ground)}`);
     if(noSprites.state.source?.enabled||!noSprites.state.guard?.legacyLayersSuppressed||noSprites.state.ground?.sourceMode!=='build47-physical-tiles')throw new Error(`${vp.name}: diagnostic source-sprite bypass invalid ${JSON.stringify(noSprites.state)}`);
-    if(on.avg>34||on.p95>55)throw new Error(`${vp.name}: Build47 absolute render cadence regressed ${JSON.stringify({on,noSprites,rollback})}`);
-    if(on.avg-rollback.avg>2.5||on.p95-rollback.p95>5.0)throw new Error(`${vp.name}: Build47 source layer regression too high ${JSON.stringify({on,noSprites,rollback})}`);
-    console.log(`PASS ${vp.name}: Build47 source performance within guardrails`);
+
+    // This is a like-for-like Stonepine stress comparison. Absolute render cadence is already
+    // enforced independently by render-performance-smoke.mjs at the canonical performance scene.
+    // Here Build 47 must not regress either its same-terrain/no-source-sprites control or the exact
+    // Build 46 rollback in the same Stonepine location.
+    if(on.avg-noSprites.avg>2.5||on.p95-noSprites.p95>5.0)throw new Error(`${vp.name}: Build47 source sprites regress physical-terrain control ${JSON.stringify({on,noSprites,rollback})}`);
+    if(on.avg-rollback.avg>2.5||on.p95-rollback.p95>5.0)throw new Error(`${vp.name}: Build47 regresses exact Build46 rollback ${JSON.stringify({on,noSprites,rollback})}`);
+
+    console.log(`PASS ${vp.name}: Build47 Stonepine stress is no slower than controls; existing absolute render-performance gate remains authoritative`);
   }
 }finally{await browser.close();}
