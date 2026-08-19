@@ -1,14 +1,14 @@
 (() => {
   'use strict';
   const debug = window.__BRIAR_GLENDebug;
+  const generatedEnabled = () => Boolean(debug?.isGeneratedArtEnabled?.());
 
   // Preserve Build 30's authored Copper-ore draw-site diagnostics while the generated sprite
   // remains the visible top layer. Historical/rollback modes still fall through exactly once.
   const legacyResource = window.__BRIAR_GLEN_PRE_GENERATED_DRAW_RESOURCE;
   const generatedResource = drawResource;
   drawResource = function build41GeneratedArtCompatibleResource(r) {
-    const state = debug?.getGeneratedArtState?.();
-    if (state?.enabled && r?.active && r.type === 'ore' && typeof legacyResource === 'function') legacyResource(r);
+    if (generatedEnabled() && r?.active && r.type === 'ore' && typeof legacyResource === 'function') legacyResource(r);
     return generatedResource(r);
   };
 
