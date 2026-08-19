@@ -69,6 +69,7 @@
     'src/v38/56-regional-prop-clusters.js',
     'src/v37/54-world-layout-v2-canonical.js',
     'src/v38/57-npc-idle-stagger.js',
+    'src/v39/58-landmark-state-polish.js',
     'src/runtime/release-info.js',
   ];
 
