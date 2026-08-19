@@ -6,6 +6,7 @@ on:
       - 'src/v36/**'
       - 'src/runtime/boot.js'
       - 'tests/generated-art-smoke.mjs'
+      - 'tests/generated-dressing-smoke.mjs'
       - '.github/workflows/generated-art-smoke.yml'
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - 'src/v36/**'
       - 'src/runtime/boot.js'
       - 'tests/generated-art-smoke.mjs'
+      - 'tests/generated-dressing-smoke.mjs'
       - '.github/workflows/generated-art-smoke.yml'
   workflow_dispatch:
 
@@ -37,7 +39,9 @@ jobs:
           echo $! > /tmp/briarglen-generated-art-http.pid
           sleep 2
       - name: Run generated art integration proof
-        run: node tests/generated-art-smoke.mjs http://127.0.0.1:4173/
+        run: |
+          node tests/generated-art-smoke.mjs http://127.0.0.1:4173/
+          node tests/generated-dressing-smoke.mjs http://127.0.0.1:4173/
       - name: Upload generated art screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,3 +61,4 @@ jobs:
             return 1
           }
           run_live node tests/generated-art-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
+          run_live node tests/generated-dressing-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
