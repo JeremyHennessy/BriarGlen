@@ -8,7 +8,7 @@ const viewports = [
   { name: 'desktop', width: 1440, height: 900, touch: false },
 ];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless:true });
 
 async function signature(page) {
   return page.evaluate(() => {
@@ -41,7 +41,9 @@ try {
     for (let attempt=1; attempt <= (live ? 48 : 1); attempt++) {
       try {
         const sep = target.includes('?') ? '&' : '?';
-        await page.goto(`${target}${sep}biome19=${Date.now()}-${attempt}`, { waitUntil:'domcontentloaded', timeout:15000 });
+        // Historical Build 19 biome-art recovery proof. Build 47 owns the normal-play ground
+        // renderer, so validate the original Grove/Fen layer against the exact Build 46 rollback.
+        await page.goto(`${target}${sep}sourceArt47=0&biome19=${Date.now()}-${attempt}`, { waitUntil:'domcontentloaded', timeout:15000 });
         await page.waitForFunction(() => Boolean(window.__BRIAR_GLENDebug?.getBiomeArtState && window.__BRIAR_GLENDebug?.getBuildInfo), { timeout:7000 });
         loaded = true; break;
       } catch (error) {
@@ -72,7 +74,7 @@ try {
     }
     const groveOn = await signature(page);
     const groveFrames = state.frames;
-    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getBiomeArtState().frames >= before + 5, groveFrames, { timeout: 3000 });
+    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getBiomeArtState().frames >= before + 5, groveFrames, { timeout:3000 });
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getBiomeArtState());
     if (state.frames - groveFrames < 5) throw new Error(`${vp.name}: Grove renderer cadence stalled`);
     if (JSON.stringify(state.entityCounts) !== JSON.stringify(baselineEntities)) throw new Error(`${vp.name}: Grove renderer mutated entities`);
@@ -99,7 +101,7 @@ try {
     }
     const fenOn = await signature(page);
     const fenFrames = state.frames;
-    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getBiomeArtState().frames >= before + 5, fenFrames, { timeout: 3000 });
+    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getBiomeArtState().frames >= before + 5, fenFrames, { timeout:3000 });
     state = await page.evaluate(() => window.__BRIAR_GLENDebug.getBiomeArtState());
     if (state.frames - fenFrames < 5) throw new Error(`${vp.name}: Fen renderer cadence stalled`);
     if (JSON.stringify(state.entityCounts) !== JSON.stringify(baselineEntities)) throw new Error(`${vp.name}: Fen renderer mutated entities`);
