@@ -7,7 +7,7 @@
   const pack=window.__BRIAR_GLEN_GENERATED_ART,debug=window.__BRIAR_GLENDebug;
   if(!pack?.atlas||!pack?.sprites||!debug)return;
   const baseGeneratedEnabled=debug.isGeneratedArtEnabled?.bind(debug);
-  const state={version:'build47-visual-rebuild-v2',requested,historicalProof,ready:!requested,failed:false,frameDraws:0,totalDraws:0,terrainMode:'physical-ground-v2',sources:{},draws:{},baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}};
+  const state={version:'build47-visual-rebuild-v3',requested,historicalProof,ready:!requested,failed:false,frameDraws:0,totalDraws:0,terrainMode:'physical-ground-v2',sources:{},draws:{},baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}};
   const generatedAtlas=new Image();generatedAtlas.decoding='async';
   const external={
     cottage:{src:'assets/v24/cottage-authored.webp',width:96,height:96,anchor:.84},
@@ -20,26 +20,27 @@
   };
   const images={};let pending=1+Object.keys(external).length,failures=[];
   function done(){pending--;if(pending>0)return;if(failures.length){state.failed=true;state.ready=false;state.failure=failures.join('; ');}else state.ready=true;}
+  function rasterize(image,def){const c=document.createElement('canvas'),scale=2;c.width=Math.max(1,Math.ceil(def.width*scale));c.height=Math.max(1,Math.ceil(def.height*scale));const x=c.getContext('2d',{alpha:true});x.imageSmoothingEnabled=true;x.drawImage(image,0,0,c.width,c.height);return c;}
   generatedAtlas.onload=done;generatedAtlas.onerror=()=>{failures.push('generated atlas');done();};generatedAtlas.src=pack.atlas;
-  for(const[name,def]of Object.entries(external)){const image=new Image();image.decoding='async';image.onload=()=>{images[name]=image;state.sources[name]=def.src;done();};image.onerror=()=>{failures.push(def.src);done();};image.src=`${def.src}?v=47r2`;}
+  for(const[name,def]of Object.entries(external)){const image=new Image();image.decoding='async';image.onload=()=>{images[name]=rasterize(image,def);state.sources[name]=def.src;done();};image.onerror=()=>{failures.push(def.src);done();};image.src=`${def.src}?v=47r3`;}
   function enabled(){return Boolean(requested&&state.ready&&!state.failed&&baseGeneratedEnabled?.());}
   function visible(p,w,h,margin=100){return p.x+w/2>-margin&&p.x-w/2<viewport.w+margin&&p.y>-margin&&p.y-h<viewport.h+margin;}
   function entityScale(o){const s=Number.isFinite(o?.s)?o.s:1;return Math.max(.94,Math.min(1.06,.99+(s-1)*.12));}
   function record(name){state.frameDraws++;state.totalDraws++;state.draws[name]=(state.draws[name]||0)+1;}
-  function drawExternal(name,o,{scale=1,alpha=1,flip=false,dx=0,dy=0}={}){const def=external[name],image=images[name];if(!def||!image)return false;const p=worldToScreen(o.x,o.y),z=camera.zoom*scale*entityScale(o),w=def.width*z,h=def.height*z;if(!visible(p,w,h))return true;ctx.save();ctx.globalAlpha=alpha;ctx.translate(p.x+dx*camera.zoom,p.y+dy*camera.zoom);if(flip)ctx.scale(-1,1);ctx.drawImage(image,-w/2,-h*def.anchor,w,h);ctx.restore();record(name);return true;}
+  function drawExternal(name,o,{scale=1,alpha=1,flip=false,dx=0,dy=0}={}){const def=external[name],image=images[name];if(!def||!image)return false;const p=worldToScreen(o.x,o.y),z=camera.zoom*scale*entityScale(o),w=def.width*z,h=def.height*z,x=p.x+dx*camera.zoom,y=p.y+dy*camera.zoom;if(!visible({x,y},w,h))return true;if(!flip&&alpha===1){ctx.drawImage(image,x-w/2,y-h*def.anchor,w,h);}else{ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);if(flip)ctx.scale(-1,1);ctx.drawImage(image,-w/2,-h*def.anchor,w,h);ctx.restore();}record(name);return true;}
   const serviceScale={tavern:.72,forge:.74,alchemy:.72,market:.74,well:.76};
-  function drawGenerated(name,o,{scale=1,alpha=1,flip=false,dx=0,dy=0}={}){const f=pack.sprites[name];if(!f)return false;const p=worldToScreen(o.x,o.y),z=camera.zoom*scale*entityScale(o),w=f.width*z,h=f.height*z;if(!visible(p,w,h))return true;ctx.save();ctx.globalAlpha=alpha;ctx.translate(p.x+dx*camera.zoom,p.y+dy*camera.zoom);if(flip)ctx.scale(-1,1);ctx.drawImage(generatedAtlas,f.sx,f.sy,f.sw,f.sh,-w/2,-h*f.anchor,w,h);ctx.restore();record(name);return true;}
+  function drawGenerated(name,o,{scale=1,alpha=1,flip=false,dx=0,dy=0}={}){const f=pack.sprites[name];if(!f)return false;const p=worldToScreen(o.x,o.y),z=camera.zoom*scale*entityScale(o),w=f.width*z,h=f.height*z,x=p.x+dx*camera.zoom,y=p.y+dy*camera.zoom;if(!visible({x,y},w,h))return true;if(!flip&&alpha===1){ctx.drawImage(generatedAtlas,f.sx,f.sy,f.sw,f.sh,x-w/2,y-h*f.anchor,w,h);}else{ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);if(flip)ctx.scale(-1,1);ctx.drawImage(generatedAtlas,f.sx,f.sy,f.sw,f.sh,-w/2,-h*f.anchor,w,h);ctx.restore();}record(name);return true;}
   function treeName(o){return(Math.abs(Math.round(o.x*7+o.y*11))%3===0)?'tree_pine':'tree_deciduous';}
   const priorObject=drawObject;
   drawObject=function build47ScaleCorrectedObject(o){
     if(!enabled())return priorObject(o);
     if(o.type==='cottage'){if(drawExternal('cottage',o,{scale:.96}))return;}
     else if(o.type==='tree'){if(drawExternal(treeName(o),o,{scale:.96}))return;}
-    else if(o.type==='fenTree'){if(drawExternal('tree_deciduous',o,{scale:.86,alpha:.90}))return;}
-    else if(o.type==='stonepineTree'){if(drawExternal('tree_pine',o,{scale:.90,alpha:.94}))return;}
+    else if(o.type==='fenTree'){if(drawExternal('tree_deciduous',o,{scale:.86}))return;}
+    else if(o.type==='stonepineTree'){if(drawExternal('tree_pine',o,{scale:.90}))return;}
     else if(o.type==='rock'){if(drawExternal('rock',o,{scale:.94}))return;}
-    else if(o.type==='quarryRock'){if(drawExternal('rock',o,{scale:.92,alpha:.92}))return;}
-    else if(o.type==='denRock'){if(drawExternal('rock',o,{scale:.94,alpha:.88}))return;}
+    else if(o.type==='quarryRock'){if(drawExternal('rock',o,{scale:.92}))return;}
+    else if(o.type==='denRock'){if(drawExternal('rock',o,{scale:.94}))return;}
     else if(o.type==='tavern'){if(drawGenerated('tavern',o,{scale:serviceScale.tavern})){const p=worldToScreen(o.x,o.y);labelAt(p.x,p.y-82*camera.zoom,'THE HEARTH & BRIAR');return;}}
     else if(o.type==='forge'){if(drawGenerated('forge',o,{scale:serviceScale.forge})){drawExternal('utility',{x:o.x+48,y:o.y+25},{scale:.72,alpha:.92});const p=worldToScreen(o.x,o.y);labelAt(p.x,p.y-76*camera.zoom,'ALDEN • SMITH');return;}}
     else if(o.type==='alchemy'){if(drawGenerated('alchemy',o,{scale:serviceScale.alchemy})){const p=worldToScreen(o.x,o.y);labelAt(p.x,p.y-78*camera.zoom,'MIRA • ALCHEMY');return;}}
@@ -49,13 +50,7 @@
     return priorObject(o);
   };
   const priorResource=drawResource;
-  drawResource=function build47ScaleCorrectedResource(r){
-    if(!enabled()||!r.active)return priorResource(r);
-    // Only Copper uses the new unfiltered source node. Iron/Mossglass retain their dedicated
-    // proven renderer until dedicated source sprites exist; do not hue-filter source art in-frame.
-    if(r.type==='ore'&&drawExternal('ore',r,{scale:.94}))return;
-    return priorResource(r);
-  };
+  drawResource=function build47ScaleCorrectedResource(r){if(!enabled()||!r.active)return priorResource(r);if(r.type==='ore'&&drawExternal('ore',r,{scale:.94}))return;return priorResource(r);};
   window.__BRIAR_GLEN_RUNTIME?.registerHook?.('beforeDraw','build47-source-art-frame-reset',()=>{state.frameDraws=0;},2060);
   debug.isSourceArt47Enabled=enabled;
   debug.getSourceArt47State=()=>({version:state.version,requested:state.requested,historicalProof:state.historicalProof,enabled:enabled(),ready:state.ready,failed:state.failed,failure:state.failure||'',frameDraws:state.frameDraws,totalDraws:state.totalDraws,terrainMode:state.terrainMode,sources:{...state.sources},draws:{...state.draws},baseline:{...state.baseline},current:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}});
