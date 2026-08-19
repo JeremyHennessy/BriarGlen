@@ -7,7 +7,7 @@
   if(!pack?.atlas||!pack?.sprites||!debug)return;
 
   const state={
-    version:'build44-landmark-state-v1',requested,ready:false,failed:false,
+    version:'build44-landmark-state-v2',requested,ready:false,failed:false,
     frameDraws:0,totalDraws:0,archetypes:{},landmarks:{},
     baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length},
   };
@@ -17,7 +17,7 @@
   function enabled(){const generated=debug.getGeneratedArtState?.();return Boolean(requested&&state.ready&&!state.failed&&generated?.enabled&&generated?.ready);}
   function hash(o){
     if(hashCache.has(o))return hashCache.get(o);
-    const text=`${o?.type||''}|${o?.name||''}|${Math.round(o?.homeX??o?.x??0)}|${Math.round(o?.homeY??o?.y??0)}`;
+    const text=`${o?.type||''}|${o?.name||o?.label||''}|${Math.round(o?.homeX??o?.x??0)}|${Math.round(o?.homeY??o?.y??0)}`;
     let h=2166136261>>>0;for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
     hashCache.set(o,h>>>0);return h>>>0;
   }
@@ -35,10 +35,14 @@
   function beforeObject(o){
     if(!enabled())return;
     if(o.type==='cottage'){
-      const variant=hash(o)%3;
-      if(variant===1){sprite('shed',o,{dx:-58,dy:9,scale:.50,alpha:.96,flipX:true});mark('archetypes','cottage-left-annex');}
-      else if(variant===2){sprite('shed',o,{dx:58,dy:10,scale:.52,alpha:.96});mark('archetypes','cottage-right-annex');}
-      else mark('archetypes','cottage-compact');
+      // Warden House is a named landmark and stays on the canonical compact silhouette.
+      // Ordinary residences may receive one stable utility annex to break obvious cloning.
+      if(o.label==='Warden House'){mark('archetypes','warden-house-compact');}
+      else {
+        const variant=1+(hash(o)%2);
+        if(variant===1){sprite('shed',o,{dx:-58,dy:9,scale:.50,alpha:.96,flipX:true});mark('archetypes','cottage-left-annex');}
+        else {sprite('shed',o,{dx:58,dy:10,scale:.52,alpha:.96});mark('archetypes','cottage-right-annex');}
+      }
     }
     if(o.type==='fenGate'&&progress.fenCrossingOpened){
       sprite('fence',o,{dx:-62,dy:10,scale:.62,alpha:.62,rotation:-.05});
