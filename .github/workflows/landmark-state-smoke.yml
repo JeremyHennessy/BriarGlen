@@ -1,0 +1,61 @@
+name: Landmark state proof
+
+on:
+  pull_request:
+    paths:
+      - 'src/v39/**'
+      - 'src/runtime/boot.js'
+      - 'tests/landmark-state-smoke.mjs'
+      - 'docs/SOURCE_ART_EXPANSION_BACKLOG.md'
+      - '.github/workflows/landmark-state-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/v39/**'
+      - 'src/runtime/boot.js'
+      - 'tests/landmark-state-smoke.mjs'
+      - 'docs/SOURCE_ART_EXPANSION_BACKLOG.md'
+      - '.github/workflows/landmark-state-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  landmark-state-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-landmark-state-http.log 2>&1 &
+          echo $! > /tmp/briarglen-landmark-state-http.pid
+          sleep 2
+      - name: Run landmark state proof
+        run: node tests/landmark-state-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload landmark state screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build44-landmark-state-proof
+          path: artifacts/landmark-state-*.png
+          if-no-files-found: warn
+      - name: Verify deployed GitHub Pages landmark state
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          run_live() {
+            local attempt
+            for attempt in 1 2 3 4 5 6; do
+              "$@" && return 0
+              [ "$attempt" -lt 6 ] && sleep $((attempt * 10))
+            done
+            return 1
+          }
+          run_live node tests/landmark-state-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
