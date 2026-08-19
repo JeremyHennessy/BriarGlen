@@ -1,0 +1,56 @@
+name: Build 47 visual rebuild proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build47-visual-rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and source-file gate
+        run: |
+          node tests/static-sanity.mjs
+          test -s assets/v47/terrain-materials.svg
+          test -s assets/v47/rock-cluster.svg
+          test -s assets/v47/ore-node.svg
+          test -s assets/v47/utility-crates.svg
+          test -s assets/v47/sign-lantern.svg
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-build47-rebuild-http.log 2>&1 &
+          sleep 2
+      - name: Verify actual Build 47 gameplay screens
+        run: node tests/build47-visual-rebuild-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify Build 47 source-layer performance
+        run: node tests/build47-source-performance-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify ground cache and historical performance guards
+        run: |
+          node tests/ground-v2-smoke.mjs http://127.0.0.1:4173/
+          node tests/ground-v2-performance-smoke.mjs http://127.0.0.1:4173/
+          node tests/render-performance-smoke.mjs http://127.0.0.1:4173/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build47-visual-rebuild-${{ github.sha }}
+          path: artifacts/build47-rebuild-*.png
+          if-no-files-found: ignore
+      - name: Verify deployed GitHub Pages Build 47
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
+          node tests/build47-visual-rebuild-smoke.mjs "$URL"
+          node tests/build47-source-performance-smoke.mjs "$URL"
+          node tests/ground-v2-performance-smoke.mjs "$URL"
+          node tests/render-performance-smoke.mjs "$URL"
