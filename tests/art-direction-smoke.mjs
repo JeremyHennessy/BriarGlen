@@ -73,10 +73,7 @@ try {
 
     const onSignature = await canvasSignature(page);
     const framesBefore = art.frames;
-    // Build 47 loads physical SVG/WebP source art and cached terrain at startup. Preserve the
-    // original state-based cadence assertion, but allow that one-time source initialization to
-    // complete before declaring the renderer stalled. The required +5 rendered frames is unchanged.
-    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getArtState().frames >= before + 5, framesBefore, { timeout: 8000 });
+    await page.waitForFunction(before => window.__BRIAR_GLENDebug.getArtState().frames >= before + 5, framesBefore, { timeout: 3000 });
     art = await page.evaluate(() => window.__BRIAR_GLENDebug.getArtState());
     if (art.frames - framesBefore < 5) throw new Error(`${vp.name}: render cadence stalled with art enabled: ${art.frames-framesBefore} frames`);
     if (JSON.stringify(art.current) !== JSON.stringify(entityCounts)) throw new Error(`${vp.name}: art pass mutated gameplay entity counts during render ${JSON.stringify({before:entityCounts,after:art.current})}`);
