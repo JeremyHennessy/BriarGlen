@@ -42,7 +42,9 @@ try {
     for (let attempt=1; attempt <= (live ? 48 : 1); attempt++) {
       try {
         const sep = target.includes('?') ? '&' : '?';
-        await page.goto(`${target}${sep}art16=${Date.now()}-${attempt}`, { waitUntil:'domcontentloaded', timeout:15000 });
+        // This is a historical Build 16 art recovery test. Build 47 has its own direct gameplay-
+        // screen and performance proofs, so keep this test pinned to the pre-Build47 visual stack.
+        await page.goto(`${target}${sep}sourceArt47=0&art16=${Date.now()}-${attempt}`, { waitUntil:'domcontentloaded', timeout:15000 });
         await page.waitForFunction(() => Boolean(window.__BRIAR_GLENDebug?.getArtState && window.__BRIAR_GLENDebug?.getBuildInfo), { timeout:7000 });
         loaded=true; break;
       } catch (error) {
