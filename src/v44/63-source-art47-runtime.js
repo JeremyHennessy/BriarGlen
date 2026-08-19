@@ -1,7 +1,8 @@
 (() => {
   'use strict';
   const params=new URLSearchParams(location.search);
-  const historicalProof=[...params.keys()].some(k=>['assetVariantProof','landmarkStateProof','env46proof','env46perf','terrain46','terrain46perf','generatedArtSmoke'].includes(k));
+  const proofKeys=['assetVariantProof','landmarkStateProof','env46proof','envperf','terrain46','tperf','generatedArtSmoke','dressing','layoutProof','renderPerf','build30Recovery'];
+  const historicalProof=[...params.keys()].some(k=>proofKeys.includes(k));
   const requested=params.get('sourceArt47')!=='0'&&!historicalProof&&!params.get('artScope')&&params.get('canvasArt')!=='1'&&params.get('generatedArt')!=='0';
   const pack=window.__BRIAR_GLEN_GENERATED_ART,debug=window.__BRIAR_GLENDebug;
   if(!pack?.atlas||!pack?.sprites||!debug)return;
