@@ -39,9 +39,13 @@
   }
   #hud33-notification {
     position: fixed;
-    left: 50vw;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    transform: none;
+    margin-inline: auto;
     top: max(82px, calc(env(safe-area-inset-top) + 76px));
-    width: min(360px, calc(100vw - 24px));
+    width: auto;
+    max-width: 360px;
     max-height: 58px;
     overflow: hidden;
     padding: 6px 11px;
@@ -78,9 +82,13 @@
   }
   #hud33-notification {
     position: fixed;
-    left: 50vw;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    transform: none;
+    margin-inline: auto;
     top: max(180px, calc(env(safe-area-inset-top) + 174px));
-    width: min(340px, calc(100vw - 24px));
+    width: auto;
+    max-width: 340px;
     max-height: min(92px, calc(100vh - 390px));
     overflow: hidden;
   }
