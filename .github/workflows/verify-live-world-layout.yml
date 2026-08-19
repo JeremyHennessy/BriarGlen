@@ -1,0 +1,46 @@
+name: Verify World Layout V2 live
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/verify-live-world-layout.yml'
+  workflow_dispatch:
+
+jobs:
+  live-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Verify deployed GitHub Pages
+        run: |
+          verify_live() {
+            local attempt
+            for attempt in 1 2 3 4 5 6 7 8; do
+              echo "Live verification attempt ${attempt}"
+              if node tests/world-layout-v2-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?verify=0dd842c48548e62d7a2d08c1e2ac3342831ceeac-${attempt}" --live \
+                && node tests/generated-art-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?verify=0dd842c48548e62d7a2d08c1e2ac3342831ceeac-${attempt}" \
+                && node tests/generated-dressing-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?verify=0dd842c48548e62d7a2d08c1e2ac3342831ceeac-${attempt}"; then
+                exit 0
+              fi
+              [ "$attempt" -lt 8 ] && sleep $((attempt * 10))
+            done
+            exit 1
+          }
+          verify_live
+      - name: Upload deployed visual proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-layout-v2-live-proof
+          path: |
+            artifacts/world-layout-v2-*.png
+            artifacts/generated-art-*.png
+          if-no-files-found: warn
