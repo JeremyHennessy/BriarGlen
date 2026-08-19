@@ -1,11 +1,12 @@
 (() => {
   'use strict';
   const params=new URLSearchParams(location.search);
-  const requested=params.get('sourceArt47')!=='0'&&!params.get('artScope')&&params.get('canvasArt')!=='1'&&params.get('generatedArt')!=='0';
+  const historicalProof=[...params.keys()].some(k=>['assetVariantProof','landmarkStateProof','env46proof','env46perf','terrain46','terrain46perf','generatedArtSmoke'].includes(k));
+  const requested=params.get('sourceArt47')!=='0'&&!historicalProof&&!params.get('artScope')&&params.get('canvasArt')!=='1'&&params.get('generatedArt')!=='0';
   const pack=window.__BRIAR_GLEN_GENERATED_ART,debug=window.__BRIAR_GLENDebug;
   if(!pack?.atlas||!pack?.sprites||!debug)return;
   const baseGeneratedEnabled=debug.isGeneratedArtEnabled?.bind(debug);
-  const state={version:'build47-visual-rebuild-v1',requested,ready:!requested,failed:false,frameDraws:0,totalDraws:0,terrainMode:'physical-ground-v2',sources:{},draws:{},baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}};
+  const state={version:'build47-visual-rebuild-v1',requested,historicalProof,ready:!requested,failed:false,frameDraws:0,totalDraws:0,terrainMode:'physical-ground-v2',sources:{},draws:{},baseline:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}};
   const generatedAtlas=new Image();generatedAtlas.decoding='async';
   const external={
     cottage:{src:'assets/v24/cottage-authored.webp',width:96,height:96,anchor:.84},
@@ -50,5 +51,5 @@
   drawResource=function build47ScaleCorrectedResource(r){if(!enabled()||!r.active)return priorResource(r);if(r.type==='ore'){if(drawExternal('ore',r,{scale:.94}))return;}else if(r.type==='iron'){if(drawExternal('ore',r,{scale:.94,filter:'hue-rotate(165deg) saturate(.28) brightness(.92)'}))return;}else if(r.type==='mossglass'){if(drawExternal('ore',r,{scale:.82,filter:'hue-rotate(80deg) saturate(.55) brightness(1.00)'}))return;}return priorResource(r);};
   window.__BRIAR_GLEN_RUNTIME?.registerHook?.('beforeDraw','build47-source-art-frame-reset',()=>{state.frameDraws=0;},2060);
   debug.isSourceArt47Enabled=enabled;
-  debug.getSourceArt47State=()=>({version:state.version,requested:state.requested,enabled:enabled(),ready:state.ready,failed:state.failed,failure:state.failure||'',frameDraws:state.frameDraws,totalDraws:state.totalDraws,terrainMode:state.terrainMode,sources:{...state.sources},draws:{...state.draws},baseline:{...state.baseline},current:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}});
+  debug.getSourceArt47State=()=>({version:state.version,requested:state.requested,historicalProof:state.historicalProof,enabled:enabled(),ready:state.ready,failed:state.failed,failure:state.failure||'',frameDraws:state.frameDraws,totalDraws:state.totalDraws,terrainMode:state.terrainMode,sources:{...state.sources},draws:{...state.draws},baseline:{...state.baseline},current:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length}});
 })();
