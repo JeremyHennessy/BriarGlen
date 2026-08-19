@@ -61,7 +61,9 @@
     'src/v36/49-generated-art-chunk-11.js',
     'src/v36/49-generated-art-chunk-12.js',
     'src/v36/49-generated-art-data.js',
+    'src/v36/49-generated-art-compat-pre.js',
     'src/v36/50-generated-art-runtime.js',
+    'src/v36/51-generated-art-compat-post.js',
     'src/runtime/release-info.js',
   ];
 
