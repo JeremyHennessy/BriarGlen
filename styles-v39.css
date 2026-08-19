@@ -14,8 +14,8 @@
  #rotate-note{display:none!important;}
  #onboarding37-prompt{top:max(98px,calc(env(safe-area-inset-top) + 92px));width:min(280px,calc(100vw - 28px));}
  #hud33-notification{position:fixed;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));transform:none;margin-inline:auto;top:max(98px,calc(env(safe-area-inset-top) + 92px));width:auto;max-width:360px;max-height:58px;overflow:hidden;padding:6px 11px;}
- /* Keep a real safety gap between the centre inventory strip and the right action cluster on 667px-class phones. */
- #inventory-strip{transform:translateX(-50%) scale(.84);transform-origin:bottom center;}
+ /* 667px-class phones need a real safety gap between the centre strip and the right utility column. */
+ #inventory-strip{left:calc(50% - 14px);transform:translateX(-50%) scale(.84);transform-origin:bottom center;}
  #warden-map-btn{left:50%;bottom:max(138px,calc(env(safe-area-inset-bottom) + 132px));}
  #context-prompt{bottom:max(190px,calc(env(safe-area-inset-bottom) + 184px));}
  #combat36-readiness{left:50%;bottom:max(101px,calc(env(safe-area-inset-bottom) + 95px));}
