@@ -1,0 +1,43 @@
+name: Ground V2 proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ground-v2-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-ground46-http.log 2>&1 &
+          echo $! > /tmp/briarglen-ground46-http.pid
+          sleep 2
+      - name: Verify Ground V2 asset, cache and regional rendering
+        run: node tests/ground-v2-smoke.mjs http://127.0.0.1:4173/
+      - name: Compare Ground V2 performance to rollback
+        run: node tests/ground-v2-performance-smoke.mjs http://127.0.0.1:4173/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ground-v2-proof-${{ github.sha }}
+          path: artifacts/ground46-*.png
+          if-no-files-found: ignore
+      - name: Verify deployed GitHub Pages Ground V2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          node tests/ground-v2-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
+          node tests/ground-v2-performance-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
