@@ -11,10 +11,14 @@
 }
 
 /* Contextual onboarding is the highest-priority message while it is visible. */
-#game-shell:has(#onboarding37-prompt:not([hidden])) :is(#hud33-notification,#rotate-note) {
+#game-shell:has(#onboarding37-prompt:not([hidden]):not([data-kind="idle"])) :is(#hud33-notification,#rotate-note) {
   display: none !important;
 }
 #game-shell:has(#onboarding21-guide:not([hidden])) #hud33-notification {
+  display: none !important;
+}
+/* An idle tutorial control yields to the shared notification queue, then returns. */
+#game-shell:has(#hud33-notification:not([hidden])) #onboarding37-prompt[data-kind="idle"] {
   display: none !important;
 }
 
