@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs><linearGradient id="stone" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#aaa99e"/><stop offset=".55" stop-color="#767872"/><stop offset="1" stop-color="#4f5654"/></linearGradient><linearGradient id="copper" x1=".2" y1="0" x2=".8" y2="1"><stop stop-color="#f0b05e"/><stop offset=".45" stop-color="#c36a35"/><stop offset="1" stop-color="#844023"/></linearGradient><filter id="s"><feGaussianBlur stdDeviation="5"/></filter></defs>
+<ellipse cx="254" cy="422" rx="148" ry="27" fill="#2c2e2a" opacity=".18" filter="url(#s)"/>
+<path d="M98 390 131 289 200 231 274 248 325 316 310 399 236 428 151 421Z" fill="url(#stone)" stroke="#505755" stroke-width="8"/>
+<path d="M248 410 284 319 353 283 414 329 405 401 354 429 292 424Z" fill="#808079" stroke="#525956" stroke-width="7"/>
+<path d="m176 301 38-42 34 20-14 44 30 24-40 47-28-31-41 12 20-46-23-17Z" fill="url(#copper)" stroke="#8a4726" stroke-width="5"/>
+<path d="m316 327 28-28 25 17-10 33 22 18-31 34-19-24-30 7 14-33-18-12Z" fill="url(#copper)" stroke="#884825" stroke-width="4"/>
+<circle cx="132" cy="408" r="17" fill="#747771"/><circle cx="394" cy="416" r="15" fill="#666b67"/>
+<path d="M188 280 224 294M214 352 243 328M329 322 355 335" stroke="#ffd184" stroke-width="5" stroke-linecap="round" opacity=".62"/>
+</svg>
