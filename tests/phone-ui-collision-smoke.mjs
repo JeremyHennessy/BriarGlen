@@ -63,7 +63,7 @@ try {
     await page.waitForFunction(() => window.__BRIAR_GLENDebug?.getPhoneUi39State?.().cssLoaded, null, { timeout:7000 });
 
     const build = await page.evaluate(() => window.__BRIAR_GLENDebug.getBuildInfo());
-    if (build.version !== '40' || build.saveKey !== 'briar-glen-vslice-v1' || build.schema !== 1) throw new Error(`${vp.name}: wrong Build 40 metadata ${JSON.stringify(build)}`);
+    if (build.version !== '41' || build.saveKey !== 'briar-glen-vslice-v1' || build.schema !== 1) throw new Error(`${vp.name}: wrong Build 41 metadata ${JSON.stringify(build)}`);
     if ((await page.evaluate(() => window.__BRIAR_GLENDebug.getPhoneUi39State())).rotateNoticeVisible) throw new Error(`${vp.name}: persistent rotation notice still competes with gameplay UI`);
 
     await assertNoChromeCollisions(page, vp, 'contextual prompt');
