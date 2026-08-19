@@ -1,0 +1,38 @@
+name: Verify Build 43 live
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/verify-build43-live.yml'
+
+jobs:
+  live-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Verify deployed Build 43 on GitHub Pages
+        run: |
+          run_live() {
+            local attempt
+            for attempt in 1 2 3 4 5 6; do
+              "$@" && return 0
+              [ "$attempt" -lt 6 ] && sleep $((attempt * 10))
+            done
+            return 1
+          }
+          base="https://jeremyhennessy.github.io/BriarGlen/?sha=12b2cda0d64c9a6811541d339f297ab3d720cf4a"
+          run_live node tests/smoke.mjs "$base" --live
+          run_live node tests/phone-ui-collision-smoke.mjs "$base"
+          run_live node tests/tutorial-skip-smoke.mjs "$base"
+          run_live node tests/generated-art-smoke.mjs "$base"
+          run_live node tests/generated-dressing-smoke.mjs "$base"
+          run_live node tests/asset-variants-smoke.mjs "$base" --live
+          run_live node tests/world-layout-v2-smoke.mjs "$base" --live
