@@ -1,0 +1,42 @@
+name: Terrain and state polish proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  terrain46-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-terrain46-http.log 2>&1 &
+          sleep 2
+      - name: Verify terrain and state presentation
+        run: node tests/terrain46-smoke.mjs http://127.0.0.1:4173/
+      - name: Compare terrain-polish performance to rollback
+        run: node tests/terrain46-performance-smoke.mjs http://127.0.0.1:4173/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain46-proof-${{ github.sha }}
+          path: artifacts/terrain46-*.png
+          if-no-files-found: ignore
+      - name: Verify deployed Terrain 46C
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          node tests/terrain46-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
+          node tests/terrain46-performance-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
