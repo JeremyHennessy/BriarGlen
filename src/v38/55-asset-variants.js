@@ -8,7 +8,7 @@
   if (!pack?.atlas || !pack?.sprites || !debug) return;
 
   const state = {
-    version:'build43-asset-variants-v1',
+    version:'build43-asset-variants-v2',
     requested,
     ready:false,
     failed:false,
@@ -25,52 +25,63 @@
   atlas.onerror=()=>{state.failed=true;state.ready=false;};
   atlas.src=pack.atlas;
 
+  const hashCache=new WeakMap();
+  const objectCache=new WeakMap();
+  const resourceCache=new WeakMap();
+  const enemyCache=new WeakMap();
+  const recorded=new WeakSet();
+
   function enabled(){
     const generated=debug.getGeneratedArtState?.();
     return Boolean(requested && state.ready && !state.failed && generated?.enabled && generated?.ready);
   }
 
-  function hash(entity,salt=0){
-    const text=`${entity?.type||''}|${entity?.name||''}|${Math.round(entity?.homeX??entity?.x??0)}|${Math.round(entity?.homeY??entity?.y??0)}|${salt}`;
+  function baseHash(entity){
+    if(hashCache.has(entity))return hashCache.get(entity);
+    const text=`${entity?.type||''}|${entity?.name||''}|${Math.round(entity?.homeX??entity?.x??0)}|${Math.round(entity?.homeY??entity?.y??0)}`;
     let h=2166136261>>>0;
     for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
-    return h>>>0;
+    hashCache.set(entity,h>>>0);return h>>>0;
   }
+  function seededIndex(entity,salt,length){
+    let h=(baseHash(entity)^Math.imul((salt+1)>>>0,2654435761))>>>0;
+    h^=h>>>16;h=Math.imul(h,2246822507)>>>0;h^=h>>>13;
+    return h%length;
+  }
+  function choice(entity,values,salt=0){return values[seededIndex(entity,salt,values.length)];}
 
-  function choice(entity,values,salt=0){return values[hash(entity,salt)%values.length];}
-
-  function objectVariant(o){
+  // Hot-path families rely on scale/silhouette/composition variation only. Reapplying Canvas
+  // color filters to 100+ trees/rocks/resources every frame was needlessly expensive on phones.
+  // Restrained filter variation is retained only for the tiny cottage/villager families.
+  function computeObjectVariant(o){
     const scale=choice(o,[.96,1,1.035],11);
     if(o.type==='cottage')return{family:'cottage',scale,filter:choice(o,['saturate(.94) brightness(1.01)','sepia(.055) saturate(.9) brightness(1.02)','hue-rotate(-5deg) saturate(.9) brightness(.98)'],12)};
-    if(o.type==='tree')return{family:'tree',scale:choice(o,[.93,1,1.07],13),filter:choice(o,['saturate(.94) brightness(.98)','hue-rotate(-7deg) saturate(.9) brightness(1.01)','hue-rotate(7deg) saturate(.82) brightness(.94)'],14)};
-    if(o.type==='bush')return{family:'bush',scale:choice(o,[.9,1,1.08],15),filter:choice(o,['saturate(.92)','hue-rotate(-7deg) saturate(.86)','hue-rotate(8deg) saturate(.8) brightness(.96)'],16)};
-    if(o.type==='rock')return{family:'rock',scale:choice(o,[.9,1,1.09],17),filter:choice(o,['saturate(.9) brightness(.96)','hue-rotate(-5deg) saturate(.72) brightness(.9)','saturate(.66) brightness(1.02)'],18)};
-    if(o.type==='garden')return{family:'garden',scale:choice(o,[.92,1,1.06],19),filter:choice(o,['saturate(.88)','hue-rotate(-6deg) saturate(.86)','hue-rotate(7deg) saturate(.82)'],20)};
-    if(o.type==='npc' && !['Orin','Perrin','Maeve'].includes(o.name))return{family:'villager',scale:choice(o,[.97,1,1.035],21),filter:choice(o,['saturate(.9)','sepia(.04) hue-rotate(-4deg) saturate(.88)','hue-rotate(6deg) saturate(.82) brightness(.98)'],22)};
+    if(o.type==='tree')return{family:'tree',scale:choice(o,[.93,1,1.07],13)};
+    if(o.type==='bush')return{family:'bush',scale:choice(o,[.9,1,1.08],15)};
+    if(o.type==='rock')return{family:'rock',scale:choice(o,[.9,1,1.09],17)};
+    if(o.type==='garden')return{family:'garden',scale:choice(o,[.92,1,1.06],19)};
+    if(o.type==='npc' && !['Orin','Perrin','Maeve'].includes(o.name))return{family:'villager',scale:choice(o,[.97,1,1.035],21),filter:choice(o,['saturate(.92)','sepia(.035) saturate(.9)','hue-rotate(5deg) saturate(.86) brightness(.99)'],22)};
     return null;
   }
+  function objectVariant(o){if(!objectCache.has(o))objectCache.set(o,computeObjectVariant(o));return objectCache.get(o);}
 
-  function resourceVariant(r){
-    const family=`resource-${r.type}`;
+  function computeResourceVariant(r){
     const scales={herb:[.9,1,1.08],mooncap:[.92,1,1.06],ore:[.9,1,1.08],iron:[.92,1,1.07],mossglass:[.92,1,1.05],resin:[.9,1,1.07]};
     if(!scales[r.type])return null;
-    const filters={
-      herb:['saturate(.9)','hue-rotate(-6deg) saturate(.86)','hue-rotate(6deg) saturate(.84) brightness(1.02)'],
-      mooncap:['saturate(.92)','hue-rotate(-5deg) saturate(.88)','hue-rotate(7deg) saturate(.84) brightness(1.03)'],
-      ore:['saturate(.9) brightness(.98)','hue-rotate(-4deg) saturate(.82) brightness(.93)','hue-rotate(5deg) saturate(.78) brightness(1.04)'],
-      iron:['saturate(.72) brightness(.96)','hue-rotate(-5deg) saturate(.58) brightness(.9)','hue-rotate(6deg) saturate(.62) brightness(1.03)'],
-    };
-    return{family,scale:choice(r,scales[r.type],31),filter:filters[r.type]?choice(r,filters[r.type],32):null};
+    return{family:`resource-${r.type}`,scale:choice(r,scales[r.type],31)};
   }
+  function resourceVariant(r){if(!resourceCache.has(r))resourceCache.set(r,computeResourceVariant(r));return resourceCache.get(r);}
 
-  function enemyVariant(e){
+  function computeEnemyVariant(e){
     if(['boss','grovekeeper','fenwarden','quarrysentinel'].includes(e.type))return null;
     return{family:`enemy-${e.type}`,scale:choice(e,[.95,1,1.045],41)};
   }
+  function enemyVariant(e){if(!enemyCache.has(e))enemyCache.set(e,computeEnemyVariant(e));return enemyCache.get(e);}
 
   function recordVariant(spec,entity){
-    if(!spec)return;
-    const key=`${spec.family}:${hash(entity,99)%3}`;
+    if(!spec||recorded.has(entity))return;
+    recorded.add(entity);
+    const key=`${spec.family}:${seededIndex(entity,99,3)}`;
     state.families[key]=(state.families[key]||0)+1;
     state.applied++;
   }
@@ -81,14 +92,13 @@
     const oldS=entity.s;
     const base=Number.isFinite(oldS)?oldS:1;
     entity.s=base*(spec.scale||1);
-    ctx.save();
-    if(spec.filter)ctx.filter=spec.filter;
-    try{return draw();}
-    finally{
-      ctx.restore();
-      if(hadS)entity.s=oldS;else delete entity.s;
-      recordVariant(spec,entity);
+    if(spec.filter){
+      ctx.save();ctx.filter=spec.filter;
+      try{return draw();}
+      finally{ctx.restore();if(hadS)entity.s=oldS;else delete entity.s;recordVariant(spec,entity);}
     }
+    try{return draw();}
+    finally{if(hadS)entity.s=oldS;else delete entity.s;recordVariant(spec,entity);}
   }
 
   function drawRaw(name,anchor,{dx=0,dy=0,scale=1,alpha=1,filter=null,rotation=0,flipX=false}={}){
