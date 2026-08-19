@@ -1,0 +1,33 @@
+name: Render performance proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  render-performance-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and syntax gate
+        run: node tests/static-sanity.mjs
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-render-perf-http.log 2>&1 &
+          echo $! > /tmp/briarglen-render-perf-http.pid
+          sleep 2
+      - name: Verify render hot path and frame cadence
+        run: node tests/render-performance-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify deployed GitHub Pages render performance
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: node tests/render-performance-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
