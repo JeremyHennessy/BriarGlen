@@ -31,7 +31,7 @@ Golden Scene SHA-256: `d990811a70be9b4d2bceabac049e44095baea772a59e7d40ed4cee599
 
 Family ID: `briar-glen-art-v1`.
 
-Renderer: `single-owner-procedural-storybook`.
+Renderer: `single-owner-painterly-storybook`.
 
 Normal production bypasses the Build 41–49 presentation stack at bootstrap and loads one late art-v1 renderer. Historical proof parameters and `?artV1=0` load the legacy recovery stack instead.
 
