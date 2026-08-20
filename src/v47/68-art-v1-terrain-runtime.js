@@ -52,7 +52,7 @@
     failClosed:true, fallbackUsed:false, atlasPath:'assets/art-v1/terrain/terrain-atlas-v1.webp', atlasWidth:0, atlasHeight:0,
     physicalTileCount:21, cacheBuilds:0, cacheHits:0, cacheMisses:0, evictions:0, frameChunks:0, frameCells:0,
     activeCache:0, currentRegion:'', materialPrimary:'', materialSecondary:'', materialMix:0, drawCalls:0,
-    texturePasses:1, textureSpacing:126,
+    texturePasses:1, textureSpacing:126, legacyRouteSuppressed:requested,
   };
 
   const atlas = new Image();
@@ -171,5 +171,7 @@
 
   const priorGround = drawGround;
   drawGround = function artV1TerrainGround(zone){if(!requested)return priorGround(zone);state.fallbackUsed=false;drawOwnedGround();};
+  const priorRoute = drawRoute;
+  drawRoute = function artV1TerrainRoute(...args){if(!requested)return priorRoute(...args);};
   debug.getArtV1TerrainState = () => ({...state,activeCache:cache.size,currentRegion:state.currentRegion||regionAt(camera.x,camera.y)});
 })();
