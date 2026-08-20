@@ -70,14 +70,19 @@
     out.sort((a,b)=>b.w-a.w);const a=out[0],b=out[1],sum=Math.max(.0001,a.w+b.w),secondary=Math.min(.34,(b.w/sum)*.60);
     return{primary:a.region,secondary:b.region,secondaryAlpha:secondary,key:`${a.region}:${b.region}:${Math.round(secondary*10)/10}`};
   }
-  function sampleRect(region,role,gx,gy,salt){
-    const cell=96,row=rows[region],col=role==='base'?0:role==='route'?1:2,h=hash(gx,gy,salt);
-    const sw=role==='accent'?cell:48,sh=role==='accent'?cell:48;
-    const ox=role==='accent'?0:(h%(cell-sw+1)),oy=role==='accent'?0:((h>>>8)%(cell-sh+1));
-    return [col*cell+ox,row*cell+oy,sw,sh];
+  const ATLAS_CELL = 32;
+  function sampleRect(region,role){
+    const row=rows[region],col=role==='base'?0:role==='route'?1:2;
+    return [col*ATLAS_CELL,row*ATLAS_CELL,ATLAS_CELL,ATLAS_CELL];
   }
   function drawSample(c,region,role,gx,gy,dx,dy,alpha=1,salt=1){
-    const [sx,sy,sw,sh]=sampleRect(region,role,gx,gy,salt);c.globalAlpha=alpha;c.drawImage(atlas,sx,sy,sw,sh,dx,dy,CELL_PX,CELL_PX);c.globalAlpha=1;
+    const [sx,sy,sw,sh]=sampleRect(region,role),h=hash(gx,gy,salt),flipX=Boolean(h&1),flipY=Boolean(h&2);
+    c.save();
+    c.globalAlpha=alpha;
+    c.translate(dx+(flipX?CELL_PX:0),dy+(flipY?CELL_PX:0));
+    c.scale(flipX?-1:1,flipY?-1:1);
+    c.drawImage(atlas,sx,sy,sw,sh,0,0,CELL_PX,CELL_PX);
+    c.restore();
   }
   function buildChunk(cx,cy,material){
     const canvas=document.createElement('canvas');canvas.width=CHUNK_PX;canvas.height=CHUNK_PX;const c=canvas.getContext('2d',{alpha:false});
@@ -90,7 +95,7 @@
       const rs=routeStrength(semantic,wx,wy);
       if(rs>.04)drawSample(c,semantic,'route',gx,gy,dx,dy,.12+rs*.68,113);
       const density={village:18,meadow:15,grove:13,fen:14,copper:16,stonepine:14,den:18}[semantic];
-      if(rs<.26&&hash(gx,gy,197)%density===0)drawSample(c,semantic,'accent',gx,gy,dx+5,dy+5,.50,229);
+      if(rs<.26&&hash(gx,gy,197)%density===0)drawSample(c,semantic,'accent',gx,gy,dx,dy,.42,229);
     }
     state.cacheBuilds++;return{canvas,last:++clock};
   }
