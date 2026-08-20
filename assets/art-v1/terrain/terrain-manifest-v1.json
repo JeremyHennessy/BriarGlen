@@ -1,0 +1,23 @@
+{
+  "family_id": "briar-glen-art-v1",
+  "family": "terrain",
+  "version": "1",
+  "recipe_id": "briar-glen-art-v1-painted-family-v1",
+  "golden_scene": "v9",
+  "golden_scene_sha256": "e148c9197bd2b97d5871fda46124d58c447ccad3f070616e2a3d01c68e6fff2c",
+  "runtime_file": "assets/art-v1/terrain/terrain-atlas-v1.png",
+  "runtime_sha256": "70b0aee874567626400e4ac6ea5c1c2a32c138268f1a29568b19975e28e8c328",
+  "runtime_dimensions": [768,1792],
+  "cell_dimensions": [256,256],
+  "layout": "columns=base,route,accent; rows=briar-glen,meadow,mooncap-grove,mosswater-fen,copper-hollow,stonepine-reach,emberback-den",
+  "provenance": "Derived from USER-APPROVED Golden Scene v9 ground language using deterministic local quilting/normalization; no external asset source.",
+  "regions": {
+    "briar-glen": {"base":{"atlas_cell":[0,0,256,256],"anchor":"tile-center","status":"runtime-ready"},"route":{"atlas_cell":[256,0,256,256],"anchor":"tile-center","status":"runtime-ready"},"accent":{"atlas_cell":[512,0,256,256],"anchor":"tile-center","status":"runtime-ready"}},
+    "meadow": {"base":{"atlas_cell":[0,256,256,256],"anchor":"tile-center","status":"runtime-ready"},"route":{"atlas_cell":[256,256,256,256],"anchor":"tile-center","status":"runtime-ready"},"accent":{"atlas_cell":[512,256,256,256],"anchor":"tile-center","status":"runtime-ready"}},
+    "mooncap-grove": {"base":{"atlas_cell":[0,512,256,256],"anchor":"tile-center","status":"runtime-ready"},"route":{"atlas_cell":[256,512,256,256],"anchor":"tile-center","status":"runtime-ready"},"accent":{"atlas_cell":[512,512,256,256],"anchor":"tile-center","status":"runtime-ready"}},
+    "mosswater-fen": {"base":{"atlas_cell":[0,768,256,256],"anchor":"tile-center","status":"runtime-ready"},"route":{"atlas_cell":[256,768,256,256],"anchor":"tile-center","status":"runtime-ready"},"accent":{"atlas_cell":[512,768,256,256],"anchor":"tile-center","status":"runtime-ready"}},
+    "copper-hollow": {"base":{"atlas_cell":[0,1024,256,256],"anchor":"tile-center","status":"runtime-ready"},"route":{"atlas_cell":[256,1024,256,256],"anchor":"tile-center","status":"runtime-ready"},"accent":{"atlas_cell":[512,1024,256,256],"anchor":"tile-center","status":"runtime-ready"}},
+    "stonepine-reach": {"base":{"atlas_cell":[0,1280,256,256],"anchor":"tile-center","status":"runtime-ready"},"route":{"atlas_cell":[256,1280,256,256],"anchor":"tile-center","status":"runtime-ready"},"accent":{"atlas_cell":[512,1280,256,256],"anchor":"tile-center","status":"runtime-ready"}},
+    "emberback-den": {"base":{"atlas_cell":[0,1536,256,256],"anchor":"tile-center","status":"runtime-ready"},"route":{"atlas_cell":[256,1536,256,256],"anchor":"tile-center","status":"runtime-ready"},"accent":{"atlas_cell":[512,1536,256,256],"anchor":"tile-center","status":"runtime-ready"}}
+  }
+}
