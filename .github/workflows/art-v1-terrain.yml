@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'assets/art-v1/terrain/**'
+      - 'tools/art_v1/**'
       - 'src/v47/68-art-v1-terrain-runtime.js'
       - 'src/runtime/boot.js'
       - 'tests/art-v1-terrain-smoke.mjs'
@@ -17,6 +18,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Materialize and verify terrain atlas
+        run: |
+          node tools/art_v1/materialize-terrain-atlas.mjs
+          git diff --exit-code -- assets/art-v1/terrain/terrain-atlas-v1.webp
       - name: Static sanity
         run: node tests/static-sanity.mjs
       - name: Install browser runtime
