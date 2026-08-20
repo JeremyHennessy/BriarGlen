@@ -1,0 +1,46 @@
+name: Art v1 terrain live Pages audit
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/art-v1-terrain-live-audit.yml'
+jobs:
+  live-terrain-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Wait for merged terrain runtime on Pages
+        run: |
+          ROOT="https://jeremyhennessy.github.io/BriarGlen"
+          for attempt in $(seq 1 72); do
+            if curl -fsSL "$ROOT/src/v47/68-art-v1-terrain-runtime.js?audit=$attempt" | grep -q 'art-v1-terrain-preview-v3-q75-authored' \
+              && curl -fsSL "$ROOT/assets/art-v1/terrain/terrain-atlas-v1.webp?audit=$attempt" -o /tmp/terrain.webp \
+              && [ "$(wc -c < /tmp/terrain.webp)" -gt 1000 ]; then
+              echo "Merged art-v1 terrain runtime is live"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Timed out waiting for merged terrain runtime on Pages" >&2
+          exit 1
+      - name: Install browser runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Live terrain and regression proof
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=e2e6ff1b5aeb15ac39eef4b35dec358e473ec629"
+          node tests/art-v1-terrain-smoke.mjs "$URL"
+          node tests/runtime-architecture-smoke.mjs "$URL"
+          node tests/world-layout-v2-smoke.mjs "$URL"
+          node tests/phone-ui-collision-smoke.mjs "$URL"
+          node tests/render-performance-smoke.mjs "$URL"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: art-v1-terrain-live-${{ github.sha }}
+          path: artifacts/art-v1-terrain-*.png
+          if-no-files-found: ignore
