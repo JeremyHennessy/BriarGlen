@@ -18,6 +18,9 @@
   const CELL_PX = TILE_WORLD / PIXEL_WORLD;
   const CHUNK_PX = CHUNK_TILES * CELL_PX;
   const CACHE_LIMIT = 20;
+  const ATLAS_CELL = 32;
+  const ATLAS_WIDTH = 96;
+  const ATLAS_HEIGHT = 224;
   const regions = ['village','meadow','grove','fen','copper','stonepine','den'];
   const rows = { village:0, meadow:1, grove:2, fen:3, copper:4, stonepine:5, den:6 };
   const anchors = {
@@ -36,14 +39,21 @@
   };
   const state = {
     version:VERSION, familyId:FAMILY_ID, recipeId:RECIPE_ID, requested, enabled:false, ready:!requested, failed:false,
-    failClosed:true, fallbackUsed:false, atlasPath:'assets/art-v1/terrain/terrain-atlas-v1.webp',
+    failClosed:true, fallbackUsed:false, atlasPath:'assets/art-v1/terrain/terrain-atlas-v1.webp', atlasWidth:0, atlasHeight:0,
     physicalTileCount:21, cacheBuilds:0, cacheHits:0, cacheMisses:0, evictions:0, frameChunks:0, frameCells:0,
     activeCache:0, currentRegion:'', materialPrimary:'', materialSecondary:'', materialMix:0, drawCalls:0,
   };
   const atlas = new Image();
   atlas.decoding = 'async';
   if (requested) {
-    atlas.onload = () => { state.ready = true; state.enabled = true; };
+    atlas.onload = () => {
+      state.atlasWidth = atlas.naturalWidth;
+      state.atlasHeight = atlas.naturalHeight;
+      if (state.atlasWidth !== ATLAS_WIDTH || state.atlasHeight !== ATLAS_HEIGHT) {
+        state.failed = true; state.ready = false; state.enabled = false; return;
+      }
+      state.ready = true; state.enabled = true;
+    };
     atlas.onerror = () => { state.failed = true; state.ready = false; state.enabled = false; };
     atlas.src = `${state.atlasPath}?v=terrain-v1`;
   }
@@ -70,7 +80,6 @@
     out.sort((a,b)=>b.w-a.w);const a=out[0],b=out[1],sum=Math.max(.0001,a.w+b.w),secondary=Math.min(.34,(b.w/sum)*.60);
     return{primary:a.region,secondary:b.region,secondaryAlpha:secondary,key:`${a.region}:${b.region}:${Math.round(secondary*10)/10}`};
   }
-  const ATLAS_CELL = 32;
   function sampleRect(region,role){
     const row=rows[region],col=role==='base'?0:role==='route'?1:2;
     return [col*ATLAS_CELL,row*ATLAS_CELL,ATLAS_CELL,ATLAS_CELL];
