@@ -52,7 +52,7 @@
     failClosed:true, fallbackUsed:false, atlasPath:'assets/art-v1/terrain/terrain-atlas-v1.webp', atlasWidth:0, atlasHeight:0,
     physicalTileCount:21, cacheBuilds:0, cacheHits:0, cacheMisses:0, evictions:0, frameChunks:0, frameCells:0,
     activeCache:0, currentRegion:'', materialPrimary:'', materialSecondary:'', materialMix:0, drawCalls:0,
-    texturePasses:2, textureSpacing:118,
+    texturePasses:3, textureSpacing:92,
   };
 
   const atlas = new Image();
@@ -112,15 +112,15 @@
       let rgb=blendRgb(primary,secondary,local.secondaryAlpha);
       const routeWarp=terrainNoise(wx*.76,wy*.82,23)*.060 + terrainNoise(wx*1.47,wy*1.39,89)*.024;
       const rs=routeStrength(semantic,wx,wy),organic=clamp01(rs + routeWarp);
-      rgb=blendRgb(rgb,routeRgb[semantic]||rgb,organic*.60);
+      rgb=blendRgb(rgb,routeRgb[semantic]||rgb,organic*.32);
       const broad=terrainNoise(wx,wy,17);
       const medium=terrainNoise(wx*1.93,wy*1.79,43);
       const fine=terrainNoise(wx*4.35,wy*4.11,97);
       const grit=terrainNoise(wx*8.7,wy*8.2,151);
       const edgeShade=(1-organic)*terrainNoise(wx*.53,wy*.53,71)*2.1;
-      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[0]+broad*7.0+medium*3.7+fine*2.2+grit*.9+edgeShade)));
-      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[1]+broad*6.0+medium*3.3+fine*1.9+grit*.8+edgeShade)));
-      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[2]+broad*5.0+medium*2.8+fine*1.6+grit*.7+edgeShade)));
+      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[0]+broad*8.0+medium*4.6+fine*3.0+grit*1.2+edgeShade)));
+      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[1]+broad*7.0+medium*4.1+fine*2.6+grit*1.0+edgeShade)));
+      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[2]+broad*6.0+medium*3.6+fine*2.2+grit*.9+edgeShade)));
       d[p++]=255;
     }
     lc.putImageData(img,0,0);return low;
@@ -131,27 +131,34 @@
     const size=64,cn=document.createElement('canvas');cn.width=cn.height=size;const c=cn.getContext('2d'),row=rows[region],col=role==='base'?0:role==='route'?1:2;
     c.imageSmoothingEnabled=true;c.drawImage(atlas,col*ATLAS_CELL,row*ATLAS_CELL,ATLAS_CELL,ATLAS_CELL,0,0,size,size);
     c.globalCompositeOperation='destination-in';
-    const g=c.createRadialGradient(size*.5,size*.5,size*.08,size*.5,size*.5,size*.5);g.addColorStop(0,'rgba(255,255,255,.98)');g.addColorStop(.46,'rgba(255,255,255,.90)');g.addColorStop(.74,'rgba(255,255,255,.56)');g.addColorStop(.92,'rgba(255,255,255,.13)');g.addColorStop(1,'rgba(255,255,255,0)');
+    const g=c.createRadialGradient(size*.5,size*.5,size*.06,size*.5,size*.5,size*.5);g.addColorStop(0,'rgba(255,255,255,.99)');g.addColorStop(.58,'rgba(255,255,255,.90)');g.addColorStop(.82,'rgba(255,255,255,.45)');g.addColorStop(.96,'rgba(255,255,255,.08)');g.addColorStop(1,'rgba(255,255,255,0)');
     c.fillStyle=g;c.fillRect(0,0,size,size);c.globalCompositeOperation='source-over';dabCache.set(key,cn);return cn;
   }
 
   function paintDabPass(c,cx,cy,pass){
-    const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD,spacing=pass===0?118:157,margin=150,seed=pass===0?173:367;
+    const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD;
+    const spacing=pass===0?92:pass===1?127:171,margin=190,seed=pass===0?173:pass===1?367:541;
     const minMx=Math.floor((wx0-margin)/spacing),maxMx=Math.ceil((wx0+CHUNK_WORLD+margin)/spacing),minMy=Math.floor((wy0-margin)/spacing),maxMy=Math.ceil((wy0+CHUNK_WORLD+margin)/spacing);
     for(let my=minMy;my<=maxMy;my++)for(let mx=minMx;mx<=maxMx;mx++){
-      const jx=(rand01(mx,my,101+pass*43)-.5)*spacing*.86,jy=(rand01(mx,my,131+pass*47)-.5)*spacing*.86,wx=mx*spacing+jx+(pass?spacing*.37:0),wy=my*spacing+jy+(pass?spacing*.23:0);
+      const jx=(rand01(mx,my,101+pass*43)-.5)*spacing*.92,jy=(rand01(mx,my,131+pass*47)-.5)*spacing*.92;
+      const wx=mx*spacing+jx+(pass===1?spacing*.37:pass===2?spacing*.19:0),wy=my*spacing+jy+(pass===1?spacing*.23:pass===2?spacing*.41:0);
       const px=(wx-wx0)/PIXEL_WORLD,py=(wy-wy0)/PIXEL_WORLD,region=regionAt(wx,wy),rs=routeStrength(region,wx,wy),h=hash(mx,my,seed);
-      const role=rs>.36?'route':'base';
-      const size=(pass===0?34:27)+(h%(pass===0?30:24));
-      const alpha=role==='route' ? (pass===0 ? .13+rs*.08 : .075+rs*.05) : (pass===0 ? .12 : .072);
-      c.save();c.globalAlpha=alpha;c.translate(px,py);c.rotate(((h>>>8)%31-15)*Math.PI/180);c.drawImage(atlasDab(region,role),-size/2,-size/2,size,size);c.restore();
-      if(rs<.20 && hash(mx,my,211+pass*23)%9===0){const as=14+(h>>>13)%10;c.save();c.globalAlpha=pass===0?.28:.18;c.drawImage(atlasDab(region,'accent'),px-as/2,py-as/2,as,as);c.restore();}
+      const role=rs>.31?'route':'base';
+      const size=(pass===0?48:pass===1?40:32)+(h%(pass===0?38:pass===1?33:27));
+      const alpha=role==='route'
+        ? (pass===0?.22+rs*.11:pass===1?.14+rs*.07:.08+rs*.04)
+        : (pass===0?.20:pass===1?.13:.075);
+      c.save();c.globalAlpha=alpha;c.translate(px,py);c.rotate(((h>>>8)%37-18)*Math.PI/180);c.drawImage(atlasDab(region,role),-size/2,-size/2,size,size);c.restore();
+      if(rs<.18 && hash(mx,my,211+pass*23)%11===0){
+        const as=14+(h>>>13)%12;c.save();c.globalAlpha=pass===0?.26:pass===1?.16:.10;c.drawImage(atlasDab(region,'accent'),px-as/2,py-as/2,as,as);c.restore();
+      }
     }
   }
 
   function paintSourceDabs(c,cx,cy){
     paintDabPass(c,cx,cy,0);
-    c.save();c.globalCompositeOperation='soft-light';paintDabPass(c,cx,cy,1);c.restore();
+    paintDabPass(c,cx,cy,1);
+    c.save();c.globalCompositeOperation='soft-light';paintDabPass(c,cx,cy,2);c.restore();
   }
 
   function buildChunk(cx,cy,material){
