@@ -15,7 +15,7 @@ try{
     let s=await page.evaluate(()=>window.__BRIAR_GLENDebug.getArtV1TerrainState());
     if(!s.requested||s.failed||!s.ready||!s.enabled)throw new Error(`${vp.name}: art-v1 terrain inactive ${JSON.stringify(s)}`);
     if(s.familyId!=='briar-glen-art-v1'||s.recipeId!=='briar-glen-art-v1-painted-family-v1')throw new Error(`${vp.name}: family/recipe drift ${JSON.stringify(s)}`);
-    if(s.atlasWidth!==96||s.atlasHeight!==224)throw new Error(`${vp.name}: atlas dimensions drifted ${JSON.stringify(s)}`);
+    if(s.atlasWidth!==288||s.atlasHeight!==672)throw new Error(`${vp.name}: atlas dimensions drifted ${JSON.stringify(s)}`);
     if(!s.failClosed||s.fallbackUsed||s.physicalTileCount!==21)throw new Error(`${vp.name}: fallback/asset contract failed ${JSON.stringify(s)}`);
     for(const [name,x,y] of regions){
       await page.evaluate(([px,py])=>window.__BRIAR_GLENDebug.teleport(px,py),[x,y]);await page.waitForTimeout(650);
