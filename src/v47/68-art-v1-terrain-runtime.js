@@ -15,14 +15,14 @@
   const CHUNK_TILES = 8;
   const CHUNK_WORLD = TILE_WORLD * CHUNK_TILES;
   const PIXEL_WORLD = 3;
-  const CELL_PX = TILE_WORLD / PIXEL_WORLD;
-  const CHUNK_PX = CHUNK_TILES * CELL_PX;
+  const CHUNK_PX = CHUNK_WORLD / PIXEL_WORLD;
   const CACHE_LIMIT = 20;
   const ATLAS_CELL = 32;
   const ATLAS_WIDTH = 96;
   const ATLAS_HEIGHT = 224;
   const regions = ['village','meadow','grove','fen','copper','stonepine','den'];
   const rows = { village:0, meadow:1, grove:2, fen:3, copper:4, stonepine:5, den:6 };
+
   const anchors = {
     village:{x:-610,y:0,sx:520,sy:900,bias:1.05}, meadow:{x:260,y:0,sx:510,sy:760,bias:1.02},
     grove:{x:480,y:-790,sx:560,sy:500,bias:1.30}, fen:{x:1500,y:-1650,sx:760,sy:620,bias:1.38},
@@ -37,12 +37,23 @@
     copper:[[650,5],[760,85],[900,35],[1035,-35],[1165,55],[1295,-45],[1415,5]],
     den:[[1410,5],[1515,72],[1635,38],[1740,-62],[1870,-35],[1995,72],[2110,92]],
   };
+
+  const baseRgb = {
+    village:[151,139,97], meadow:[109,120,74], grove:[82,101,66], fen:[75,96,82],
+    copper:[132,106,76], stonepine:[89,95,73], den:[88,74,62],
+  };
+  const routeRgb = {
+    village:[181,163,117], meadow:[156,137,91], grove:[117,118,83], fen:[102,110,94],
+    copper:[154,126,94], stonepine:[122,114,85], den:[115,92,75],
+  };
+
   const state = {
     version:VERSION, familyId:FAMILY_ID, recipeId:RECIPE_ID, requested, enabled:false, ready:!requested, failed:false,
     failClosed:true, fallbackUsed:false, atlasPath:'assets/art-v1/terrain/terrain-atlas-v1.webp', atlasWidth:0, atlasHeight:0,
     physicalTileCount:21, cacheBuilds:0, cacheHits:0, cacheMisses:0, evictions:0, frameChunks:0, frameCells:0,
     activeCache:0, currentRegion:'', materialPrimary:'', materialSecondary:'', materialMix:0, drawCalls:0,
   };
+
   const atlas = new Image();
   atlas.decoding = 'async';
   if (requested) {
@@ -59,102 +70,83 @@
   }
 
   const cache = new Map();
+  const dabCache = new Map();
   let clock = 0;
+
   function hash(a,b,c=1){let h=(2166136261^c)>>>0;for(const v of[a,b,c]){h^=v|0;h=Math.imul(h,16777619)>>>0;h^=h>>>13;}return h>>>0;}
+  function rand01(a,b,c=1){return hash(a,b,c)/4294967295;}
   function regionAt(x,y){if(x>=2240&&y<=-1120)return'stonepine';if(x>=880&&x<=2200&&y<=-1180)return'fen';if(x>=-80&&x<=900&&y<=-430)return'grove';if(x<-210)return'village';if(x<660)return'meadow';if(x<1430)return'copper';return'den';}
   function seg(px,py,ax,ay,bx,by){const vx=bx-ax,vy=by-ay,wx=px-ax,wy=py-ay,c1=vx*wx+vy*wy;if(c1<=0)return Math.hypot(px-ax,py-ay);const c2=vx*vx+vy*vy;if(c2<=c1)return Math.hypot(px-bx,py-by);const t=c1/c2;return Math.hypot(px-(ax+t*vx),py-(ay+t*vy));}
   function routeDist(region,x,y){const p=routes[region];if(!p)return 1e9;let d=1e9;for(let i=1;i<p.length;i++)d=Math.min(d,seg(x,y,...p[i-1],...p[i]));return d;}
   const clamp01 = v => Math.max(0,Math.min(1,v));
   function routeStrength(region,x,y){
     if(region==='village'){
-      const radial=Math.hypot(x+470,y-255), approach=Math.min(Math.abs(x+470),Math.abs(y-255));
-      return Math.max(clamp01(1-Math.abs(radial-155)/85),clamp01(1-approach/120));
+      const radial=Math.hypot(x+470,y-255);
+      const ring=clamp01(1-Math.abs(radial-155)/92);
+      const north=clamp01(1-Math.abs(x+470)/92)*clamp01(1-Math.abs(y+255)/430);
+      const south=clamp01(1-Math.abs(x+445)/98)*clamp01(1-Math.abs(y-205)/430);
+      return Math.max(ring,north,south);
     }
-    const width={meadow:92,grove:76,fen:70,copper:94,stonepine:72,den:84}[region]||80;
-    return clamp01(1-(routeDist(region,x,y)-width*.40)/(width*.70));
+    const width={meadow:100,grove:82,fen:76,copper:102,stonepine:78,den:90}[region]||86;
+    return clamp01(1-(routeDist(region,x,y)-width*.30)/(width*.86));
   }
   function boundaryNoise(x,y){return(Math.sin(x*.0057+y*.0041)+Math.cos(x*.0031-y*.0063)+Math.sin((x-y)*.0027))*.12;}
   function materialMixAt(x,y){
-    const n=boundaryNoise(x,y), out=[];
+    const n=boundaryNoise(x,y),out=[];
     for(const region of regions){const a=anchors[region],dx=(x-a.x)/(a.sx*(1+n*.16)),dy=(y-a.y)/(a.sy*(1-n*.12)),w=Math.exp(-.5*(dx*dx+dy*dy))*a.bias;out.push({region,w});}
     out.sort((a,b)=>b.w-a.w);const a=out[0],b=out[1],sum=Math.max(.0001,a.w+b.w),secondary=Math.min(.34,(b.w/sum)*.60);
-    return{primary:a.region,secondary:b.region,secondaryAlpha:secondary,key:`${a.region}:${b.region}:${Math.round(secondary*10)/10}`};
+    return {primary:a.region,secondary:b.region,secondaryAlpha:secondary,key:`${a.region}:${b.region}:${Math.round(secondary*10)/10}`};
   }
-  const baseRgb = {
-    village:[178,154,103], meadow:[143,137,84], grove:[102,112,69], fen:[96,111,91],
-    copper:[168,127,77], stonepine:[112,108,79], den:[87,75,62],
-  };
-  function sampleRect(region,role,gx,gy,salt=1){
-    const row=rows[region],col=role==='base'?0:role==='route'?1:2,h=hash(gx,gy,salt);
-    const cell=ATLAS_CELL;
-    if(role==='accent')return[col*cell,row*cell,cell,cell];
-    const crop=18,span=cell-crop;
-    const ox=h%(span+1),oy=(h>>>8)%(span+1);
-    return[col*cell+ox,row*cell+oy,crop,crop];
-  }
-  function drawSample(c,region,role,gx,gy,dx,dy,alpha=1,salt=1,size=CELL_PX){
-    const [sx,sy,sw,sh]=sampleRect(region,role,gx,gy,salt),h=hash(gx,gy,salt+31),flipX=Boolean(h&1),flipY=Boolean(h&2);
-    const pad=(CELL_PX-size)/2;
-    c.save();
-    c.globalAlpha=alpha;
-    c.translate(dx+pad+(flipX?size:0),dy+pad+(flipY?size:0));
-    c.scale(flipX?-1:1,flipY?-1:1);
-    c.drawImage(atlas,sx,sy,sw,sh,0,0,size,size);
-    c.restore();
-  }
-  function mixedBaseRgb(primary,secondary,t){
-    const a=baseRgb[primary]||baseRgb.meadow,b=baseRgb[secondary]||a,mt=Math.max(0,Math.min(.32,t||0));
-    return [
-      Math.round(a[0]*(1-mt)+b[0]*mt),
-      Math.round(a[1]*(1-mt)+b[1]*mt),
-      Math.round(a[2]*(1-mt)+b[2]*mt),
-    ];
-  }
+  function blendRgb(a,b,t){return [a[0]*(1-t)+b[0]*t,a[1]*(1-t)+b[1]*t,a[2]*(1-t)+b[2]*t];}
   function terrainNoise(x,y,seed=1){
-    return Math.sin(x*.0097+y*.0061+seed)*.48+Math.cos(x*.0043-y*.0111+seed*1.7)*.31+Math.sin((x-y)*.0029+seed*.37)*.21;
+    return Math.sin(x*.0089+y*.0067+seed)*.43 + Math.cos(x*.0041-y*.0103+seed*1.31)*.29 + Math.sin((x-y)*.0025+seed*.51)*.18 + Math.cos((x+y)*.017+seed*.19)*.10;
   }
-  function buildContinuousBase(cx,cy){
-    const low=document.createElement('canvas'),N=40;low.width=low.height=N;const lc=low.getContext('2d'),img=lc.createImageData(N,N),d=img.data;
+
+  function makeContinuousField(cx,cy){
+    const N=112,low=document.createElement('canvas');low.width=low.height=N;const lc=low.getContext('2d'),img=lc.createImageData(N,N),d=img.data;
     const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD,step=CHUNK_WORLD/N;let p=0;
     for(let py=0;py<N;py++)for(let px=0;px<N;px++){
-      const wx=wx0+(px+.5)*step,wy=wy0+(py+.5)*step,local=materialMixAt(wx,wy),rgb=mixedBaseRgb(local.primary,local.secondary,local.secondaryAlpha),n=terrainNoise(wx,wy,17);
-      d[p++]=Math.max(0,Math.min(255,rgb[0]+n*5));
-      d[p++]=Math.max(0,Math.min(255,rgb[1]+n*4));
-      d[p++]=Math.max(0,Math.min(255,rgb[2]+n*3));
+      const wx=wx0+(px+.5)*step,wy=wy0+(py+.5)*step,local=materialMixAt(wx,wy),semantic=regionAt(wx,wy);
+      const primary=baseRgb[local.primary]||baseRgb[semantic],secondary=baseRgb[local.secondary]||primary;
+      let rgb=blendRgb(primary,secondary,local.secondaryAlpha);
+      const rs=routeStrength(semantic,wx,wy),organic=clamp01(rs + terrainNoise(wx,wy,23)*.055);
+      rgb=blendRgb(rgb,routeRgb[semantic]||rgb,organic*.78);
+      const broad=terrainNoise(wx,wy,17),micro=terrainNoise(wx*1.77,wy*1.63,43);
+      const edgeShade=(1-organic)*terrainNoise(wx*.53,wy*.53,71)*1.7;
+      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[0]+broad*6+micro*2+edgeShade)));
+      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[1]+broad*5+micro*2+edgeShade)));
+      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[2]+broad*4+micro*1.5+edgeShade)));
       d[p++]=255;
     }
-    lc.putImageData(img,0,0);
-    return low;
+    lc.putImageData(img,0,0);return low;
   }
-  function buildRouteMask(cx,cy){
-    const low=document.createElement('canvas'),N=64;low.width=low.height=N;const lc=low.getContext('2d'),img=lc.createImageData(N,N),d=img.data;
-    const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD,step=CHUNK_WORLD/N;let p=0;
-    for(let py=0;py<N;py++)for(let px=0;px<N;px++){
-      const wx=wx0+(px+.5)*step,wy=wy0+(py+.5)*step,semantic=regionAt(wx,wy),rs=routeStrength(semantic,wx,wy),a=Math.round(Math.pow(rs,.8)*255);
-      d[p++]=255;d[p++]=255;d[p++]=255;d[p++]=a;
+
+  function atlasDab(region,role){
+    const key=`${region}:${role}`;if(dabCache.has(key))return dabCache.get(key);
+    const size=72,cn=document.createElement('canvas');cn.width=cn.height=size;const c=cn.getContext('2d'),row=rows[region],col=role==='base'?0:role==='route'?1:2;
+    c.drawImage(atlas,col*ATLAS_CELL,row*ATLAS_CELL,ATLAS_CELL,ATLAS_CELL,0,0,size,size);
+    c.globalCompositeOperation='destination-in';
+    const g=c.createRadialGradient(size*.5,size*.5,size*.12,size*.5,size*.5,size*.5);g.addColorStop(0,'rgba(255,255,255,.96)');g.addColorStop(.56,'rgba(255,255,255,.82)');g.addColorStop(.83,'rgba(255,255,255,.28)');g.addColorStop(1,'rgba(255,255,255,0)');
+    c.fillStyle=g;c.fillRect(0,0,size,size);c.globalCompositeOperation='source-over';dabCache.set(key,cn);return cn;
+  }
+
+  function paintSourceDabs(c,cx,cy){
+    const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD,spacing=170,margin=130;
+    const minMx=Math.floor((wx0-margin)/spacing),maxMx=Math.ceil((wx0+CHUNK_WORLD+margin)/spacing),minMy=Math.floor((wy0-margin)/spacing),maxMy=Math.ceil((wy0+CHUNK_WORLD+margin)/spacing);
+    for(let my=minMy;my<=maxMy;my++)for(let mx=minMx;mx<=maxMx;mx++){
+      const jx=(rand01(mx,my,101)-.5)*spacing*.78,jy=(rand01(mx,my,131)-.5)*spacing*.78,wx=mx*spacing+jx,wy=my*spacing+jy;
+      const px=(wx-wx0)/PIXEL_WORLD,py=(wy-wy0)/PIXEL_WORLD,region=regionAt(wx,wy),rs=routeStrength(region,wx,wy),h=hash(mx,my,173);
+      const role=rs>.40?'route':'base',size=46+(h%31),alpha=role==='route'?(.065+rs*.055):.055;
+      c.save();c.globalAlpha=alpha;c.translate(px,py);c.rotate(((h>>>8)%21-10)*Math.PI/180);c.drawImage(atlasDab(region,role),-size/2,-size/2,size,size);c.restore();
+      if(rs<.18 && hash(mx,my,211)%11===0){const as=18+(h>>>13)%10;c.save();c.globalAlpha=.22;c.drawImage(atlasDab(region,'accent'),px-as/2,py-as/2,as,as);c.restore();}
     }
-    lc.putImageData(img,0,0);
-    const mask=document.createElement('canvas');mask.width=CHUNK_PX;mask.height=CHUNK_PX;const mc=mask.getContext('2d');
-    mc.imageSmoothingEnabled=true;mc.filter='blur(5px)';mc.drawImage(low,0,0,CHUNK_PX,CHUNK_PX);mc.filter='none';
-    return mask;
   }
+
   function buildChunk(cx,cy,material){
-    const canvas=document.createElement('canvas');canvas.width=CHUNK_PX;canvas.height=CHUNK_PX;const c=canvas.getContext('2d',{alpha:false});
-    c.imageSmoothingEnabled=true;c.drawImage(buildContinuousBase(cx,cy),0,0,CHUNK_PX,CHUNK_PX);
-    const routeLayer=document.createElement('canvas');routeLayer.width=CHUNK_PX;routeLayer.height=CHUNK_PX;const rc=routeLayer.getContext('2d',{alpha:true});
-    const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD;
-    for(let ty=0;ty<CHUNK_TILES;ty++)for(let tx=0;tx<CHUNK_TILES;tx++){
-      const wx=wx0+(tx+.5)*TILE_WORLD,wy=wy0+(ty+.5)*TILE_WORLD,gx=Math.floor(wx/TILE_WORLD),gy=Math.floor(wy/TILE_WORLD),dx=tx*CELL_PX,dy=ty*CELL_PX;
-      const semantic=regionAt(wx,wy),local=materialMixAt(wx,wy),primary=local.primary||material.primary,secondary=local.secondary||material.secondary;
-      drawSample(c,primary,'base',gx,gy,dx,dy,.11,71,48);
-      if(local.secondaryAlpha>.08)drawSample(c,secondary,'base',gx,gy,dx,dy,.045,173,48);
-      drawSample(rc,semantic,'route',gx,gy,dx,dy,.72,113,48);
-      const rs=routeStrength(semantic,wx,wy),density={village:18,meadow:15,grove:13,fen:14,copper:16,stonepine:14,den:18}[semantic];
-      if(rs<.20&&hash(gx,gy,197)%density===0)drawSample(c,semantic,'accent',gx,gy,dx,dy,.32,229,17);
-    }
-    rc.globalCompositeOperation='destination-in';rc.drawImage(buildRouteMask(cx,cy),0,0);rc.globalCompositeOperation='source-over';
-    c.save();c.globalAlpha=.70;c.drawImage(routeLayer,0,0);c.restore();
-    state.cacheBuilds++;return{canvas,last:++clock};
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=CHUNK_PX;const c=canvas.getContext('2d',{alpha:false});c.imageSmoothingEnabled=true;
+    c.drawImage(makeContinuousField(cx,cy),0,0,CHUNK_PX,CHUNK_PX);
+    paintSourceDabs(c,cx,cy);
+    state.cacheBuilds++;return {canvas,last:++clock};
   }
   function chunk(cx,cy,material){const key=`${material.key}:${cx},${cy}`;let e=cache.get(key);if(e){e.last=++clock;state.cacheHits++;return e;}state.cacheMisses++;e=buildChunk(cx,cy,material);cache.set(key,e);if(cache.size>CACHE_LIMIT){let victim=null,old=Infinity;for(const[k,v]of cache)if(v.last<old){old=v.last;victim=k;}if(victim){cache.delete(victim);state.evictions++;}}state.activeCache=cache.size;return e;}
   function visible(cx,cy){const p=worldToScreen(cx*CHUNK_WORLD+CHUNK_WORLD/2,cy*CHUNK_WORLD+CHUNK_WORLD/2),hw=CHUNK_WORLD*.80*camera.zoom,hh=CHUNK_WORLD*.43*camera.zoom;return p.x+hw>-160&&p.x-hw<viewport.w+160&&p.y+hh>-120&&p.y-hh<viewport.h+120;}
@@ -171,11 +163,6 @@
   }
 
   const priorGround = drawGround;
-  drawGround = function artV1TerrainGround(zone){
-    if(!requested)return priorGround(zone);
-    state.fallbackUsed=false;
-    drawOwnedGround();
-  };
-
+  drawGround = function artV1TerrainGround(zone){if(!requested)return priorGround(zone);state.fallbackUsed=false;drawOwnedGround();};
   debug.getArtV1TerrainState = () => ({...state,activeCache:cache.size,currentRegion:state.currentRegion||regionAt(camera.x,camera.y)});
 })();
