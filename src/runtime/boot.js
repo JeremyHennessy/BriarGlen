@@ -9,7 +9,12 @@
     'src/v36/49-generated-art-chunk-00.js','src/v36/49-generated-art-chunk-01.js','src/v36/49-generated-art-chunk-02.js','src/v36/49-generated-art-chunk-03.js','src/v36/49-generated-art-chunk-04.js','src/v36/49-generated-art-chunk-05.js','src/v36/49-generated-art-chunk-06.js','src/v36/49-generated-art-chunk-07.js','src/v36/49-generated-art-chunk-08.js','src/v36/49-generated-art-chunk-09.js','src/v36/49-generated-art-chunk-10.js','src/v36/49-generated-art-chunk-11.js','src/v36/49-generated-art-chunk-12.js','src/v36/49-generated-art-data.js','src/v36/49-generated-art-compat-pre.js','src/v36/50-generated-art-runtime.js','src/v36/51-generated-art-compat-post.js','src/v44/63-source-art47-runtime.js','src/v38/55-asset-variants.js','src/v36/52-generated-art-dressing.js','src/v38/56-regional-prop-clusters.js','src/v37/54-world-layout-v2-canonical.js','src/v41/60-ground-v2-runtime.js','src/v38/57-npc-idle-stagger.js','src/v39/58-landmark-state-polish.js','src/v42/61-environment-variation.js','src/v43/62-terrain-polish.js','src/v44/65-source-ground47-owner.js','src/v44/64-source-art47-layer-guard.js','src/v45/66-living-cast48-runtime.js','src/v46/67-scene-cohesion49-runtime.js','src/v47/68-art-v1-runtime.js','src/runtime/release-info.js',
   ];
   const params=new URLSearchParams(location.search);
-  const historicalProofKeys=new Set(['assetVariantProof','landmarkStateProof','env46proof','envperf','terrain46','tperf','generatedArtSmoke','dressing','layoutProof','renderPerf','build30Recovery','ground46','sourceArt47Proof','livingCast48Proof','sceneCohesion49Proof','build47rebuild','build47perf','cast48','cohesion49']);
+  const historicalProofKeys=new Set([
+    'assetVariantProof','landmarkStateProof','env46proof','envperf','terrain46','tperf','generatedArtSmoke','dressing','layoutProof','renderPerf','build30Recovery','ground46','sourceArt47Proof','livingCast48Proof','sceneCohesion49Proof','build47rebuild','build47perf','cast48','cohesion49',
+    // Historical visual-control/rollback parameters. Their presence means the caller is explicitly
+    // exercising the retained legacy presentation stack rather than the new production art owner.
+    'groundV2','sourceArt47','sourceSprites47','livingCast48','sceneCohesion49','env46','terrainPolish'
+  ]);
   const historicalProof=Boolean(params.get('artScope'))||[...params.keys()].some(k=>historicalProofKeys.has(k));
   const artV1Requested=!historicalProof&&params.get('artV1')!=='0'&&params.get('canvasArt')!=='1'&&params.get('generatedArt')!=='0';
   const legacyPresentation=new Set([
