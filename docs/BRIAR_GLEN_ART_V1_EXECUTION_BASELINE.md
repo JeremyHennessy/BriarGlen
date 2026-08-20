@@ -26,7 +26,7 @@ The prior generic `golden_daylight_fantasy_village.png` remains discarded. Build
 
 The prior raster-atlas staging path was abandoned because binary publication became an execution bottleneck in this environment and would have left the live game unchanged again.
 
-Build 51 instead uses a **single-owner procedural storybook Canvas renderer**:
+Build 51 instead uses a **single-owner painterly storybook Canvas renderer**:
 
 - one code path owns terrain, routes, vegetation, architecture, props, characters, resources and enemies;
 - a common palette, material language, shadow model and scale system is used across all roles;
