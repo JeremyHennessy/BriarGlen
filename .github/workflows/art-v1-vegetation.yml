@@ -17,12 +17,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify vegetation atlas
+      - name: Verify vegetation atlas transport
         run: |
           test -s assets/art-v1/vegetation/vegetation-atlas-v1.webp
           ACTUAL="$(sha256sum assets/art-v1/vegetation/vegetation-atlas-v1.webp | awk '{print $1}')"
           echo "vegetation atlas sha256=$ACTUAL"
-          test "$ACTUAL" = 'bdf4aee028dc7b4de4e64d79acf0df3f3b6a44c46478e543a480e41d01e37ae7'
+          test "$ACTUAL" = '021473cbe15c03f63a69ab00bcbeb88fbcb39acdbf09228cfb79820ab13f01db'
       - name: Static sanity
         run: node tests/static-sanity.mjs
       - name: Install browser runtime
@@ -46,5 +46,7 @@ jobs:
         if: always()
         with:
           name: art-v1-vegetation-${{ github.sha }}
-          path: artifacts/art-v1-vegetation-*.png
+          path: |
+            artifacts/art-v1-vegetation-*.png
+            assets/art-v1/vegetation/vegetation-atlas-v1.webp
           if-no-files-found: ignore
