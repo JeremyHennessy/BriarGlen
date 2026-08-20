@@ -106,11 +106,11 @@ try{
     });
     const returningPage=await returning.newPage();
     await load(returningPage,`${target}${target.includes('?')?'&':'?'}accept50return=${Date.now()}-${vp.name}`);
-    await returningPage.waitForFunction(()=>window.__BRIAR_GLENDebug?.getOnboardingState?.().startOpen===true,{timeout:7000});
+    await returningPage.waitForFunction(()=>window.__BRIAR_GLENDebug?.getOnboardingState?.().startOpen===true,null,{timeout:7000});
     const continueButton=returningPage.locator('#onboarding21-continue');
     if(!(await continueButton.isVisible()))throw new Error(`${vp.name}: returning-save Continue control unavailable`);
     await continueButton.click();
-    await returningPage.waitForFunction(()=>window.__BRIAR_GLENDebug?.getOnboardingState?.().startOpen===false,{timeout:7000});
+    await returningPage.waitForFunction(()=>window.__BRIAR_GLENDebug?.getOnboardingState?.().startOpen===false,null,{timeout:7000});
     const saved=await returningPage.evaluate(()=>JSON.parse(localStorage.getItem('briar-glen-vslice-v1')||'null'));
     if(!saved?.player||!saved?.progress||saved.progress.step<1)throw new Error(`${vp.name}: returning save failed compatibility load ${JSON.stringify(saved)}`);
     const layers=await returningPage.evaluate(()=>({source:window.__BRIAR_GLENDebug.getSourceArt47State(),cast:window.__BRIAR_GLENDebug.getLivingCast48State(),scene:window.__BRIAR_GLENDebug.getSceneCohesion49State()}));
