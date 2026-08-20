@@ -9,33 +9,19 @@ on:
       - 'tests/art-v1-terrain-smoke.mjs'
       - '.github/workflows/art-v1-terrain.yml'
   workflow_dispatch:
-permissions:
-  contents: write
 jobs:
   terrain-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - name: Materialize and verify terrain atlas
-        run: node tools/art_v1/materialize-terrain-atlas.mjs
-      - name: Persist materialized atlas on PR branch
-        if: github.event_name == 'pull_request'
         run: |
-          if git diff --quiet -- assets/art-v1/terrain/terrain-atlas-v1.webp; then
-            echo 'Terrain atlas already matches deterministic q75 materializer.'
-          else
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add assets/art-v1/terrain/terrain-atlas-v1.webp
-            git commit -m 'Art v1 terrain: materialize high-detail q75 atlas'
-            git push origin HEAD:${{ github.head_ref }}
-          fi
+          node tools/art_v1/materialize-terrain-atlas.mjs
+          git diff --exit-code -- assets/art-v1/terrain/terrain-atlas-v1.webp
       - name: Static sanity
         run: node tests/static-sanity.mjs
       - name: Install browser runtime
