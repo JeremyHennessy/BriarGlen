@@ -11,41 +11,63 @@ const views=[
   {name:'phone-portrait',width:430,height:932,touch:true},
   {name:'desktop',width:1440,height:900,touch:false},
 ];
-const regions=[['village',-650,-250],['meadow',320,0],['grove',600,-800],['fen',1500,-1700],['copper',1020,40],['den',1900,0],['stonepine',2800,-1500]];
+const regions=[
+  ['village',-650,-250,'BRIAR GLEN'],
+  ['meadow',320,0,'MEADOW ROAD'],
+  ['grove',600,-800,'MOONCAP GROVE'],
+  ['fen',1500,-1700,'MOSSWATER FEN'],
+  ['copper',1020,40,'COPPER HOLLOW'],
+  ['den',1900,0,'EMBERBACK DEN'],
+  ['stonepine',2800,-1500,'STONEPINE REACH'],
+];
 
-async function load(page,url){let last;for(let i=0;i<(live?48:1);i++){try{await page.goto(url,{waitUntil:'domcontentloaded',timeout:15000});await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getArtV1State&&window.__BRIAR_GLENDebug?.getRuntimeArchitectureState),{timeout:8000});return;}catch(e){last=e;if(live)await sleep(5000);}}throw last;}
+async function load(page,url){let last;for(let i=0;i<(live?48:1);i++){try{await page.goto(url,{waitUntil:'domcontentloaded',timeout:15000});await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getArtV1State&&window.__BRIAR_GLENDebug?.getRuntimeArchitectureState),{timeout:8000});return;}catch(e){last=e;if(live&&i<47)await sleep(5000);}}throw last;}
 
 try{
   for(const vp of views){
     const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,deviceScaleFactor:1});
     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('requestfailed',r=>errors.push(`${r.url()} ${r.failure()?.errorText||''}`));
     await load(page,`${target}${target.includes('?')?'&':'?'}art51=${Date.now()}-${vp.name}`);
-    let first=await page.evaluate(()=>({art:window.__BRIAR_GLENDebug.getArtV1State(),manifest:window.__BRIAR_GLEN_MANIFEST,runtime:window.__BRIAR_GLENDebug.getRuntimeArchitectureState()}));
+    let first=await page.evaluate(()=>({
+      art:window.__BRIAR_GLENDebug.getArtV1State(),manifest:window.__BRIAR_GLEN_MANIFEST,runtime:window.__BRIAR_GLENDebug.getRuntimeArchitectureState(),
+      artStyle:[...document.styleSheets].some(s=>(s.href||'').includes('styles-v16-artv1.css')),
+      dataset:document.documentElement.dataset.briarGlenArtV1,
+    }));
     if(!first.art.enabled||first.art.failed||!first.art.ready||!first.art.noFallback||first.art.legacyFallbackCount!==0)throw new Error(`${vp.name}: art-v1 inactive/fallback ${JSON.stringify(first.art)}`);
     if(first.art.familyId!=='briar-glen-art-v1'||first.art.renderer!=='single-owner-painterly-storybook')throw new Error(`${vp.name}: wrong renderer ${JSON.stringify(first.art)}`);
-    if(first.manifest.artMode!=='briar-glen-art-v1'||first.manifest.scripts.some(src=>/generated-art-runtime|source-art47-runtime|living-cast48-runtime|scene-cohesion49-runtime/.test(src)))throw new Error(`${vp.name}: mixed legacy presentation loaded ${JSON.stringify(first.manifest)}`);
+    if(!first.art.polish?.ambientDecor||!first.art.polish?.expandedZoneIdentity)throw new Error(`${vp.name}: art-v1 world polish inactive ${JSON.stringify(first.art.polish)}`);
+    if(!first.artStyle||first.dataset!=='ready')throw new Error(`${vp.name}: art-v1 HUD style inactive ${JSON.stringify(first)}`);
+    if(first.manifest.artMode!=='briar-glen-art-v1'||!first.manifest.scripts.includes('src/v47/69-art-v1-world-polish.js')||first.manifest.scripts.some(src=>/generated-art-runtime|source-art47-runtime|living-cast48-runtime|scene-cohesion49-runtime/.test(src)))throw new Error(`${vp.name}: mixed/incorrect presentation manifest ${JSON.stringify(first.manifest)}`);
     if(first.art.missingWorldTypes.length)throw new Error(`${vp.name}: missing art roles ${JSON.stringify(first.art.missingWorldTypes)}`);
     if(JSON.stringify(first.art.baseline)!==JSON.stringify(first.art.current))throw new Error(`${vp.name}: entity counts changed ${JSON.stringify(first.art)}`);
+
+    if(vp.name==='phone-landscape'){
+      const ui=await page.evaluate(()=>{const r=id=>{const e=document.querySelector(id),b=e?.getBoundingClientRect();return b?{w:b.width,h:b.height,x:b.x,y:b.y}:null;};return{status:r('.status-panel'),quest:r('.quest-panel'),move:r('#move-pad'),actions:r('.action-cluster')};});
+      if(!ui.status||!ui.quest||!ui.move||ui.status.w>225||ui.quest.w>255||ui.status.h>72||ui.quest.h>78||ui.move.w>98)throw new Error(`phone-landscape: HUD footprint not compact ${JSON.stringify(ui)}`);
+    }
+
     let last=first.art.totalDraws,regionsSeen=0;
-    for(const [name,x,y] of regions){
+    for(const [name,x,y,zone] of regions){
       await page.evaluate(([px,py])=>window.__BRIAR_GLENDebug.teleport(px,py),[x,y]);await page.waitForTimeout(540);
-      const art=await page.evaluate(()=>window.__BRIAR_GLENDebug.getArtV1State());if(art.totalDraws>last)regionsSeen++;last=art.totalDraws;
+      const snap=await page.evaluate(()=>({art:window.__BRIAR_GLENDebug.getArtV1State(),zone:document.getElementById('zone-name')?.textContent?.trim()}));
+      if(snap.art.totalDraws>last)regionsSeen++;last=snap.art.totalDraws;
+      if(snap.zone!==zone)throw new Error(`${vp.name}/${name}: wrong visible region identity ${snap.zone} !== ${zone}`);
       await page.screenshot({path:`artifacts/art-v1-${vp.name}-${name}.png`});
     }
     const end=await page.evaluate(()=>window.__BRIAR_GLENDebug.getArtV1State());
     if(regionsSeen<6||end.playerDraws<1||end.totalDraws<25||end.legacyFallbackCount!==0)throw new Error(`${vp.name}: insufficient unified art coverage ${regionsSeen}/7 ${JSON.stringify(end)}`);
     const overflow=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,sh:document.documentElement.scrollHeight,ih:innerHeight}));if(overflow.sw>overflow.iw+1||overflow.sh>overflow.ih+1)throw new Error(`${vp.name}: overflow ${JSON.stringify(overflow)}`);
     if(errors.length)throw new Error(`${vp.name}: runtime/resource errors ${errors.join('; ')}`);
-    console.log(`PASS ${vp.name}: one art-v1 renderer owns seven regions with zero legacy fallback`);
+    console.log(`PASS ${vp.name}: painterly art-v1 + compact HUD own seven correctly-labelled regions with zero legacy fallback`);
     await context.close();
   }
 
   const context=await browser.newContext({viewport:{width:932,height:430},hasTouch:true,deviceScaleFactor:1});const page=await context.newPage();
   await page.goto(`${target}${target.includes('?')?'&':'?'}artV1=0`,{waitUntil:'domcontentloaded',timeout:15000});
   await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getSourceArt47State&&window.__BRIAR_GLENDebug?.getLivingCast48State&&window.__BRIAR_GLENDebug?.getSceneCohesion49State),{timeout:10000});
-  const rollback=await page.evaluate(()=>({manifest:window.__BRIAR_GLEN_MANIFEST,source:window.__BRIAR_GLENDebug.getSourceArt47State(),cast:window.__BRIAR_GLENDebug.getLivingCast48State(),scene:window.__BRIAR_GLENDebug.getSceneCohesion49State()}));
-  if(rollback.manifest.artMode!=='legacy-recovery'||!rollback.source.enabled||!rollback.cast.enabled||!rollback.scene.enabled)throw new Error(`artV1=0 rollback did not restore Build49 visual stack ${JSON.stringify(rollback)}`);
-  await context.close();console.log('PASS art-v1 rollback restores Build49 stack');
+  const rollback=await page.evaluate(()=>({manifest:window.__BRIAR_GLEN_MANIFEST,source:window.__BRIAR_GLENDebug.getSourceArt47State(),cast:window.__BRIAR_GLENDebug.getLivingCast48State(),scene:window.__BRIAR_GLENDebug.getSceneCohesion49State(),artStyle:[...document.styleSheets].some(s=>(s.href||'').includes('styles-v16-artv1.css'))}));
+  if(rollback.manifest.artMode!=='legacy-recovery'||!rollback.source.enabled||!rollback.cast.enabled||!rollback.scene.enabled||rollback.artStyle)throw new Error(`artV1=0 rollback did not cleanly restore Build49 visual stack ${JSON.stringify(rollback)}`);
+  await context.close();console.log('PASS art-v1 rollback restores Build49 stack without art-v1 HUD styling');
 
   const context2=await browser.newContext({viewport:{width:932,height:430},hasTouch:true,deviceScaleFactor:1});const page2=await context2.newPage();
   await page2.addInitScript(()=>localStorage.setItem('briar-glen-vslice-v1',JSON.stringify({schema:1,player:{x:-700,y:0,hp:73,maxHp:100,coins:77,inventory:{herb:2,ore:1,tusk:0},weapon:'Worn Sword',weaponType:'sword',reinforced:false},progress:{step:2,bossDefeated:false,shortcutUnlocked:false,contractComplete:false,tipShown:true}})));
