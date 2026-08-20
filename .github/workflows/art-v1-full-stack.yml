@@ -23,7 +23,7 @@ jobs:
           test -s docs/BRIAR_GLEN_ART_BIBLE_V1.md
           node --check src/v47/68-art-v1-runtime.js
           node --check tests/art-v1-full-stack-smoke.mjs
-          grep -q "single-owner-procedural-storybook" src/v47/68-art-v1-runtime.js
+          grep -q "single-owner-painterly-storybook" src/v47/68-art-v1-runtime.js
           grep -q "artMode:artV1Requested?'briar-glen-art-v1':'legacy-recovery'" src/runtime/boot.js
       - name: Install Chromium runtime
         run: |
