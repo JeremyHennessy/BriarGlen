@@ -18,6 +18,7 @@ try{
     if(s.familyId!=='briar-glen-art-v1'||s.recipeId!=='briar-glen-art-v1-painted-family-v1')throw new Error(`${vp.name}: family/recipe drift ${JSON.stringify(s)}`);
     if(s.atlasWidth!==288||s.atlasHeight!==672)throw new Error(`${vp.name}: atlas dimensions drifted ${JSON.stringify(s)}`);
     if(!s.failClosed||s.fallbackUsed||s.physicalTileCount!==21)throw new Error(`${vp.name}: fallback/asset contract failed ${JSON.stringify(s)}`);
+    if(!s.legacyRouteSuppressed||!s.routeTextureOwnedExternally)throw new Error(`${vp.name}: base terrain still owns visible route presentation ${JSON.stringify(s)}`);
     if(!r.requested||r.failed||!r.ready||r.familyId!=='briar-glen-art-v1'||r.recipeId!=='briar-glen-art-v1-painted-family-v1')throw new Error(`${vp.name}: art-v1 route owner inactive ${JSON.stringify(r)}`);
     if(r.atlasWidth!==288||r.atlasHeight!==672||r.routeOwner!=='art-v1-q75-polyline-dabs'||r.legacyRouteUsed)throw new Error(`${vp.name}: route ownership/atlas contract failed ${JSON.stringify(r)}`);
     for(const [name,x,y] of regions){
