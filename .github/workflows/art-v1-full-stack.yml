@@ -19,11 +19,16 @@ jobs:
         run: |
           node tests/static-sanity.mjs
           test -s src/v47/68-art-v1-runtime.js
+          test -s src/v47/69-art-v1-world-polish.js
+          test -s styles-v16-artv1.css
           test -s tests/art-v1-full-stack-smoke.mjs
           test -s docs/BRIAR_GLEN_ART_BIBLE_V1.md
           node --check src/v47/68-art-v1-runtime.js
+          node --check src/v47/69-art-v1-world-polish.js
           node --check tests/art-v1-full-stack-smoke.mjs
           grep -q "single-owner-painterly-storybook" src/v47/68-art-v1-runtime.js
+          grep -q "world-polish-v1" src/v47/69-art-v1-world-polish.js
+          grep -q "styles-v16-artv1.css" src/runtime/boot.js
           grep -q "artMode:artV1Requested?'briar-glen-art-v1':'legacy-recovery'" src/runtime/boot.js
       - name: Install Chromium runtime
         run: |
