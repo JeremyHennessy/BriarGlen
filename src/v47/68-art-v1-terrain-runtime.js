@@ -80,32 +80,54 @@
     out.sort((a,b)=>b.w-a.w);const a=out[0],b=out[1],sum=Math.max(.0001,a.w+b.w),secondary=Math.min(.34,(b.w/sum)*.60);
     return{primary:a.region,secondary:b.region,secondaryAlpha:secondary,key:`${a.region}:${b.region}:${Math.round(secondary*10)/10}`};
   }
-  function sampleRect(region,role){
-    const row=rows[region],col=role==='base'?0:role==='route'?1:2;
-    return [col*ATLAS_CELL,row*ATLAS_CELL,ATLAS_CELL,ATLAS_CELL];
+  const baseRgb = {
+    village:[178,154,103], meadow:[143,137,84], grove:[102,112,69], fen:[96,111,91],
+    copper:[168,127,77], stonepine:[112,108,79], den:[87,75,62],
+  };
+  function sampleRect(region,role,gx,gy,salt=1){
+    const row=rows[region],col=role==='base'?0:role==='route'?1:2,h=hash(gx,gy,salt);
+    const cell=ATLAS_CELL;
+    if(role==='accent')return[col*cell,row*cell,cell,cell];
+    const crop=18,span=cell-crop;
+    const ox=h%(span+1),oy=(h>>>8)%(span+1);
+    return[col*cell+ox,row*cell+oy,crop,crop];
   }
-  function drawSample(c,region,role,gx,gy,dx,dy,alpha=1,salt=1){
-    const [sx,sy,sw,sh]=sampleRect(region,role),h=hash(gx,gy,salt),flipX=Boolean(h&1),flipY=Boolean(h&2);
+  function drawSample(c,region,role,gx,gy,dx,dy,alpha=1,salt=1,size=CELL_PX){
+    const [sx,sy,sw,sh]=sampleRect(region,role,gx,gy,salt),h=hash(gx,gy,salt+31),flipX=Boolean(h&1),flipY=Boolean(h&2);
+    const pad=(CELL_PX-size)/2;
     c.save();
     c.globalAlpha=alpha;
-    c.translate(dx+(flipX?CELL_PX:0),dy+(flipY?CELL_PX:0));
+    c.translate(dx+pad+(flipX?size:0),dy+pad+(flipY?size:0));
     c.scale(flipX?-1:1,flipY?-1:1);
-    c.drawImage(atlas,sx,sy,sw,sh,0,0,CELL_PX,CELL_PX);
+    c.drawImage(atlas,sx,sy,sw,sh,0,0,size,size);
     c.restore();
+  }
+  function mixedBaseColor(primary,secondary,t){
+    const a=baseRgb[primary]||baseRgb.meadow,b=baseRgb[secondary]||a,mt=Math.max(0,Math.min(.32,t||0));
+    const r=Math.round(a[0]*(1-mt)+b[0]*mt),g=Math.round(a[1]*(1-mt)+b[1]*mt),bl=Math.round(a[2]*(1-mt)+b[2]*mt);
+    return `rgb(${r},${g},${bl})`;
   }
   function buildChunk(cx,cy,material){
     const canvas=document.createElement('canvas');canvas.width=CHUNK_PX;canvas.height=CHUNK_PX;const c=canvas.getContext('2d',{alpha:false});
+    const routeLayer=document.createElement('canvas');routeLayer.width=CHUNK_PX;routeLayer.height=CHUNK_PX;const rc=routeLayer.getContext('2d',{alpha:true});
     const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD;
     for(let ty=0;ty<CHUNK_TILES;ty++)for(let tx=0;tx<CHUNK_TILES;tx++){
       const wx=wx0+(tx+.5)*TILE_WORLD,wy=wy0+(ty+.5)*TILE_WORLD,gx=Math.floor(wx/TILE_WORLD),gy=Math.floor(wy/TILE_WORLD),dx=tx*CELL_PX,dy=ty*CELL_PX;
-      const semantic=regionAt(wx,wy), local=materialMixAt(wx,wy), primary=local.primary||material.primary, secondary=local.secondary||material.secondary;
-      drawSample(c,primary,'base',gx,gy,dx,dy,1,71);
-      if(local.secondaryAlpha>.035)drawSample(c,secondary,'base',gx,gy,dx,dy,local.secondaryAlpha,173);
+      const semantic=regionAt(wx,wy),local=materialMixAt(wx,wy),primary=local.primary||material.primary,secondary=local.secondary||material.secondary;
+      c.fillStyle=mixedBaseColor(primary,secondary,local.secondaryAlpha);
+      c.fillRect(dx,dy,CELL_PX,CELL_PX);
+      drawSample(c,primary,'base',gx,gy,dx,dy,.28,71);
+      if(local.secondaryAlpha>.06)drawSample(c,secondary,'base',gx,gy,dx,dy,Math.min(.14,local.secondaryAlpha*.35),173);
       const rs=routeStrength(semantic,wx,wy);
-      if(rs>.04)drawSample(c,semantic,'route',gx,gy,dx,dy,.12+rs*.68,113);
+      if(rs>.025)drawSample(rc,semantic,'route',gx,gy,dx,dy,.10+rs*.58,113);
       const density={village:18,meadow:15,grove:13,fen:14,copper:16,stonepine:14,den:18}[semantic];
-      if(rs<.26&&hash(gx,gy,197)%density===0)drawSample(c,semantic,'accent',gx,gy,dx,dy,.42,229);
+      if(rs<.24&&hash(gx,gy,197)%density===0)drawSample(c,semantic,'accent',gx,gy,dx,dy,.34,229,18);
     }
+    c.save();
+    c.globalAlpha=.82;
+    c.filter='blur(1.2px)';
+    c.drawImage(routeLayer,0,0);
+    c.restore();
     state.cacheBuilds++;return{canvas,last:++clock};
   }
   function chunk(cx,cy,material){const key=`${material.key}:${cx},${cy}`;let e=cache.get(key);if(e){e.last=++clock;state.cacheHits++;return e;}state.cacheMisses++;e=buildChunk(cx,cy,material);cache.set(key,e);if(cache.size>CACHE_LIMIT){let victim=null,old=Infinity;for(const[k,v]of cache)if(v.last<old){old=v.last;victim=k;}if(victim){cache.delete(victim);state.evictions++;}}state.activeCache=cache.size;return e;}
