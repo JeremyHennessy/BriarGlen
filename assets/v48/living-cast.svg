@@ -1,0 +1,213 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+  <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e1bd91"/><stop offset="1" stop-color="#b9825d"/></linearGradient>
+  <linearGradient id="green" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#70845a"/><stop offset=".55" stop-color="#4f6749"/><stop offset="1" stop-color="#35463a"/></linearGradient>
+  <linearGradient id="leather" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8a6947"/><stop offset=".6" stop-color="#60462f"/><stop offset="1" stop-color="#3d3027"/></linearGradient>
+  <linearGradient id="cloth" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9b8b6c"/><stop offset="1" stop-color="#5e594d"/></linearGradient>
+  <linearGradient id="fur" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#85877b"/><stop offset=".55" stop-color="#565c56"/><stop offset="1" stop-color="#383d3b"/></linearGradient>
+  <linearGradient id="boar" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#86654f"/><stop offset=".6" stop-color="#5c4437"/><stop offset="1" stop-color="#3a302c"/></linearGradient>
+  <linearGradient id="ember" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9b503b"/><stop offset=".6" stop-color="#60352f"/><stop offset="1" stop-color="#33292a"/></linearGradient>
+  <linearGradient id="moss" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7d8d59"/><stop offset=".6" stop-color="#4d6647"/><stop offset="1" stop-color="#34453b"/></linearGradient>
+  <linearGradient id="bog" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#69837a"/><stop offset=".6" stop-color="#405f59"/><stop offset="1" stop-color="#2c4544"/></linearGradient>
+  <linearGradient id="stone" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9b9684"/><stop offset=".5" stop-color="#68695f"/><stop offset="1" stop-color="#414640"/></linearGradient>
+  <linearGradient id="iron" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a9a69a"/><stop offset=".45" stop-color="#696a64"/><stop offset="1" stop-color="#3e423f"/></linearGradient>
+  <radialGradient id="wisp"><stop stop-color="#d7eee0"/><stop offset=".35" stop-color="#8fbbaa"/><stop offset="1" stop-color="#5c766d" stop-opacity="0"/></radialGradient>
+  <filter id="paint" x="-20%" y="-20%" width="140%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="19" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .12 0" result="noise"/>
+    <feBlend in="SourceGraphic" in2="noise" mode="soft-light"/>
+  </filter>
+  <style>
+    .o{stroke:#302820;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}.d{stroke:#3a3027;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.hi{stroke:#dfd0a9;stroke-width:3;stroke-linecap:round;opacity:.5}.eye{fill:#e8d59d;stroke:#2e2923;stroke-width:2}
+  </style>
+</defs>
+
+<!-- row 0: Warden / Alden / Rowan / Mira -->
+<g transform="translate(0 0)" filter="url(#paint)">
+  <path class="o" fill="#453b31" d="M92 208l8-65 29-41 28 40 10 66-23 16h-32z"/>
+  <path class="o" fill="url(#green)" d="M101 201l8-72 19-25 28 24 11 73-21 16-30-3z"/>
+  <path class="d" fill="#27372e" d="M108 134l20 16 31-18 7 34-26 11-32-10z"/>
+  <path class="o" fill="url(#leather)" d="M106 188h58l-1 13h-57z"/><rect x="132" y="186" width="10" height="17" rx="2" fill="#c2a36d" stroke="#302820" stroke-width="3"/>
+  <path class="o" fill="#50473b" d="M107 207l18 2-2 30H99zM142 209l18-1 10 31h-25z"/>
+  <path class="o" fill="#332d28" d="M96 235h31l-1 11H92zM143 235h31l4 11h-34z"/>
+  <ellipse class="o" fill="url(#skin)" cx="130" cy="88" rx="25" ry="29"/>
+  <path class="o" fill="#3b3028" d="M105 88q4-35 31-35 23 3 27 30l-18-12-16 7-18-2z"/>
+  <path class="d" fill="#3b3028" d="M111 73q-4 25 2 36M153 72q5 22-1 37"/>
+  <circle class="eye" cx="139" cy="89" r="3"/><path class="d" fill="none" d="M147 103q-10 8-19 0"/>
+  <path class="o" fill="#6e5940" d="M109 116l-25 27 15 15 21-25z"/>
+  <path class="o" fill="#303c35" d="M95 151l-14 42 24 4 10-35z"/>
+  <path class="hi" fill="none" d="M116 121l14 14 17-14M116 159q19 11 39 0"/>
+</g>
+
+<g transform="translate(256 0)" filter="url(#paint)">
+  <path class="o" fill="#37332e" d="M102 210l8-74 19-29 29 24 10 79-20 13-31-2z"/>
+  <path class="o" fill="#6a5140" d="M110 131h49l11 74-15 11-39-5z"/>
+  <path class="o" fill="#8b7860" d="M116 134l37-1 4 65-38-3z"/>
+  <path class="d" fill="#4a3b2f" d="M120 155h34M119 177h36"/>
+  <path class="o" fill="#49413a" d="M109 207l19 1-5 32H99zM145 208l17 0 10 32h-29z"/>
+  <ellipse class="o" fill="url(#skin)" cx="132" cy="90" rx="27" ry="30"/>
+  <path class="o" fill="#3c322b" d="M105 89q2-35 29-37 28 2 31 34l-18-12-17 3-16 10z"/>
+  <path class="d" fill="#6e4f38" d="M113 103q18 20 39 0l-2 15q-18 13-35 0z"/>
+  <circle class="eye" cx="141" cy="89" r="3"/>
+  <path class="o" fill="#644b36" d="M159 137l32 18-8 14-31-15z"/>
+  <path class="o" fill="#65594c" d="M184 151l18 4-4 10-17 0z"/>
+  <path class="d" fill="none" d="M201 158l18 23M205 168l-16 18"/>
+  <path class="hi" fill="none" d="M122 139v52M142 139v50"/>
+</g>
+
+<g transform="translate(512 0)" filter="url(#paint)">
+  <path class="o" fill="#413830" d="M99 209l12-70 22-32 29 26 7 76-22 15-29-4z"/>
+  <path class="o" fill="#57694e" d="M109 135l25-24 26 22 3 63-46 3z"/>
+  <path class="o" fill="url(#leather)" d="M107 185h58l-3 14h-57z"/>
+  <path class="o" fill="#4b4035" d="M111 202l19 4-5 34H99zM145 205l17-2 13 36h-28z"/>
+  <ellipse class="o" fill="url(#skin)" cx="134" cy="88" rx="25" ry="29"/>
+  <path class="o" fill="#49372a" d="M109 86q2-31 27-35 26 4 27 34l-18-10-12 7-18-4z"/>
+  <path class="d" fill="#49372a" d="M112 69q-10 18-3 40M157 70q8 17 2 38"/>
+  <circle class="eye" cx="143" cy="89" r="3"/>
+  <path class="o" fill="#725a3b" d="M98 142l-22 48 17 9 25-48z"/>
+  <path class="o" fill="#8f7048" d="M77 185l18-2 11 34-25 3z"/>
+  <path class="d" fill="none" d="M83 193h15M86 203h16"/>
+  <path class="hi" fill="none" d="M118 135q15 14 37 0M119 161h35"/>
+</g>
+
+<g transform="translate(768 0)" filter="url(#paint)">
+  <path class="o" fill="#4a4038" d="M101 213l8-72 20-31 29 25 10 78-19 13-34-3z"/>
+  <path class="o" fill="#64705a" d="M108 139l21-28 30 24 4 65-47 0z"/>
+  <path class="o" fill="#75624a" d="M114 162h44v47h-44z"/>
+  <path class="d" fill="#3e4e44" d="M116 165l40 0-4 16-34 0z"/>
+  <path class="o" fill="#4f443a" d="M111 205l18 2-5 34H99zM145 207l17-2 12 35h-29z"/>
+  <ellipse class="o" fill="url(#skin)" cx="133" cy="89" rx="24" ry="28"/>
+  <path class="o" fill="#4b3a2e" d="M110 89q0-33 24-37 25 4 28 36l-14-11-16 4-17-6z"/>
+  <path class="o" fill="#536653" d="M107 93q-5-22 5-33l11 11-8 29z"/>
+  <circle class="eye" cx="141" cy="89" r="3"/>
+  <path class="o" fill="#5d4a3a" d="M160 146l27 14-5 13-29-13z"/>
+  <path class="o" fill="#4e7b6a" d="M183 151q12 2 15 13-5 12-17 9-9-8 2-22z"/>
+  <circle cx="190" cy="161" r="4" fill="#cbe8d9"/><path class="hi" fill="none" d="M119 141l12 12 19-13"/>
+</g>
+
+<!-- row 1: wolf / hollow boar / emberback / grovekeeper -->
+<g transform="translate(0 256)" filter="url(#paint)">
+  <path class="o" fill="url(#fur)" d="M48 166q26-39 74-35l48 7 29 31-18 30-53 9-61-11z"/>
+  <path class="o" fill="#4c514d" d="M153 137l38-31 16 14-17 34 23 9-21 28-34-16z"/>
+  <path class="o" fill="#505650" d="M54 164l-27-18-12 12 30 29z"/>
+  <path class="o" fill="#5b6059" d="M86 191l18 0-8 43H79zM139 191l18-1 12 42h-18z"/>
+  <path class="o" fill="#5b6059" d="M55 184l16 7-16 36H40zM169 182l16-4 20 32-14 8z"/>
+  <path class="o" fill="#5f655e" d="M183 119l15-26 10 31M163 119l-4-29 18 25"/>
+  <path class="d" fill="#2d3331" d="M191 147l27 10-23 15-20-5z"/>
+  <circle class="eye" cx="193" cy="137" r="4"/><path class="hi" fill="none" d="M73 153q42-15 87 2M95 172q32 8 62-2"/>
+</g>
+
+<g transform="translate(256 256)" filter="url(#paint)">
+  <path class="o" fill="url(#boar)" d="M48 164q30-39 86-34 46 0 76 38l-13 32-60 16-67-12z"/>
+  <path class="o" fill="#5c4437" d="M164 139l39-19 25 24-9 44-42 14-20-24z"/>
+  <path class="o" fill="#43362f" d="M64 189l16 4-6 42H57zM118 197l17-1 8 42h-18zM166 195l17-3 17 35-15 8z"/>
+  <path class="o" fill="#43362f" d="M50 161l-28-21-8 13 29 30z"/>
+  <path class="d" fill="#7d5b44" d="M76 137l7-26 12 27M100 132l12-26 6 29M128 131l14-24 3 28"/>
+  <path class="o" fill="#d7c092" d="M204 172l25 17-28 6zM197 177l15 25-24-11z"/>
+  <circle class="eye" cx="200" cy="151" r="4"/><path class="d" fill="#302a26" d="M214 159l20 7-18 9z"/>
+  <path class="hi" fill="none" d="M70 157q47-16 93 4"/>
+</g>
+
+<g transform="translate(512 256)" filter="url(#paint)">
+  <path class="o" fill="url(#ember)" d="M34 166q31-54 100-48 55-3 89 46l-13 39-71 24-83-15z"/>
+  <path class="o" fill="#6a382f" d="M168 127l43-25 30 29-3 53-47 25-30-31z"/>
+  <path class="o" fill="#3e2e2b" d="M52 201l21 3-7 41H45zM118 209l20 0 8 39h-20zM178 205l19-4 20 34-16 11z"/>
+  <path class="o" fill="#3d2c2a" d="M42 159L13 136l-8 16 31 31z"/>
+  <path class="o" fill="#c67a49" d="M68 127l11-31 14 32M98 120l14-34 9 36M132 119l18-32 6 36M164 124l19-29 3 36"/>
+  <path class="o" fill="#e2c394" d="M216 171l27 19-31 7zM207 177l17 27-27-11z"/>
+  <circle class="eye" cx="212" cy="150" r="5" fill="#f1b56b"/>
+  <path class="d" fill="none" stroke="#e07a47" d="M65 158l22 13 13-17 21 18 15-15 24 20M83 190l18-11 18 20 17-17 24 13"/>
+  <path class="hi" fill="none" stroke="#efb06a" d="M86 136q46-14 84 8"/>
+</g>
+
+<g transform="translate(768 256)" filter="url(#paint)">
+  <path class="o" fill="#514a3d" d="M101 214l5-91 23-40 31 38 9 93-22 17-31-5z"/>
+  <path class="o" fill="url(#moss)" d="M107 137l22-47 29 38 4 72-48 4z"/>
+  <path class="o" fill="#40523d" d="M111 160l49 0-8 43-36 1z"/>
+  <path class="o" fill="#4c453b" d="M110 205l18 2-5 38H98zM146 207l18-2 12 39h-30z"/>
+  <path class="o" fill="#5f6f46" d="M102 132L78 104l10-12 27 22M161 130l24-33 13 9-22 39"/>
+  <path class="o" fill="#7f8d5a" d="M86 97l-8-24 17 13 2-25 14 24M192 99l11-22 7 22 18-13-9 24"/>
+  <ellipse class="o" fill="#59614d" cx="133" cy="76" rx="25" ry="28"/>
+  <path class="o" fill="#6e7656" d="M108 74l-8-27 18 16 7-30 11 29 17-25-3 31"/>
+  <circle class="eye" cx="124" cy="76" r="4" fill="#d7d18a"/><circle class="eye" cx="143" cy="76" r="4" fill="#d7d18a"/>
+  <path class="d" fill="none" d="M122 93q12 8 24-1"/><path class="hi" fill="none" d="M119 128q14 14 32 1"/>
+</g>
+
+<!-- row 2: mireling / bog stalker / drowned warden / ridgehorn -->
+<g transform="translate(0 512)" filter="url(#paint)">
+  <path class="o" fill="url(#bog)" d="M60 194q8-59 66-72 63 9 74 69-21 34-71 37-49-2-69-34z"/>
+  <path class="o" fill="#58746b" d="M78 176q18-31 48-30 35 1 55 31-19 23-51 24-34-1-52-25z"/>
+  <circle class="eye" cx="111" cy="164" r="6" fill="#d5dfb8"/><circle class="eye" cx="150" cy="164" r="6" fill="#d5dfb8"/>
+  <path class="d" fill="none" d="M111 188q19 12 40 0"/>
+  <path class="d" fill="#415c54" d="M84 131l-7-32 14 21 8-37 11 40M159 126l12-31 5 27 19-18-13 37"/>
+  <path class="hi" fill="none" d="M88 184q40 18 80 0"/>
+</g>
+
+<g transform="translate(256 512)" filter="url(#paint)">
+  <path class="o" fill="url(#bog)" d="M45 173q24-43 78-39l49 7 31 30-11 31-64 12-62-12z"/>
+  <path class="o" fill="#3f5a56" d="M151 140l43-31 21 16-18 34 25 7-22 31-43-17z"/>
+  <path class="o" fill="#39524f" d="M63 193l18 0-12 43H50zM111 198l18-1 2 43h-19zM161 190l18-4 21 34-17 9z"/>
+  <path class="o" fill="#455f5b" d="M47 164l-30-16-8 13 30 28z"/>
+  <path class="o" fill="#596e5b" d="M176 116l3-28 12 23 16-21-5 31"/>
+  <circle class="eye" cx="194" cy="142" r="4" fill="#d5dfb8"/>
+  <path class="d" fill="#2c3d3c" d="M198 156l27 11-24 12-21-8z"/>
+  <path class="hi" fill="none" d="M70 158q42-13 86 4"/>
+</g>
+
+<g transform="translate(512 512)" filter="url(#paint)">
+  <path class="o" fill="#3f4c49" d="M94 219l12-86 22-37 31 36 11 87-21 18-34-6z"/>
+  <path class="o" fill="url(#iron)" d="M108 130l20-30 29 29 5 68-48 3z"/>
+  <path class="d" fill="#63726c" d="M111 137h49l-4 20-42 2z"/>
+  <path class="o" fill="#294a46" d="M104 154l-19 51 21 11 15-49zM163 151l27 43-18 14-23-39z"/>
+  <path class="o" fill="#3b4542" d="M109 205l19 2-7 40H96zM146 207l18-2 14 41h-31z"/>
+  <ellipse class="o" fill="#66716b" cx="132" cy="83" rx="27" ry="31"/>
+  <path class="o" fill="#505d59" d="M105 82l7-39 22-11 23 14 3 37-14-10-15 7-14-8z"/>
+  <path class="d" fill="none" d="M112 64h39M119 50l1 20M143 47v24"/>
+  <circle class="eye" cx="123" cy="84" r="4" fill="#a8d8c7"/><circle class="eye" cx="144" cy="84" r="4" fill="#a8d8c7"/>
+  <path class="d" fill="none" stroke="#8bb8ab" d="M122 103q12 6 23-1"/><path class="hi" fill="none" d="M120 133l13 13 18-14"/>
+</g>
+
+<g transform="translate(768 512)" filter="url(#paint)">
+  <path class="o" fill="#625645" d="M48 170q27-43 80-39 48 0 77 35l-12 35-58 17-66-11z"/>
+  <path class="o" fill="#574a3e" d="M160 139l37-22 27 20-6 46-39 20-25-24z"/>
+  <path class="o" fill="#4c4338" d="M63 198l17 2-9 39H53zM116 202l18 0 8 38h-19zM167 197l18-3 18 34-16 8z"/>
+  <path class="o" fill="#4d473c" d="M49 164l-29-20-9 13 29 29z"/>
+  <path class="o" fill="#c0aa7a" d="M189 124q-2-35 24-48-10 24 6 45zM171 126q-14-29 4-49 1 25 16 39z"/>
+  <path class="d" fill="#302d28" d="M209 153l23 8-20 13-18-7z"/>
+  <circle class="eye" cx="204" cy="143" r="4" fill="#d8d29b"/><path class="hi" fill="none" d="M72 157q43-14 88 4"/>
+</g>
+
+<!-- row 3: quarry wisp / quarry sentinel / villager / reserve -->
+<g transform="translate(0 768)" filter="url(#paint)">
+  <circle cx="128" cy="145" r="82" fill="url(#wisp)"/>
+  <path class="o" fill="url(#stone)" d="M80 157l14-42 33-16 31 22 17 42-23 30-44 2z"/>
+  <path class="o" fill="#6b6f67" d="M91 121l-17-25 28 8 8-31 18 26 27-27-4 35 31-6-24 25z"/>
+  <circle cx="120" cy="147" r="7" fill="#cceadd"/><circle cx="143" cy="147" r="7" fill="#cceadd"/>
+  <path class="d" fill="none" stroke="#a8d2c4" d="M111 172q20 11 38-1"/>
+  <path class="d" fill="none" stroke="#91b9ad" d="M65 201q21-18 42-9M151 194q25-14 45 5"/>
+</g>
+
+<g transform="translate(256 768)" filter="url(#paint)">
+  <path class="o" fill="#444843" d="M87 220l17-92 27-43 36 42 15 93-25 20-41-8z"/>
+  <path class="o" fill="url(#stone)" d="M104 132l28-40 31 37 6 69-56 4z"/>
+  <path class="o" fill="#555b56" d="M103 145l-33 28 14 21 29-17zM165 145l35 27-13 22-30-18z"/>
+  <path class="o" fill="#3f4541" d="M106 201l23 4-8 43H94zM149 204l21-4 18 44-29 3z"/>
+  <path class="o" fill="#77786d" d="M106 92l11-43 21-16 26 20 6 39-18-10-20 7-12-9z"/>
+  <path class="d" fill="none" d="M115 59l42 5M123 43l4 41M151 46l-5 39"/>
+  <circle class="eye" cx="124" cy="93" r="5" fill="#d9d09b"/><circle class="eye" cx="150" cy="93" r="5" fill="#d9d09b"/>
+  <path class="d" fill="#8c7048" d="M91 155l-26-42-11 8 23 45zM187 157l28-39 10 9-25 43z"/>
+  <path class="hi" fill="none" d="M117 135q17 15 35 0"/>
+</g>
+
+<g transform="translate(512 768)" filter="url(#paint)">
+  <path class="o" fill="#443a31" d="M101 213l9-76 20-29 29 25 8 80-19 13-33-4z"/>
+  <path class="o" fill="url(#cloth)" d="M109 137l21-27 28 24 4 65-47 1z"/>
+  <path class="o" fill="url(#leather)" d="M108 185h55v14h-56z"/>
+  <path class="o" fill="#4d4339" d="M110 204l19 3-6 35H99zM145 207l17-3 13 36h-29z"/>
+  <ellipse class="o" fill="url(#skin)" cx="133" cy="89" rx="24" ry="28"/>
+  <path class="o" fill="#4b392c" d="M109 88q2-31 25-35 25 4 28 34l-16-10-13 6-18-7z"/>
+  <circle class="eye" cx="141" cy="90" r="3"/><path class="d" fill="none" d="M128 104q10 7 20 0"/>
+  <path class="hi" fill="none" d="M119 139l13 12 18-13"/>
+</g>
+
+</svg>
