@@ -1,0 +1,55 @@
+name: Build 51 art-v1 unified renderer proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  art-v1-unified:
+    runs-on: ubuntu-latest
+    timeout-minutes: 26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and single-owner contract
+        run: |
+          node tests/static-sanity.mjs
+          test -s src/v47/68-art-v1-runtime.js
+          test -s tests/art-v1-full-stack-smoke.mjs
+          test -s docs/BRIAR_GLEN_ART_BIBLE_V1.md
+          node --check src/v47/68-art-v1-runtime.js
+          node --check tests/art-v1-full-stack-smoke.mjs
+          grep -q "single-owner-procedural-storybook" src/v47/68-art-v1-runtime.js
+          grep -q "artMode:artV1Requested?'briar-glen-art-v1':'legacy-recovery'" src/runtime/boot.js
+      - name: Install Chromium runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-artv1-http.log 2>&1 &
+          sleep 2
+      - name: Unified art-v1 seven-region acceptance
+        run: node tests/art-v1-full-stack-smoke.mjs http://127.0.0.1:4173/
+      - name: Locked game/runtime/UI regressions
+        run: |
+          node tests/world-layout-v2-smoke.mjs http://127.0.0.1:4173/
+          node tests/phone-ui-collision-smoke.mjs http://127.0.0.1:4173/
+          node tests/tutorial-skip-smoke.mjs http://127.0.0.1:4173/
+          node tests/runtime-architecture-smoke.mjs http://127.0.0.1:4173/
+          node tests/render-performance-smoke.mjs http://127.0.0.1:4173/
+      - name: Upload gameplay screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build51-art-v1-${{ github.sha }}
+          path: artifacts/art-v1-*.png
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Verify live GitHub Pages art-v1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: node tests/art-v1-full-stack-smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}" --live
