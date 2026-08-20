@@ -164,7 +164,7 @@
     state.frameChunks=0;state.frameCells=0;const centerCx=Math.floor(camera.x/CHUNK_WORLD),centerCy=Math.floor(camera.y/CHUNK_WORLD),unit=PIXEL_WORLD;
     for(let cy=centerCy-2;cy<=centerCy+2;cy++)for(let cx=centerCx-2;cx<=centerCx+2;cx++){
       if(!visible(cx,cy))continue;const entry=chunk(cx,cy,material),p=worldToScreen(cx*CHUNK_WORLD,cy*CHUNK_WORLD);
-      ctx.save();ctx.translate(p.x,p.y);ctx.transform(.78*camera.zoom*unit,.39*camera.zoom*unit,-.78*camera.zoom*unit,.39*camera.zoom*unit,0,0);ctx.drawImage(entry.canvas,0,0);ctx.restore();state.frameChunks++;state.frameCells+=64;
+      ctx.save();ctx.translate(p.x,p.y);ctx.transform(.78*camera.zoom*unit,.39*camera.zoom*unit,-.78*camera.zoom*unit,.39*camera.zoom*unit,0,0);ctx.drawImage(entry.canvas,-.75,-.75,CHUNK_PX+1.5,CHUNK_PX+1.5);ctx.restore();state.frameChunks++;state.frameCells+=64;
     }
     state.drawCalls++;
   }
