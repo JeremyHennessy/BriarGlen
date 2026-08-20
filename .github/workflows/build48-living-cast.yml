@@ -1,0 +1,46 @@
+name: Build 48 living cast proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build48-living-cast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and cast source gate
+        run: |
+          node tests/static-sanity.mjs
+          test -s assets/v48/living-cast.svg
+          test -s src/v45/66-living-cast48-runtime.js
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-build48-http.log 2>&1 &
+          sleep 2
+      - name: Verify actual Build 48 living-cast screens
+        run: node tests/build48-living-cast-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify canonical render performance
+        run: node tests/render-performance-smoke.mjs http://127.0.0.1:4173/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build48-living-cast-${{ github.sha }}
+          path: artifacts/build48-cast-*.png
+          if-no-files-found: ignore
+      - name: Verify deployed GitHub Pages Build 48
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
+          node tests/build48-living-cast-smoke.mjs "$URL" --live
+          node tests/render-performance-smoke.mjs "$URL"
