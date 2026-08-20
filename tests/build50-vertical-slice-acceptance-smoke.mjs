@@ -68,12 +68,15 @@ try{
     if(s.build.saveKey!=='briar-glen-vslice-v1'||s.build.schema!==1)throw new Error(`${vp.name}: save/runtime identity changed ${JSON.stringify(s.build)}`);
     if(s.runtime.manifestId!=='briar-glen-runtime-v20.1'||s.runtime.legacyLoaderScriptCount!==0)throw new Error(`${vp.name}: canonical runtime regressed ${JSON.stringify(s.runtime)}`);
     if(s.source.version!=='build49-world-scale-reset-v1'||!s.source.enabled||s.source.failed)throw new Error(`${vp.name}: reference-scale source layer inactive ${JSON.stringify(s.source)}`);
-    if(s.cast.version!=='build48-living-cast-v3'||!s.cast.enabled||s.cast.failed||s.cast.uniqueEnemyAssets!==10)throw new Error(`${vp.name}: living-cast contract regressed ${JSON.stringify(s.cast)}`);
+    if(s.cast.version!=='build49-reference-scale-cast-v1'||!s.cast.enabled||s.cast.failed||s.cast.uniqueEnemyAssets!==10)throw new Error(`${vp.name}: reference-scale living-cast contract regressed ${JSON.stringify(s.cast)}`);
     if(!s.scene.enabled||s.scene.failed||s.scene.laneSafetyViolations!==0||s.scene.minLaneClearance<155)throw new Error(`${vp.name}: scene-cohesion/lane contract regressed ${JSON.stringify(s.scene)}`);
     if(s.ground.sourceMode!=='build47-physical-tiles'||s.ground.physicalTileCount!==21||!s.ground.enabled)throw new Error(`${vp.name}: physical terrain contract regressed ${JSON.stringify(s.ground)}`);
     for(const layer of [s.source,s.cast,s.scene]){
       if(JSON.stringify(layer.baseline)!==JSON.stringify(layer.current))throw new Error(`${vp.name}: presentation layer mutated gameplay entities ${JSON.stringify(layer)}`);
     }
+
+    const castScale=s.cast.scaleContract||{};
+    if(castScale.wardenHeight!==68||castScale.npcHeight>68||castScale.wolfHeight>=68||castScale.boarHeight>=68||castScale.emberbackHeight<=68||castScale.quarrySentinelHeight<=68)throw new Error(`${vp.name}: cast/avatar scale family regressed ${JSON.stringify(castScale)}`);
 
     const c=s.source.scaleContract||{};
     const scaleChecks={
