@@ -10,7 +10,7 @@
 
   const FAMILY_ID = 'briar-glen-art-v1';
   const RECIPE_ID = 'briar-glen-art-v1-painted-family-v1';
-  const VERSION = 'art-v1-terrain-preview-v2-q75';
+  const VERSION = 'art-v1-terrain-preview-v3-q75-authored';
   const TILE_WORLD = 96;
   const CHUNK_TILES = 8;
   const CHUNK_WORLD = TILE_WORLD * CHUNK_TILES;
@@ -52,7 +52,7 @@
     failClosed:true, fallbackUsed:false, atlasPath:'assets/art-v1/terrain/terrain-atlas-v1.webp', atlasWidth:0, atlasHeight:0,
     physicalTileCount:21, cacheBuilds:0, cacheHits:0, cacheMisses:0, evictions:0, frameChunks:0, frameCells:0,
     activeCache:0, currentRegion:'', materialPrimary:'', materialSecondary:'', materialMix:0, drawCalls:0,
-    texturePasses:2, textureSpacing:132,
+    texturePasses:1, textureSpacing:126,
   };
 
   const atlas = new Image();
@@ -67,7 +67,7 @@
       state.ready = true; state.enabled = true;
     };
     atlas.onerror = () => { state.failed = true; state.ready = false; state.enabled = false; };
-    atlas.src = `${state.atlasPath}?v=terrain-v2-q75`;
+    atlas.src = `${state.atlasPath}?v=terrain-v3-q75-authored`;
   }
 
   const cache = new Map();
@@ -112,15 +112,12 @@
       let rgb=blendRgb(primary,secondary,local.secondaryAlpha);
       const routeWarp=terrainNoise(wx*.76,wy*.82,23)*.060 + terrainNoise(wx*1.47,wy*1.39,89)*.024;
       const rs=routeStrength(semantic,wx,wy),organic=clamp01(rs + routeWarp);
-      rgb=blendRgb(rgb,routeRgb[semantic]||rgb,organic*.40);
-      const broad=terrainNoise(wx,wy,17);
-      const medium=terrainNoise(wx*1.93,wy*1.79,43);
-      const fine=terrainNoise(wx*4.35,wy*4.11,97);
-      const grit=terrainNoise(wx*8.7,wy*8.2,151);
-      const edgeShade=(1-organic)*terrainNoise(wx*.53,wy*.53,71)*2.1;
-      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[0]+broad*7.0+medium*4.0+fine*2.4+grit*.9+edgeShade)));
-      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[1]+broad*6.0+medium*3.6+fine*2.1+grit*.8+edgeShade)));
-      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[2]+broad*5.0+medium*3.1+fine*1.8+grit*.7+edgeShade)));
+      rgb=blendRgb(rgb,routeRgb[semantic]||rgb,organic*.24);
+      const broad=terrainNoise(wx,wy,17),medium=terrainNoise(wx*1.93,wy*1.79,43),fine=terrainNoise(wx*4.35,wy*4.11,97);
+      const edgeShade=(1-organic)*terrainNoise(wx*.53,wy*.53,71)*1.8;
+      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[0]+broad*5.0+medium*2.5+fine*1.2+edgeShade)));
+      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[1]+broad*4.2+medium*2.1+fine*1.0+edgeShade)));
+      d[p++]=Math.max(0,Math.min(255,Math.round(rgb[2]+broad*3.5+medium*1.8+fine*.9+edgeShade)));
       d[p++]=255;
     }
     lc.putImageData(img,0,0);return low;
@@ -128,34 +125,28 @@
 
   function atlasDab(region,role){
     const key=`${region}:${role}`;if(dabCache.has(key))return dabCache.get(key);
-    const size=112,cn=document.createElement('canvas');cn.width=cn.height=size;const c=cn.getContext('2d'),row=rows[region],col=role==='base'?0:role==='route'?1:2;
+    const size=128,cn=document.createElement('canvas');cn.width=cn.height=size;const c=cn.getContext('2d'),row=rows[region],col=role==='base'?0:role==='route'?1:2;
     c.imageSmoothingEnabled=true;c.drawImage(atlas,col*ATLAS_CELL,row*ATLAS_CELL,ATLAS_CELL,ATLAS_CELL,0,0,size,size);
-    c.globalCompositeOperation='destination-in';
-    const g=c.createRadialGradient(size*.5,size*.5,size*.07,size*.5,size*.5,size*.5);g.addColorStop(0,'rgba(255,255,255,.98)');g.addColorStop(.50,'rgba(255,255,255,.90)');g.addColorStop(.76,'rgba(255,255,255,.55)');g.addColorStop(.92,'rgba(255,255,255,.15)');g.addColorStop(1,'rgba(255,255,255,0)');
-    c.fillStyle=g;c.fillRect(0,0,size,size);c.globalCompositeOperation='source-over';dabCache.set(key,cn);return cn;
-  }
-
-  function paintDabPass(c,cx,cy,pass){
-    const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD;
-    const spacing=pass===0?132:191,margin=210,seed=pass===0?173:367;
-    const minMx=Math.floor((wx0-margin)/spacing),maxMx=Math.ceil((wx0+CHUNK_WORLD+margin)/spacing),minMy=Math.floor((wy0-margin)/spacing),maxMy=Math.ceil((wy0+CHUNK_WORLD+margin)/spacing);
-    for(let my=minMy;my<=maxMy;my++)for(let mx=minMx;mx<=maxMx;mx++){
-      const jx=(rand01(mx,my,101+pass*43)-.5)*spacing*.90,jy=(rand01(mx,my,131+pass*47)-.5)*spacing*.90;
-      const wx=mx*spacing+jx+(pass?spacing*.37:0),wy=my*spacing+jy+(pass?spacing*.23:0);
-      const px=(wx-wx0)/PIXEL_WORLD,py=(wy-wy0)/PIXEL_WORLD,region=regionAt(wx,wy),rs=routeStrength(region,wx,wy),h=hash(mx,my,seed);
-      const role=rs>.35?'route':'base';
-      const size=(pass===0?55:43)+(h%(pass===0?36:30));
-      const alpha=role==='route' ? (pass===0?.17+rs*.07:.08+rs*.04) : (pass===0?.15:.075);
-      c.save();c.globalAlpha=alpha;c.translate(px,py);c.rotate(((h>>>8)%35-17)*Math.PI/180);c.drawImage(atlasDab(region,role),-size/2,-size/2,size,size);c.restore();
-      if(rs<.18 && hash(mx,my,211+pass*23)%12===0){
-        const as=15+(h>>>13)%11;c.save();c.globalAlpha=pass===0?.24:.13;c.drawImage(atlasDab(region,'accent'),px-as/2,py-as/2,as,as);c.restore();
-      }
+    const mask=document.createElement('canvas');mask.width=mask.height=size;const m=mask.getContext('2d');
+    const seed=rows[region]*19+col*37+11;
+    m.globalCompositeOperation='lighter';
+    for(let i=0;i<6;i++){
+      const a=(i/6)*Math.PI*2+seed*.17,r=size*(i===0?0:.13+.03*((seed+i)%3)),cx=size*.5+Math.cos(a)*r,cy=size*.5+Math.sin(a)*r,rr=size*(i===0?.42:.29+.02*((seed+i)%4));
+      const g=m.createRadialGradient(cx,cy,rr*.18,cx,cy,rr);g.addColorStop(0,'rgba(255,255,255,.92)');g.addColorStop(.62,'rgba(255,255,255,.72)');g.addColorStop(1,'rgba(255,255,255,0)');m.fillStyle=g;m.fillRect(0,0,size,size);
     }
+    c.globalCompositeOperation='destination-in';c.drawImage(mask,0,0);c.globalCompositeOperation='source-over';dabCache.set(key,cn);return cn;
   }
 
   function paintSourceDabs(c,cx,cy){
-    paintDabPass(c,cx,cy,0);
-    c.save();c.globalCompositeOperation='soft-light';paintDabPass(c,cx,cy,1);c.restore();
+    const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD,spacing=126,margin=220;
+    const minMx=Math.floor((wx0-margin)/spacing),maxMx=Math.ceil((wx0+CHUNK_WORLD+margin)/spacing),minMy=Math.floor((wy0-margin)/spacing),maxMy=Math.ceil((wy0+CHUNK_WORLD+margin)/spacing);
+    for(let my=minMy;my<=maxMy;my++)for(let mx=minMx;mx<=maxMx;mx++){
+      const jx=(rand01(mx,my,101)-.5)*spacing*.86,jy=(rand01(mx,my,131)-.5)*spacing*.86,wx=mx*spacing+jx,wy=my*spacing+jy;
+      const px=(wx-wx0)/PIXEL_WORLD,py=(wy-wy0)/PIXEL_WORLD,region=regionAt(wx,wy),rs=routeStrength(region,wx,wy),h=hash(mx,my,173);
+      const role=rs>.34?'route':'base',size=96+(h%49),alpha=role==='route'?(.46+rs*.11):.43;
+      c.save();c.globalAlpha=alpha;c.translate(px,py);c.rotate(((h>>>8)%31-15)*Math.PI/180);c.drawImage(atlasDab(region,role),-size/2,-size/2,size,size);c.restore();
+      if(rs<.16 && hash(mx,my,211)%13===0){const as=17+(h>>>13)%12;c.save();c.globalAlpha=.26;c.drawImage(atlasDab(region,'accent'),px-as/2,py-as/2,as,as);c.restore();}
+    }
   }
 
   function buildChunk(cx,cy,material){
