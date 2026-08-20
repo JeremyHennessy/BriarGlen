@@ -10,7 +10,7 @@
   ];
   const params=new URLSearchParams(location.search);
   const historicalProofKeys=new Set([
-    'assetVariantProof','landmarkStateProof','env46proof','envperf','terrain46','tperf','generatedArtSmoke','dressing','layoutProof','renderPerf','build30Recovery','ground46','sourceArt47Proof','livingCast48Proof','sceneCohesion49Proof','build47rebuild','build47perf','cast48','cohesion49',
+    'assetVariantProof','landmarkStateProof','env46proof','envperf','terrain46','tperf','generatedArtSmoke','dressing','layoutProof','renderPerf','build30Recovery','ground46','gperf','sourceArt47Proof','livingCast48Proof','sceneCohesion49Proof','build47rebuild','build47perf','cast48','cohesion49',
     // Historical visual-control/rollback parameters. Their presence means the caller is explicitly
     // exercising the retained legacy presentation stack rather than the new production art owner.
     'groundV2','sourceArt47','sourceSprites47','livingCast48','sceneCohesion49','env46','terrainPolish'
