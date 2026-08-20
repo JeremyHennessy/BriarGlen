@@ -1,0 +1,49 @@
+name: Art v1 terrain proof
+on:
+  pull_request:
+    paths:
+      - 'assets/art-v1/terrain/**'
+      - 'tools/art_v1/**'
+      - 'src/v47/68-art-v1-terrain-runtime.js'
+      - 'src/runtime/boot.js'
+      - 'tests/art-v1-terrain-smoke.mjs'
+      - '.github/workflows/art-v1-terrain.yml'
+  workflow_dispatch:
+jobs:
+  terrain-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Materialize and verify terrain atlas
+        run: |
+          node tools/art_v1/materialize-terrain-atlas.mjs
+          git diff --exit-code -- assets/art-v1/terrain/terrain-atlas-v1.webp
+      - name: Static sanity
+        run: node tests/static-sanity.mjs
+      - name: Install browser runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Serve branch
+        run: |
+          python3 -m http.server 4173 > /tmp/briar-http.log 2>&1 &
+          echo $! > /tmp/briar-http.pid
+          sleep 2
+      - name: Art-v1 terrain proof
+        run: node tests/art-v1-terrain-smoke.mjs http://127.0.0.1:4173/
+      - name: Canonical runtime and performance regression
+        run: |
+          node tests/runtime-architecture-smoke.mjs http://127.0.0.1:4173/
+          node tests/world-layout-v2-smoke.mjs http://127.0.0.1:4173/
+          node tests/phone-ui-collision-smoke.mjs http://127.0.0.1:4173/
+          node tests/render-performance-smoke.mjs http://127.0.0.1:4173/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: art-v1-terrain-${{ github.sha }}
+          path: artifacts/art-v1-terrain-*.png
+          if-no-files-found: ignore
