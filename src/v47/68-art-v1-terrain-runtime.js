@@ -102,32 +102,58 @@
     c.drawImage(atlas,sx,sy,sw,sh,0,0,size,size);
     c.restore();
   }
-  function mixedBaseColor(primary,secondary,t){
+  function mixedBaseRgb(primary,secondary,t){
     const a=baseRgb[primary]||baseRgb.meadow,b=baseRgb[secondary]||a,mt=Math.max(0,Math.min(.32,t||0));
-    const r=Math.round(a[0]*(1-mt)+b[0]*mt),g=Math.round(a[1]*(1-mt)+b[1]*mt),bl=Math.round(a[2]*(1-mt)+b[2]*mt);
-    return `rgb(${r},${g},${bl})`;
+    return [
+      Math.round(a[0]*(1-mt)+b[0]*mt),
+      Math.round(a[1]*(1-mt)+b[1]*mt),
+      Math.round(a[2]*(1-mt)+b[2]*mt),
+    ];
+  }
+  function terrainNoise(x,y,seed=1){
+    return Math.sin(x*.0097+y*.0061+seed)*.48+Math.cos(x*.0043-y*.0111+seed*1.7)*.31+Math.sin((x-y)*.0029+seed*.37)*.21;
+  }
+  function buildContinuousBase(cx,cy){
+    const low=document.createElement('canvas'),N=40;low.width=low.height=N;const lc=low.getContext('2d'),img=lc.createImageData(N,N),d=img.data;
+    const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD,step=CHUNK_WORLD/N;let p=0;
+    for(let py=0;py<N;py++)for(let px=0;px<N;px++){
+      const wx=wx0+(px+.5)*step,wy=wy0+(py+.5)*step,local=materialMixAt(wx,wy),rgb=mixedBaseRgb(local.primary,local.secondary,local.secondaryAlpha),n=terrainNoise(wx,wy,17);
+      d[p++]=Math.max(0,Math.min(255,rgb[0]+n*5));
+      d[p++]=Math.max(0,Math.min(255,rgb[1]+n*4));
+      d[p++]=Math.max(0,Math.min(255,rgb[2]+n*3));
+      d[p++]=255;
+    }
+    lc.putImageData(img,0,0);
+    return low;
+  }
+  function buildRouteMask(cx,cy){
+    const low=document.createElement('canvas'),N=64;low.width=low.height=N;const lc=low.getContext('2d'),img=lc.createImageData(N,N),d=img.data;
+    const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD,step=CHUNK_WORLD/N;let p=0;
+    for(let py=0;py<N;py++)for(let px=0;px<N;px++){
+      const wx=wx0+(px+.5)*step,wy=wy0+(py+.5)*step,semantic=regionAt(wx,wy),rs=routeStrength(semantic,wx,wy),a=Math.round(Math.pow(rs,.8)*255);
+      d[p++]=255;d[p++]=255;d[p++]=255;d[p++]=a;
+    }
+    lc.putImageData(img,0,0);
+    const mask=document.createElement('canvas');mask.width=CHUNK_PX;mask.height=CHUNK_PX;const mc=mask.getContext('2d');
+    mc.imageSmoothingEnabled=true;mc.filter='blur(5px)';mc.drawImage(low,0,0,CHUNK_PX,CHUNK_PX);mc.filter='none';
+    return mask;
   }
   function buildChunk(cx,cy,material){
     const canvas=document.createElement('canvas');canvas.width=CHUNK_PX;canvas.height=CHUNK_PX;const c=canvas.getContext('2d',{alpha:false});
+    c.imageSmoothingEnabled=true;c.drawImage(buildContinuousBase(cx,cy),0,0,CHUNK_PX,CHUNK_PX);
     const routeLayer=document.createElement('canvas');routeLayer.width=CHUNK_PX;routeLayer.height=CHUNK_PX;const rc=routeLayer.getContext('2d',{alpha:true});
     const wx0=cx*CHUNK_WORLD,wy0=cy*CHUNK_WORLD;
     for(let ty=0;ty<CHUNK_TILES;ty++)for(let tx=0;tx<CHUNK_TILES;tx++){
       const wx=wx0+(tx+.5)*TILE_WORLD,wy=wy0+(ty+.5)*TILE_WORLD,gx=Math.floor(wx/TILE_WORLD),gy=Math.floor(wy/TILE_WORLD),dx=tx*CELL_PX,dy=ty*CELL_PX;
       const semantic=regionAt(wx,wy),local=materialMixAt(wx,wy),primary=local.primary||material.primary,secondary=local.secondary||material.secondary;
-      c.fillStyle=mixedBaseColor(primary,secondary,local.secondaryAlpha);
-      c.fillRect(dx,dy,CELL_PX,CELL_PX);
-      drawSample(c,primary,'base',gx,gy,dx,dy,.28,71);
-      if(local.secondaryAlpha>.06)drawSample(c,secondary,'base',gx,gy,dx,dy,Math.min(.14,local.secondaryAlpha*.35),173);
-      const rs=routeStrength(semantic,wx,wy);
-      if(rs>.025)drawSample(rc,semantic,'route',gx,gy,dx,dy,.10+rs*.58,113);
-      const density={village:18,meadow:15,grove:13,fen:14,copper:16,stonepine:14,den:18}[semantic];
-      if(rs<.24&&hash(gx,gy,197)%density===0)drawSample(c,semantic,'accent',gx,gy,dx,dy,.34,229,18);
+      drawSample(c,primary,'base',gx,gy,dx,dy,.11,71,48);
+      if(local.secondaryAlpha>.08)drawSample(c,secondary,'base',gx,gy,dx,dy,.045,173,48);
+      drawSample(rc,semantic,'route',gx,gy,dx,dy,.72,113,48);
+      const rs=routeStrength(semantic,wx,wy),density={village:18,meadow:15,grove:13,fen:14,copper:16,stonepine:14,den:18}[semantic];
+      if(rs<.20&&hash(gx,gy,197)%density===0)drawSample(c,semantic,'accent',gx,gy,dx,dy,.32,229,17);
     }
-    c.save();
-    c.globalAlpha=.82;
-    c.filter='blur(1.2px)';
-    c.drawImage(routeLayer,0,0);
-    c.restore();
+    rc.globalCompositeOperation='destination-in';rc.drawImage(buildRouteMask(cx,cy),0,0);rc.globalCompositeOperation='source-over';
+    c.save();c.globalAlpha=.70;c.drawImage(routeLayer,0,0);c.restore();
     state.cacheBuilds++;return{canvas,last:++clock};
   }
   function chunk(cx,cy,material){const key=`${material.key}:${cx},${cy}`;let e=cache.get(key);if(e){e.last=++clock;state.cacheHits++;return e;}state.cacheMisses++;e=buildChunk(cx,cy,material);cache.set(key,e);if(cache.size>CACHE_LIMIT){let victim=null,old=Infinity;for(const[k,v]of cache)if(v.last<old){old=v.last;victim=k;}if(victim){cache.delete(victim);state.evictions++;}}state.activeCache=cache.size;return e;}
