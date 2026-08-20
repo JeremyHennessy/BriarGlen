@@ -105,7 +105,7 @@ try{
       localStorage.setItem('briar-glen-context-guide-v37',JSON.stringify({move:true,dodge:true}));
     });
     const returningPage=await returning.newPage();
-    await load(returningPage,`${target}${target.includes('?')?'&':'?'}accept50return=${Date.now()}-${vp.name}`);
+    await load(returningPage,`${target}${target.includes('?')?'&':'?'}onboarding=1&onboarding37=1&accept50return=${Date.now()}-${vp.name}`);
     await returningPage.waitForFunction(()=>window.__BRIAR_GLENDebug?.getOnboardingState?.().startOpen===true,null,{timeout:7000});
     const continueButton=returningPage.locator('#onboarding21-continue');
     if(!(await continueButton.isVisible()))throw new Error(`${vp.name}: returning-save Continue control unavailable`);
