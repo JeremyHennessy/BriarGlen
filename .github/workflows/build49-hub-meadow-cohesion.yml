@@ -1,0 +1,52 @@
+name: Build 49 hub meadow cohesion proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build49-hub-meadow-cohesion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and source prop gate
+        run: |
+          node tests/static-sanity.mjs
+          test -s assets/v49/hub-meadow-props.svg
+          test -s src/v46/67-scene-cohesion49-runtime.js
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-build49-http.log 2>&1 &
+          sleep 2
+      - name: Verify actual Build 49 hub and meadow screens
+        run: node tests/build49-hub-meadow-cohesion-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify Build 47 and Build 48 visual contracts remain intact
+        run: |
+          node tests/build47-visual-rebuild-smoke.mjs http://127.0.0.1:4173/
+          node tests/build48-living-cast-smoke.mjs http://127.0.0.1:4173/
+      - name: Verify canonical render performance
+        run: node tests/render-performance-smoke.mjs http://127.0.0.1:4173/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build49-hub-meadow-cohesion-${{ github.sha }}
+          path: artifacts/build49-cohesion-*.png
+          if-no-files-found: ignore
+      - name: Verify deployed GitHub Pages Build 49
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
+          node tests/build49-hub-meadow-cohesion-smoke.mjs "$URL" --live
+          node tests/build47-visual-rebuild-smoke.mjs "$URL"
+          node tests/build48-living-cast-smoke.mjs "$URL" --live
+          node tests/render-performance-smoke.mjs "$URL"
