@@ -1,0 +1,71 @@
+name: Build 50 vertical slice acceptance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build50-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity and freeze-contract gate
+        run: |
+          node tests/static-sanity.mjs
+          test -s docs/WORLD_SCALE_CONTRACT.md
+          test -s docs/BUILD50_VERTICAL_SLICE_ACCEPTANCE.md
+          test -s tests/build50-vertical-slice-acceptance-smoke.mjs
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 > /tmp/briarglen-build50-http.log 2>&1 &
+          sleep 2
+      - name: Final-stack acceptance across three viewports and seven regions
+        run: node tests/build50-vertical-slice-acceptance-smoke.mjs http://127.0.0.1:4173/
+      - name: Locked visual and rollback contracts
+        run: |
+          node tests/build49-hub-meadow-cohesion-smoke.mjs http://127.0.0.1:4173/
+          node tests/build48-living-cast-smoke.mjs http://127.0.0.1:4173/
+          node tests/build47-visual-rebuild-smoke.mjs http://127.0.0.1:4173/
+      - name: Representative final gameplay systems
+        run: |
+          node tests/tutorial-skip-smoke.mjs http://127.0.0.1:4173/
+          node tests/specialist-crafting-smoke.mjs http://127.0.0.1:4173/
+          node tests/warden-response-smoke.mjs http://127.0.0.1:4173/
+          node tests/contracts-smoke.mjs http://127.0.0.1:4173/
+          node tests/map-journal35-smoke.mjs http://127.0.0.1:4173/
+          node tests/combat-quality-smoke.mjs http://127.0.0.1:4173/
+          node tests/final-polish-smoke.mjs http://127.0.0.1:4173/
+      - name: Performance acceptance
+        run: |
+          node tests/ground-v2-performance-smoke.mjs http://127.0.0.1:4173/
+          node tests/render-performance-smoke.mjs http://127.0.0.1:4173/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build50-acceptance-${{ github.sha }}
+          path: |
+            artifacts/build50-acceptance-*.png
+            artifacts/build49-cohesion-*.png
+            artifacts/build48-cast-*.png
+            artifacts/build47-rebuild-*.png
+          if-no-files-found: ignore
+      - name: Verify deployed GitHub Pages acceptance candidate
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
+          node tests/build50-vertical-slice-acceptance-smoke.mjs "$URL" --live
+          node tests/build49-hub-meadow-cohesion-smoke.mjs "$URL" --live
+          node tests/build48-living-cast-smoke.mjs "$URL" --live
+          node tests/build47-visual-rebuild-smoke.mjs "$URL"
+          node tests/ground-v2-performance-smoke.mjs "$URL"
+          node tests/render-performance-smoke.mjs "$URL"
