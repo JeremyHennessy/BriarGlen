@@ -1,0 +1,101 @@
+name: Build 48 live Pages audit
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  live-pages-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity
+        run: node tests/static-sanity.mjs
+      - name: Wait for merged Build 48 on GitHub Pages
+        run: |
+          BASE="https://jeremyhennessy.github.io/BriarGlen"
+          ok=0
+          for attempt in $(seq 1 48); do
+            if curl -fsSL "$BASE/src/v45/66-living-cast48-runtime.js?deploy=$attempt" | grep -q "build48-living-cast-v3" \
+              && curl -fsSL "$BASE/assets/v48/living-cast.svg?deploy=$attempt" | grep -q "id=\"paint\"" \
+              && curl -fsSL "$BASE/src/runtime/boot.js?deploy=$attempt" | grep -q "src/v45/66-living-cast48-runtime.js"; then
+              ok=1
+              break
+            fi
+            sleep 5
+          done
+          test "$ok" = "1"
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Live Build 47 and Build 48 visual/performance proof
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=9539c959b819dc4c7765f9b11973a314800c0bc0"
+          node tests/build47-visual-rebuild-smoke.mjs "$URL"
+          node tests/build48-living-cast-smoke.mjs "$URL" --live
+          node tests/build47-source-performance-smoke.mjs "$URL"
+          node tests/ground-v2-performance-smoke.mjs "$URL"
+          node tests/render-performance-smoke.mjs "$URL"
+      - name: Full live vertical-slice browser matrix
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=9539c959b819dc4c7765f9b11973a314800c0bc0"
+          run_live() {
+            local attempt
+            for attempt in 1 2 3; do
+              "$@" && return 0
+              [ "$attempt" -lt 3 ] && sleep $((attempt * 3))
+            done
+            return 1
+          }
+          run_live node tests/smoke.mjs "$URL" --live
+          run_live node tests/world-smoke.mjs "$URL" --live
+          run_live node tests/controls-smoke.mjs "$URL" --live
+          run_live node tests/aiming-gear-smoke.mjs "$URL" --live
+          run_live node tests/skills-smoke.mjs "$URL" --live
+          run_live node tests/crafting-smoke.mjs "$URL" --live
+          run_live node tests/specialist-crafting-smoke.mjs "$URL" --live
+          run_live node tests/warden-response-smoke.mjs "$URL" --live
+          run_live node tests/specialist-economy38-smoke.mjs "$URL" --live
+          run_live node tests/phone-ui-collision-smoke.mjs "$URL" --live
+          run_live node tests/tutorial-skip-smoke.mjs "$URL" --live
+          run_live node tests/hud-notifications-smoke.mjs "$URL" --live
+          run_live node tests/satchel-character-smoke.mjs "$URL" --live
+          run_live node tests/map-journal-smoke.mjs "$URL" --live
+          run_live node tests/map-journal35-smoke.mjs "$URL" --live
+          run_live node tests/fen-smoke.mjs "$URL" --live
+          run_live node tests/contracts-smoke.mjs "$URL" --live
+          run_live node tests/stability-smoke.mjs "$URL" --live
+          run_live node tests/game-feel-smoke.mjs "$URL" --live
+          run_live node tests/economy2-smoke.mjs "$URL" --live
+          run_live node tests/combat-identity-smoke.mjs "$URL" --live
+          run_live node tests/combat-quality-smoke.mjs "$URL" --live
+          run_live node tests/art-direction-smoke.mjs "$URL" --live
+          run_live node tests/feedback-tuning-smoke.mjs "$URL" --live
+          run_live node tests/stonepine-smoke.mjs "$URL" --live
+          run_live node tests/stonepine-integration-smoke.mjs "$URL" --live
+          run_live node tests/biome-art-smoke.mjs "$URL" --live
+          run_live node tests/hollow-den-art-smoke.mjs "$URL" --live
+          run_live node tests/runtime-architecture-smoke.mjs "$URL" --live
+          run_live node tests/onboarding-smoke.mjs "$URL" --live
+          run_live node tests/contextual-onboarding-smoke.mjs "$URL" --live
+          run_live node tests/balance-pacing-smoke.mjs "$URL" --live
+          run_live node tests/final-polish-smoke.mjs "$URL" --live
+          run_live node tests/build25-production-smoke.mjs "$URL" --live
+          run_live node tests/build26-production-smoke.mjs "$URL" --live
+          run_live node tests/build27-production-smoke.mjs "$URL" --live
+          run_live node tests/build28-production-smoke.mjs "$URL" --live
+          run_live node tests/build29-production-smoke.mjs "$URL" --live
+          run_live node tests/build30-production-smoke.mjs "$URL" --live
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build48-live-pages-${{ github.sha }}
+          path: |
+            artifacts/build47-rebuild-*.png
+            artifacts/build48-cast-*.png
+          if-no-files-found: ignore
