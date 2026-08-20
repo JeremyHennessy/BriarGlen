@@ -3,12 +3,12 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 const root = process.cwd();
-const parts = Array.from({ length: 7 }, (_, i) => path.join(root, 'tools', 'art_v1', `terrain-atlas-v1.part${String(i + 1).padStart(2, '0')}.b64`));
+const parts = Array.from({ length: 12 }, (_, i) => path.join(root, 'tools', 'art_v1', `terrain-atlas-v1-96q75.part${String(i + 1).padStart(2, '0')}.b64`));
 const output = path.join(root, 'assets', 'art-v1', 'terrain', 'terrain-atlas-v1.webp');
-const expectedSha256 = 'f01bd8da86c3e6b0953e43337c4fe8083b82200bd06cd1f649121075f24f036a';
-const expectedBytes = 4570;
-const expectedWidth = 96;
-const expectedHeight = 224;
+const expectedSha256 = '9c3bacff2ad97b94c7eaf2595dd15abd994f48496430c77100c28deadbb586af';
+const expectedBytes = 49902;
+const expectedWidth = 288;
+const expectedHeight = 672;
 
 for (const file of parts) {
   if (!fs.existsSync(file)) throw new Error(`Missing terrain atlas source chunk: ${path.relative(root, file)}`);
