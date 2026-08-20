@@ -1,0 +1,24 @@
+{
+  "family_id": "briar-glen-art-v1",
+  "family": "vegetation",
+  "version": "1",
+  "recipe_id": "briar-glen-art-v1-painted-family-v1",
+  "golden_scene": "v9",
+  "golden_scene_sha256": "e148c9197bd2b97d5871fda46124d58c447ccad3f070616e2a3d01c68e6fff2c",
+  "runtime_file": "assets/art-v1/vegetation/vegetation-atlas-v1.webp",
+  "runtime_sha256": "bdf4aee028dc7b4de4e64d79acf0df3f3b6a44c46478e543a480e41d01e37ae7",
+  "runtime_dimensions": [640, 480],
+  "anchor_policy": "bottom-center physical ground contact",
+  "provenance": "Complete nine-member painterly vegetation family cleaned/extracted together from the approved Golden Scene visual family; local deterministic alpha-edge cleanup, no external source assets and no per-role style substitution.",
+  "roles": {
+    "broadleaf-large": {"atlas_rect":[7,70,145,165],"anchor":0.96,"status":"runtime-ready"},
+    "broadleaf-medium": {"atlas_rect":[167,58,145,177],"anchor":0.96,"status":"runtime-ready"},
+    "pine-full": {"atlas_rect":[332,15,136,220],"anchor":0.97,"status":"runtime-ready"},
+    "pine-slim": {"atlas_rect":[516,15,88,220],"anchor":0.97,"status":"runtime-ready"},
+    "flowering-bush": {"atlas_rect":[12,350,104,95],"anchor":0.91,"status":"runtime-ready"},
+    "dense-hedge": {"atlas_rect":[133,357,118,81],"anchor":0.91,"status":"runtime-ready"},
+    "meadow-wildflowers": {"atlas_rect":[261,356,117,82],"anchor":0.90,"status":"runtime-ready"},
+    "fen-reeds": {"atlas_rect":[395,350,105,95],"anchor":0.92,"status":"runtime-ready"},
+    "stonepine-scrub": {"atlas_rect":[517,352,118,91],"anchor":0.92,"status":"runtime-ready"}
+  }
+}
