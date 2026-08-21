@@ -3,27 +3,47 @@ on:
   pull_request:
     paths:
       - 'assets/art-v1/vegetation/**'
+      - 'tools/art_v1/vegetation-atlas-v3.part*.b64'
+      - 'tools/art_v1/materialize-vegetation-atlas.mjs'
       - 'src/v47/70-art-v1-vegetation-runtime.js'
       - 'src/runtime/boot.js'
       - 'tests/art-v1-vegetation-smoke.mjs'
       - '.github/workflows/art-v1-vegetation.yml'
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   vegetation-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Materialize and verify vegetation v3 atlas
+        run: node tools/art_v1/materialize-vegetation-atlas.mjs
+      - name: Persist materialized vegetation v3 atlas on owned PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/art-v1-vegetation-v2'
+        run: |
+          if git diff --quiet -- assets/art-v1/vegetation/vegetation-atlas-v3.webp; then
+            echo 'Vegetation v3 atlas already matches deterministic materializer.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add assets/art-v1/vegetation/vegetation-atlas-v3.webp
+            git commit -m 'Art v1 vegetation: materialize clean v3 atlas'
+            git push origin HEAD:agent/art-v1-vegetation-v2
+          fi
       - name: Static sanity
         run: node tests/static-sanity.mjs
-      - name: Verify vegetation runtime files
+      - name: Inspect active vegetation runtime files
         run: |
-          test -s assets/art-v1/vegetation/vegetation-atlas-v2.webp
           test -s assets/art-v1/vegetation/vegetation-manifest-v2.json
-          sha256sum assets/art-v1/vegetation/vegetation-atlas-v2.webp | grep 021473cbe15c03f63a69ab00bcbeb88fbcb39acdbf09228cfb79820ab13f01db
+          sha256sum assets/art-v1/vegetation/vegetation-atlas-v3.webp | grep 59a74c45c02d2f82d00ddf965a244d6eb3e59ae4bc07b03d2e72bff21811be56
       - name: Install browser runtime
         run: |
           npm install --no-save playwright@1.55.0
@@ -47,5 +67,5 @@ jobs:
           name: art-v1-vegetation-${{ github.sha }}
           path: |
             artifacts/art-v1-vegetation-*.png
-            assets/art-v1/vegetation/vegetation-atlas-v2.webp
+            assets/art-v1/vegetation/vegetation-atlas-v3.webp
           if-no-files-found: ignore
