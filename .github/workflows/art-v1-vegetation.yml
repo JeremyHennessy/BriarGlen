@@ -19,11 +19,11 @@ jobs:
           node-version: '24'
       - name: Static sanity
         run: node tests/static-sanity.mjs
-      - name: Inspect vegetation runtime files
+      - name: Verify vegetation runtime files
         run: |
           test -s assets/art-v1/vegetation/vegetation-atlas-v2.webp
           test -s assets/art-v1/vegetation/vegetation-manifest-v2.json
-          sha256sum assets/art-v1/vegetation/vegetation-atlas-v2.webp
+          sha256sum assets/art-v1/vegetation/vegetation-atlas-v2.webp | grep 021473cbe15c03f63a69ab00bcbeb88fbcb39acdbf09228cfb79820ab13f01db
       - name: Install browser runtime
         run: |
           npm install --no-save playwright@1.55.0
