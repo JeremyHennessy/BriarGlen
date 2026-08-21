@@ -10,41 +10,28 @@ on:
       - 'tests/art-v1-vegetation-smoke.mjs'
       - '.github/workflows/art-v1-vegetation.yml'
   workflow_dispatch:
-permissions:
-  contents: write
 jobs:
   vegetation-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - name: Materialize and verify vegetation v3 atlas
-        run: node tools/art_v1/materialize-vegetation-atlas.mjs
-      - name: Persist materialized vegetation v3 atlas on owned PR branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/art-v1-vegetation-v2'
         run: |
-          FILE='assets/art-v1/vegetation/vegetation-atlas-v3.webp'
-          if git ls-files --error-unmatch "$FILE" >/dev/null 2>&1 && git diff --quiet -- "$FILE"; then
-            echo 'Vegetation v3 atlas is tracked and already matches deterministic materializer.'
-          else
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add "$FILE"
-            git commit -m 'Art v1 vegetation: materialize clean v3 atlas'
-            git push origin HEAD:agent/art-v1-vegetation-v2
-          fi
+          node tools/art_v1/materialize-vegetation-atlas.mjs
+          git diff --exit-code -- assets/art-v1/vegetation/vegetation-atlas-v3.webp
       - name: Static sanity
         run: node tests/static-sanity.mjs
-      - name: Inspect active vegetation runtime files
+      - name: Verify active vegetation v3 files
         run: |
-          test -s assets/art-v1/vegetation/vegetation-manifest-v2.json
+          test -s assets/art-v1/vegetation/vegetation-atlas-v3.webp
+          test -s assets/art-v1/vegetation/vegetation-manifest-v3.json
           sha256sum assets/art-v1/vegetation/vegetation-atlas-v3.webp | grep 59a74c45c02d2f82d00ddf965a244d6eb3e59ae4bc07b03d2e72bff21811be56
+          grep -q '"runtime_dimensions": \[512, 384\]' assets/art-v1/vegetation/vegetation-manifest-v3.json
+          grep -q '"runtime_role_count": 9' assets/art-v1/vegetation/vegetation-manifest-v3.json
       - name: Install browser runtime
         run: |
           npm install --no-save playwright@1.55.0
@@ -69,4 +56,5 @@ jobs:
           path: |
             artifacts/art-v1-vegetation-*.png
             assets/art-v1/vegetation/vegetation-atlas-v3.webp
+            assets/art-v1/vegetation/vegetation-manifest-v3.json
           if-no-files-found: ignore
