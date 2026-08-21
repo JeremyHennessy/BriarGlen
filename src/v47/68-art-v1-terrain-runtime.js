@@ -10,7 +10,7 @@
 
   const FAMILY_ID = 'briar-glen-art-v1';
   const RECIPE_ID = 'briar-glen-art-v1-painted-family-v1';
-  const VERSION = 'art-v1-terrain-preview-v3-q75-authored';
+  const VERSION = 'art-v1-terrain-preview-v4-q75-base-only';
   const TILE_WORLD = 96;
   const CHUNK_TILES = 8;
   const CHUNK_WORLD = TILE_WORLD * CHUNK_TILES;
@@ -42,17 +42,13 @@
     village:[151,139,97], meadow:[109,120,74], grove:[82,101,66], fen:[75,96,82],
     copper:[132,106,76], stonepine:[89,95,73], den:[88,74,62],
   };
-  const routeRgb = {
-    village:[181,163,117], meadow:[156,137,91], grove:[117,118,83], fen:[102,110,94],
-    copper:[154,126,94], stonepine:[122,114,85], den:[115,92,75],
-  };
 
   const state = {
     version:VERSION, familyId:FAMILY_ID, recipeId:RECIPE_ID, requested, enabled:false, ready:!requested, failed:false,
     failClosed:true, fallbackUsed:false, atlasPath:'assets/art-v1/terrain/terrain-atlas-v1.webp', atlasWidth:0, atlasHeight:0,
     physicalTileCount:21, cacheBuilds:0, cacheHits:0, cacheMisses:0, evictions:0, frameChunks:0, frameCells:0,
     activeCache:0, currentRegion:'', materialPrimary:'', materialSecondary:'', materialMix:0, drawCalls:0,
-    texturePasses:1, textureSpacing:126, legacyRouteSuppressed:requested,
+    texturePasses:1, textureSpacing:126, legacyRouteSuppressed:requested, routeTextureOwnedExternally:requested,
   };
 
   const atlas = new Image();
@@ -67,7 +63,7 @@
       state.ready = true; state.enabled = true;
     };
     atlas.onerror = () => { state.failed = true; state.ready = false; state.enabled = false; };
-    atlas.src = `${state.atlasPath}?v=terrain-v3-q75-authored`;
+    atlas.src = `${state.atlasPath}?v=terrain-v4-q75-base-only`;
   }
 
   const cache = new Map();
@@ -109,12 +105,9 @@
     for(let py=0;py<N;py++)for(let px=0;px<N;px++){
       const wx=wx0+(px+.5)*step,wy=wy0+(py+.5)*step,local=materialMixAt(wx,wy),semantic=regionAt(wx,wy);
       const primary=baseRgb[local.primary]||baseRgb[semantic],secondary=baseRgb[local.secondary]||primary;
-      let rgb=blendRgb(primary,secondary,local.secondaryAlpha);
-      const routeWarp=terrainNoise(wx*.76,wy*.82,23)*.060 + terrainNoise(wx*1.47,wy*1.39,89)*.024;
-      const rs=routeStrength(semantic,wx,wy),organic=clamp01(rs + routeWarp);
-      rgb=blendRgb(rgb,routeRgb[semantic]||rgb,organic*.24);
+      const rgb=blendRgb(primary,secondary,local.secondaryAlpha);
       const broad=terrainNoise(wx,wy,17),medium=terrainNoise(wx*1.93,wy*1.79,43),fine=terrainNoise(wx*4.35,wy*4.11,97);
-      const edgeShade=(1-organic)*terrainNoise(wx*.53,wy*.53,71)*1.8;
+      const edgeShade=terrainNoise(wx*.53,wy*.53,71)*1.8;
       d[p++]=Math.max(0,Math.min(255,Math.round(rgb[0]+broad*5.0+medium*2.5+fine*1.2+edgeShade)));
       d[p++]=Math.max(0,Math.min(255,Math.round(rgb[1]+broad*4.2+medium*2.1+fine*1.0+edgeShade)));
       d[p++]=Math.max(0,Math.min(255,Math.round(rgb[2]+broad*3.5+medium*1.8+fine*.9+edgeShade)));
@@ -143,7 +136,7 @@
     for(let my=minMy;my<=maxMy;my++)for(let mx=minMx;mx<=maxMx;mx++){
       const jx=(rand01(mx,my,101)-.5)*spacing*.86,jy=(rand01(mx,my,131)-.5)*spacing*.86,wx=mx*spacing+jx,wy=my*spacing+jy;
       const px=(wx-wx0)/PIXEL_WORLD,py=(wy-wy0)/PIXEL_WORLD,region=regionAt(wx,wy),rs=routeStrength(region,wx,wy),h=hash(mx,my,173);
-      const role=rs>.34?'route':'base',size=96+(h%49),alpha=role==='route'?(.46+rs*.11):.43;
+      const role='base',size=96+(h%49),alpha=.43;
       c.save();c.globalAlpha=alpha;c.translate(px,py);c.rotate(((h>>>8)%31-15)*Math.PI/180);c.drawImage(atlasDab(region,role),-size/2,-size/2,size,size);c.restore();
       if(rs<.16 && hash(mx,my,211)%13===0){const as=17+(h>>>13)%12;c.save();c.globalAlpha=.26;c.drawImage(atlasDab(region,'accent'),px-as/2,py-as/2,as,as);c.restore();}
     }
@@ -164,7 +157,7 @@
     state.frameChunks=0;state.frameCells=0;const centerCx=Math.floor(camera.x/CHUNK_WORLD),centerCy=Math.floor(camera.y/CHUNK_WORLD),unit=PIXEL_WORLD;
     for(let cy=centerCy-2;cy<=centerCy+2;cy++)for(let cx=centerCx-2;cx<=centerCx+2;cx++){
       if(!visible(cx,cy))continue;const entry=chunk(cx,cy,material),p=worldToScreen(cx*CHUNK_WORLD,cy*CHUNK_WORLD);
-      ctx.save();ctx.translate(p.x,p.y);ctx.transform(.78*camera.zoom*unit,.39*camera.zoom*unit,-.78*camera.zoom*unit,.39*camera.zoom*unit,0,0);ctx.drawImage(entry.canvas,0,0);ctx.restore();state.frameChunks++;state.frameCells+=64;
+      ctx.save();ctx.translate(p.x,p.y);ctx.transform(.78*camera.zoom*unit,.39*camera.zoom*unit,-.78*camera.zoom*unit,.39*camera.zoom*unit,0,0);ctx.drawImage(entry.canvas,-.75,-.75,CHUNK_PX+1.5,CHUNK_PX+1.5);ctx.restore();state.frameChunks++;state.frameCells+=64;
     }
     state.drawCalls++;
   }
