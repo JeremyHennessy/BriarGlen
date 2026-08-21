@@ -96,4 +96,7 @@
     ...state,enabled:Boolean(requested&&state.ready&&!state.failed),draws:{...state.draws},baseline:{...baseline},
     current:{objects:worldObjects.length,resources:resources.length,enemies:enemies.length},
   });
+  debug.getArtV1VegetationAnchors=()=>worldObjects
+    .filter(o=>vegetationTypes.has(o?.type))
+    .map(o=>({type:o.type,role:roleFor(o),region:regionAt(o.x,o.y),x:o.x,y:o.y,s:Number.isFinite(o.s)?o.s:1}));
 })();
