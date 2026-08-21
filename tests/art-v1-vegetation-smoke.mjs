@@ -42,6 +42,9 @@ try{
     if(errors.length)throw new Error(`${vp.name}: runtime errors ${errors.join('; ')}`);
     console.log(`PASS ${vp.name}: art-v1 vegetation v2 representative family preview`);await context.close();
   }
+  const atlasContext=await browser.newContext({viewport:{width:640,height:480},deviceScaleFactor:1});const atlasPage=await atlasContext.newPage();
+  await atlasPage.goto(new URL('assets/art-v1/vegetation/vegetation-atlas-v2.webp',target).href,{waitUntil:'load',timeout:20000});
+  await atlasPage.screenshot({path:'artifacts/art-v1-vegetation-atlas-browser.png'});await atlasContext.close();
   const context=await browser.newContext({viewport:{width:932,height:430},hasTouch:true});const page=await context.newPage();
   await page.goto(`${target}${target.includes('?')?'&':'?'}artV1Terrain=1&artV1Vegetation=0`,{waitUntil:'domcontentloaded',timeout:20000});
   await page.waitForFunction(()=>Boolean(window.__BRIAR_GLENDebug?.getArtV1VegetationState),{timeout:10000});
