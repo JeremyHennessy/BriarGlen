@@ -10,25 +10,25 @@
 
   const FAMILY_ID = 'briar-glen-art-v1';
   const RECIPE_ID = 'briar-glen-art-v1-painted-family-v1';
-  const VERSION = 'art-v1-vegetation-preview-v2-clean-family';
-  const ATLAS_W = 640, ATLAS_H = 480;
+  const VERSION = 'art-v1-vegetation-preview-v3-clean-atlas';
+  const ATLAS_W = 512, ATLAS_H = 384;
   const roles = Object.freeze({
-    broadleaf_large:{rect:[7,70,145,165],anchor:.96,content:.88,target:190},
-    broadleaf_medium:{rect:[167,58,145,177],anchor:.96,content:.89,target:174},
-    pine_full:{rect:[332,15,136,220],anchor:.97,content:.90,target:188},
-    pine_slim:{rect:[516,15,88,220],anchor:.97,content:.90,target:182},
-    flowering_bush:{rect:[12,350,104,95],anchor:.91,content:.86,target:72},
-    dense_hedge:{rect:[133,357,118,81],anchor:.91,content:.84,target:66},
-    meadow_wildflowers:{rect:[261,356,117,82],anchor:.90,content:.82,target:58},
-    fen_reeds:{rect:[395,350,105,95],anchor:.92,content:.86,target:82},
-    stonepine_scrub:{rect:[517,352,118,91],anchor:.92,content:.85,target:72},
+    broadleaf_large:{rect:[0,0,128,240],anchor:.933,content:.463,target:190},
+    broadleaf_medium:{rect:[128,0,128,240],anchor:.933,content:.483,target:174},
+    pine_full:{rect:[256,0,128,240],anchor:.921,content:.629,target:188},
+    pine_slim:{rect:[384,0,128,240],anchor:.904,content:.800,target:182},
+    flowering_bush:{rect:[0,240,103,144],anchor:.917,content:.507,target:72},
+    dense_hedge:{rect:[103,240,103,144],anchor:.917,content:.382,target:66},
+    meadow_wildflowers:{rect:[206,240,102,144],anchor:.917,content:.368,target:58},
+    fen_reeds:{rect:[308,240,102,144],anchor:.917,content:.500,target:82},
+    stonepine_scrub:{rect:[410,240,102,144],anchor:.917,content:.417,target:72},
   });
   const vegetationTypes = new Set(['tree','fenTree','stonepineTree','bush','garden']);
   const baseline = {objects:worldObjects.length,resources:resources.length,enemies:enemies.length};
   const state = {
     version:VERSION,familyId:FAMILY_ID,recipeId:RECIPE_ID,requested,historicalProof,
     ready:!requested,enabled:false,failed:false,failClosed:true,fallbackUsed:false,
-    atlasPath:'assets/art-v1/vegetation/vegetation-atlas-v2.webp',atlasWidth:0,atlasHeight:0,
+    atlasPath:'assets/art-v1/vegetation/vegetation-atlas-v3.webp',atlasWidth:0,atlasHeight:0,
     frameDraws:0,totalDraws:0,draws:{},baseline,roleCount:Object.keys(roles).length,
     sourceMasterCount:9,densityPreserved:true,legacyVegetationUsed:false,
   };
@@ -41,7 +41,7 @@
       state.ready=true; state.enabled=true;
     };
     atlas.onerror = () => { state.failed=true; state.ready=false; state.enabled=false; };
-    atlas.src = `${state.atlasPath}?v=vegetation-v2`;
+    atlas.src = `${state.atlasPath}?v=vegetation-v3`;
   }
 
   function stable01(o,salt=1){
