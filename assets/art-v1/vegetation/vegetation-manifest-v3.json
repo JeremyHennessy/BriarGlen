@@ -1,0 +1,30 @@
+{
+  "family_id": "briar-glen-art-v1",
+  "family": "vegetation",
+  "version": "3",
+  "recipe_id": "briar-glen-art-v1-painted-family-v1",
+  "golden_scene": "v9",
+  "golden_scene_sha256": "e148c9197bd2b97d5871fda46124d58c447ccad3f070616e2a3d01c68e6fff2c",
+  "source_sheet_sha256": "6c87bdf28739027e713c651d672c1049f3a553ffa7949d62cb9e8bd93b9d36ba",
+  "provenance": "Project-generated Briar Glen vegetation family sheet; deterministically extracted by connected alpha component, chromatic-fringe decontaminated only at the alpha boundary, transparent RGB zeroed, and safe margins normalized. Runtime atlas v3 is deterministically reconstructed from seven committed base64 chunks generated from the cleaned nine-role family. No external stock or third-party art dependency.",
+  "license": "Project-owned generated artwork; no external asset license dependency.",
+  "runtime_file": "assets/art-v1/vegetation/vegetation-atlas-v3.webp",
+  "runtime_sha256": "59a74c45c02d2f82d00ddf965a244d6eb3e59ae4bc07b03d2e72bff21811be56",
+  "runtime_blob_sha": "375f91aae08ee201f73e7f70ff551f53d53550b9",
+  "runtime_dimensions": [512, 384],
+  "runtime_bytes": 54590,
+  "runtime_role_count": 9,
+  "owner": "src/v47/70-art-v1-vegetation-runtime.js",
+  "materializer": "tools/art_v1/materialize-vegetation-atlas.mjs",
+  "roles": {
+    "broadleaf-large": {"source_file":"project-artifact:art-v1-vegetation-v2-source2/broadleaf-large-v1.png","source_dimensions":[634,716],"source_sha256":"798b856b858484110decf5b18b4d64eb0d7109915dae75977d78017cd40b59c1","anchor":"bottom-center","atlas_rect":[0,0,128,240],"anchor_y":0.96,"target_visible_height":190,"status":"runtime-ready"},
+    "broadleaf-medium": {"source_file":"project-artifact:art-v1-vegetation-v2-source2/broadleaf-medium-v1.png","source_dimensions":[532,625],"source_sha256":"be4e78201e18229983ed0ee7b6a312aebf392a604c396c2de44842602d4db6d2","anchor":"bottom-center","atlas_rect":[128,0,128,240],"anchor_y":0.96,"target_visible_height":174,"status":"runtime-ready"},
+    "pine-full": {"source_file":"project-artifact:art-v1-vegetation-v2-source2/pine-full-v1.png","source_dimensions":[449,686],"source_sha256":"47e64e186e0538ce1f1617fb7ae85f91d7541d03f7df218c16c69732e0ce1a14","anchor":"bottom-center","atlas_rect":[256,0,128,240],"anchor_y":0.97,"target_visible_height":188,"status":"runtime-ready"},
+    "pine-slim": {"source_file":"project-artifact:art-v1-vegetation-v2-source2/pine-slim-v1.png","source_dimensions":[344,716],"source_sha256":"e6e0ade7da3fbd2d25f404dd94c5391a1162d95e8d8f75cbce03ec7e7d02b3e6","anchor":"bottom-center","atlas_rect":[384,0,128,240],"anchor_y":0.97,"target_visible_height":182,"status":"runtime-ready"},
+    "flowering-bush": {"source_file":"project-artifact:art-v1-vegetation-v2-source2/flowering-bush-v1.png","source_dimensions":[357,333],"source_sha256":"b1574e89b99fc44a9bcc3a69c168dff9985874c093ff608cb5a97f8672e98372","anchor":"bottom-center","atlas_rect":[0,240,103,144],"anchor_y":0.91,"target_visible_height":72,"status":"runtime-ready"},
+    "dense-hedge": {"source_file":"project-artifact:art-v1-vegetation-v2-source2/dense-hedge-v1.png","source_dimensions":[357,263],"source_sha256":"df8ff272df8155829eb03ef185624d4a57fb600d1209659a7764432fcc1b8399","anchor":"bottom-center","atlas_rect":[103,240,103,144],"anchor_y":0.91,"target_visible_height":66,"status":"runtime-ready"},
+    "meadow-wildflowers": {"source_file":"project-artifact:art-v1-vegetation-v2-source2/meadow-wildflowers-v1.png","source_dimensions":[408,296],"source_sha256":"e031549e18acc4f92a29090bfdcd674f69304cb6457e24dac3f17865d725ec2b","anchor":"bottom-center","atlas_rect":[206,240,102,144],"anchor_y":0.90,"target_visible_height":58,"status":"runtime-ready"},
+    "fen-reeds": {"source_file":"project-artifact:art-v1-vegetation-v2-source2/fen-reeds-v1.png","source_dimensions":[377,354],"source_sha256":"7d3d24c84ea49f57443a0aae045ef5ce75a7f819942db0fde9bc0e122e1db333","anchor":"bottom-center","atlas_rect":[308,240,102,144],"anchor_y":0.92,"target_visible_height":82,"status":"runtime-ready"},
+    "stonepine-scrub": {"source_file":"project-artifact:art-v1-vegetation-v2-source2/stonepine-scrub-v1.png","source_dimensions":[346,277],"source_sha256":"9bb47f7003ea7db05e0aed7fba87321b1f98bd815498b67032b1179a8890a4ad","anchor":"bottom-center","atlas_rect":[410,240,102,144],"anchor_y":0.92,"target_visible_height":72,"status":"runtime-ready"}
+  }
+}
