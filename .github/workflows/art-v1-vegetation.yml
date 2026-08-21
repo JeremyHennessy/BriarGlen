@@ -45,5 +45,7 @@ jobs:
         if: always()
         with:
           name: art-v1-vegetation-${{ github.sha }}
-          path: artifacts/art-v1-vegetation-*.png
+          path: |
+            artifacts/art-v1-vegetation-*.png
+            assets/art-v1/vegetation/vegetation-atlas-v2.webp
           if-no-files-found: ignore
