@@ -1,0 +1,47 @@
+name: Art v1 architecture branch bootstrap
+on:
+  pull_request:
+    paths:
+      - 'tools/art_v1/architecture-atlas-v1.part*.b64'
+      - 'tools/art_v1/materialize-architecture-atlas.mjs'
+      - 'assets/art-v1/architecture/**'
+      - 'src/v47/71-art-v1-architecture-runtime.js'
+      - 'tests/art-v1-architecture-smoke.mjs'
+      - '.github/workflows/art-v1-architecture*.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
+      - name: Ensure architecture runtime boot slot
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs');
+          const file='src/runtime/boot.js';
+          const needle="{ name:'art-v1-vegetation', slot:70, src:'src/v47/70-art-v1-vegetation-runtime.js', optional:true },";
+          const line="    { name:'art-v1-architecture', slot:71, src:'src/v47/71-art-v1-architecture-runtime.js', optional:true },";
+          let s=fs.readFileSync(file,'utf8');
+          if(!s.includes(line.trim())){
+            if(!s.includes(needle))throw new Error('Accepted vegetation slot 70 boot anchor missing');
+            s=s.replace(needle,needle+'\n'+line);
+            fs.writeFileSync(file,s);
+          }
+          NODE
+      - name: Persist boot integration on owned branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/art-v1-architecture-v1'
+        run: |
+          if git diff --quiet -- src/runtime/boot.js; then
+            echo 'Architecture runtime boot slot already present.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add src/runtime/boot.js
+            git commit -m 'Art v1 architecture: register runtime slot 71'
+            git push origin HEAD:agent/art-v1-architecture-v1
+          fi
