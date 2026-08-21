@@ -9,7 +9,7 @@
   "provenance": "Project-generated Briar Glen vegetation family sheet; deterministically extracted by connected alpha component, chromatic-fringe decontaminated only at the alpha boundary, transparent RGB zeroed, safe margins normalized; no external stock or third-party art dependency.",
   "license": "Project-owned generated artwork; no external asset license dependency.",
   "runtime_file": "assets/art-v1/vegetation/vegetation-atlas-v2.webp",
-  "runtime_sha256": "bdf4aee028dc7b4de4e64d79acf0df3f3b6a44c46478e543a480e41d01e37ae7",
+  "runtime_sha256": "021473cbe15c03f63a69ab00bcbeb88fbcb39acdbf09228cfb79820ab13f01db",
   "runtime_dimensions": [640, 480],
   "runtime_role_count": 9,
   "owner": "src/v47/70-art-v1-vegetation-runtime.js",
