@@ -52,8 +52,14 @@
   function visible(p,w,h,m=190){return p.x+w/2>-m&&p.x-w/2<viewport.w+m&&p.y>-m&&p.y-h<viewport.h+m;}
   function record(name){state.frameDraws++;state.totalDraws++;state.draws[name]=(state.draws[name]||0)+1;}
   function roleFor(o){
-    if(o.type==='fenTree')return stable01(o,41)<.58?'broadleaf_medium':'broadleaf_large';
-    if(o.type==='stonepineTree')return stable01(o,43)<.48?'pine_slim':'pine_full';
+    if(o.type==='fenTree'){
+      if(stable01(o,79)<.15)return'fen_reeds';
+      return stable01(o,41)<.58?'broadleaf_medium':'broadleaf_large';
+    }
+    if(o.type==='stonepineTree'){
+      if(stable01(o,79)<.08)return'stonepine_scrub';
+      return stable01(o,43)<.48?'pine_slim':'pine_full';
+    }
     if(o.type==='tree'){
       const r=regionAt(o.x,o.y),v=stable01(o,47);
       if(r==='stonepine')return v<.52?'pine_full':'pine_slim';
