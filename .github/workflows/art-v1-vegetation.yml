@@ -29,12 +29,13 @@ jobs:
       - name: Persist materialized vegetation v3 atlas on owned PR branch
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/art-v1-vegetation-v2'
         run: |
-          if git diff --quiet -- assets/art-v1/vegetation/vegetation-atlas-v3.webp; then
-            echo 'Vegetation v3 atlas already matches deterministic materializer.'
+          FILE='assets/art-v1/vegetation/vegetation-atlas-v3.webp'
+          if git ls-files --error-unmatch "$FILE" >/dev/null 2>&1 && git diff --quiet -- "$FILE"; then
+            echo 'Vegetation v3 atlas is tracked and already matches deterministic materializer.'
           else
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add assets/art-v1/vegetation/vegetation-atlas-v3.webp
+            git add "$FILE"
             git commit -m 'Art v1 vegetation: materialize clean v3 atlas'
             git push origin HEAD:agent/art-v1-vegetation-v2
           fi
