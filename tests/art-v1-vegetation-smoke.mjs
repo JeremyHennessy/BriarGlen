@@ -5,9 +5,8 @@ fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true});
 const views=[{name:'landscape',width:932,height:430},{name:'portrait',width:430,height:932}];
 const fallback={copper:[1020,40],den:[1900,0]};
-const required={
-  village:['tree'],meadow:['tree','bush','garden'],grove:['tree'],fen:['fenTree'],stonepine:['stonepineTree'],
-};
+const required={village:['tree'],meadow:['tree','bush','garden'],grove:['tree'],fen:['fenTree'],stonepine:['stonepineTree']};
+const roleNames=['broadleaf_large','broadleaf_medium','pine_full','pine_slim','flowering_bush','dense_hedge','meadow_wildflowers','fen_reeds','stonepine_scrub'];
 try{
   for(const vp of views){
     const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:true,deviceScaleFactor:1});
@@ -23,6 +22,11 @@ try{
     if(!v.failClosed||v.fallbackUsed||v.legacyVegetationUsed||!v.densityPreserved)throw new Error(`${vp.name}: vegetation ownership/fallback contract failed ${JSON.stringify(v)}`);
     if(v.baseline.objects!==v.current.objects||v.baseline.resources!==v.current.resources||v.baseline.enemies!==v.current.enemies)throw new Error(`${vp.name}: gameplay entity counts mutated ${JSON.stringify(v)}`);
     const anchors=await page.evaluate(()=>window.__BRIAR_GLENDebug.getArtV1VegetationAnchors());
+    const roleAnchors={};
+    for(const role of roleNames){
+      roleAnchors[role]=anchors.find(a=>a.role===role)||null;
+      if(!roleAnchors[role])throw new Error(`${vp.name}: no in-world anchor owns vegetation role ${role}`);
+    }
     for(const name of ['village','meadow','grove','fen','copper','den','stonepine']){
       let anchor=null;
       if(required[name]){
@@ -31,16 +35,20 @@ try{
       }
       const [x,y]=anchor?[anchor.x+92,anchor.y+92]:fallback[name];
       const before=v.draws?.[anchor?.role]||0;
-      await page.evaluate(([px,py])=>window.__BRIAR_GLENDebug.teleport(px,py),[x,y]);await page.waitForTimeout(750);
+      await page.evaluate(([px,py])=>window.__BRIAR_GLENDebug.teleport(px,py),[x,y]);await page.waitForTimeout(700);
       v=await page.evaluate(()=>window.__BRIAR_GLENDebug.getArtV1VegetationState());
-      if(anchor){
-        const after=v.draws?.[anchor.role]||0;
-        if(v.frameDraws<1||after<=before)throw new Error(`${vp.name}/${name}: representative ${anchor.role} did not draw ${JSON.stringify(v)}`);
-      }
+      if(anchor){const after=v.draws?.[anchor.role]||0;if(v.frameDraws<1||after<=before)throw new Error(`${vp.name}/${name}: representative ${anchor.role} did not draw ${JSON.stringify(v)}`);}
       await page.screenshot({path:`artifacts/art-v1-vegetation-${vp.name}-${name}.png`});
     }
+    for(const role of roleNames){
+      const anchor=roleAnchors[role],before=v.draws?.[role]||0;
+      await page.evaluate(([px,py])=>window.__BRIAR_GLENDebug.teleport(px,py),[anchor.x+78,anchor.y+78]);await page.waitForTimeout(550);
+      v=await page.evaluate(()=>window.__BRIAR_GLENDebug.getArtV1VegetationState());
+      const after=v.draws?.[role]||0;if(v.frameDraws<1||after<=before)throw new Error(`${vp.name}/role-${role}: role did not draw ${JSON.stringify(v)}`);
+      await page.screenshot({path:`artifacts/art-v1-vegetation-${vp.name}-role-${role}.png`});
+    }
     if(errors.length)throw new Error(`${vp.name}: runtime errors ${errors.join('; ')}`);
-    console.log(`PASS ${vp.name}: art-v1 vegetation v3 representative family preview`);await context.close();
+    console.log(`PASS ${vp.name}: art-v1 vegetation v3 nine-role in-world family preview`);await context.close();
   }
   const atlasContext=await browser.newContext({viewport:{width:512,height:384},deviceScaleFactor:1});const atlasPage=await atlasContext.newPage();
   await atlasPage.goto(new URL('assets/art-v1/vegetation/vegetation-atlas-v3.webp',target).href,{waitUntil:'load',timeout:20000});
