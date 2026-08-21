@@ -1,0 +1,73 @@
+name: Art v1 architecture proof
+on:
+  pull_request:
+    paths:
+      - 'assets/art-v1/architecture/**'
+      - 'tools/art_v1/architecture-atlas-v1.part*.b64'
+      - 'tools/art_v1/materialize-architecture-atlas.mjs'
+      - 'src/v47/71-art-v1-architecture-runtime.js'
+      - 'src/runtime/boot.js'
+      - 'tests/art-v1-architecture-smoke.mjs'
+      - '.github/workflows/art-v1-architecture.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  architecture-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Materialize and verify architecture atlas
+        run: node tools/art_v1/materialize-architecture-atlas.mjs
+      - name: Persist materialized architecture atlas on owned PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/art-v1-architecture-v1'
+        run: |
+          FILE='assets/art-v1/architecture/architecture-atlas-v1.webp'
+          if git ls-files --error-unmatch "$FILE" >/dev/null 2>&1 && git diff --quiet -- "$FILE"; then
+            echo 'Architecture atlas is tracked and already matches deterministic materializer.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add "$FILE"
+            git commit -m 'Art v1 architecture: materialize atlas'
+            git push origin HEAD:agent/art-v1-architecture-v1
+          fi
+      - name: Static sanity
+        run: node tests/static-sanity.mjs
+      - name: Verify active architecture runtime files
+        run: |
+          test -s assets/art-v1/architecture/architecture-manifest-v1.json
+          test -s assets/art-v1/architecture/architecture-atlas-v1.webp
+          sha256sum assets/art-v1/architecture/architecture-atlas-v1.webp | grep 3b7acdac9f3aed323796f34a0ca13492e09e98a436ca099c96bcd43c440e9736
+      - name: Install browser runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Serve branch
+        run: |
+          python3 -m http.server 4173 > /tmp/briar-http.log 2>&1 &
+          echo $! > /tmp/briar-http.pid
+          sleep 2
+      - name: Art-v1 architecture proof
+        run: node tests/art-v1-architecture-smoke.mjs http://127.0.0.1:4173/
+      - name: Canonical runtime and performance regression
+        run: |
+          node tests/runtime-architecture-smoke.mjs http://127.0.0.1:4173/
+          node tests/world-layout-v2-smoke.mjs http://127.0.0.1:4173/
+          node tests/phone-ui-collision-smoke.mjs http://127.0.0.1:4173/
+          node tests/render-performance-smoke.mjs http://127.0.0.1:4173/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: art-v1-architecture-${{ github.sha }}
+          path: |
+            artifacts/art-v1-architecture-*.png
+            assets/art-v1/architecture/architecture-atlas-v1.webp
+          if-no-files-found: ignore
