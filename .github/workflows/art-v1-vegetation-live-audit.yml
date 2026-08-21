@@ -1,0 +1,56 @@
+name: Art v1 vegetation live Pages audit
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/art-v1-vegetation-live-audit.yml'
+
+jobs:
+  vegetation-live-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Static integrity
+        run: node tests/static-sanity.mjs
+      - name: Wait for merged vegetation V3 on GitHub Pages
+        run: |
+          BASE="https://jeremyhennessy.github.io/BriarGlen"
+          SHA="eb2163985a37a8b349f493b345edaa440d9f4d52"
+          for attempt in $(seq 1 72); do
+            if curl -fsSL "$BASE/src/v47/70-art-v1-vegetation-runtime.js?sha=$SHA" | grep -q 'art-v1-vegetation-preview-v3-clean-atlas' \
+              && curl -fsSL "$BASE/src/runtime/boot.js?sha=$SHA" | grep -q '70-art-v1-vegetation-runtime.js' \
+              && curl -fsSL "$BASE/assets/art-v1/vegetation/vegetation-manifest-v3.json?sha=$SHA" | grep -q '59a74c45c02d2f82d00ddf965a244d6eb3e59ae4bc07b03d2e72bff21811be56' \
+              && curl -fsSL "$BASE/assets/art-v1/vegetation/vegetation-atlas-v3.webp?sha=$SHA" -o /tmp/vegetation-atlas-v3.webp \
+              && test "$(sha256sum /tmp/vegetation-atlas-v3.webp | awk '{print $1}')" = "59a74c45c02d2f82d00ddf965a244d6eb3e59ae4bc07b03d2e72bff21811be56"; then
+              echo "Art-v1 vegetation V3 production files are live on Pages"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Merged art-v1 vegetation V3 files were not observed on Pages"
+          exit 1
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Live vegetation phone proofs and rollback
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=eb2163985a37a8b349f493b345edaa440d9f4d52"
+          node tests/art-v1-vegetation-smoke.mjs "$URL"
+      - name: Live runtime layout UI and performance regression
+        run: |
+          URL="https://jeremyhennessy.github.io/BriarGlen/?sha=eb2163985a37a8b349f493b345edaa440d9f4d52"
+          node tests/runtime-architecture-smoke.mjs "$URL" --live
+          node tests/world-layout-v2-smoke.mjs "$URL" --live
+          node tests/phone-ui-collision-smoke.mjs "$URL" --live
+          node tests/render-performance-smoke.mjs "$URL" --live
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: art-v1-vegetation-live-${{ github.sha }}
+          path: artifacts/art-v1-vegetation-*.png
+          if-no-files-found: ignore
