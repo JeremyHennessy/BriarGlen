@@ -1,0 +1,37 @@
+{
+  "family_id": "briar-glen-art-v1",
+  "family": "architecture",
+  "version": "2",
+  "recipe_id": "briar-glen-art-v1-painted-family-v1",
+  "golden_scene": "v9",
+  "golden_scene_sha256": "e148c9197bd2b97d5871fda46124d58c447ccad3f070616e2a3d01c68e6fff2c",
+  "source_family": "architecture-v4-inspected-family",
+  "provenance": "Project-generated Briar Glen architecture family derived only from accepted Golden Scene v9 and canonical Briar Glen references. Eight v4 source masters were visually inspected as one coherent painterly family, packed without external stock or third-party art, and encoded as the phone-scale 768px Q80 production atlas.",
+  "license": "Project-owned generated artwork; no external asset license dependency.",
+  "runtime_file": "assets/art-v1/architecture/architecture-atlas-v2.webp",
+  "runtime_sha256": "63a9ffe87ff97cfed1fd60d62bb1381a671705bc2a2de4964b44cca1db87b5ec",
+  "runtime_bytes": 91784,
+  "runtime_dimensions": [768, 768],
+  "runtime_role_count": 8,
+  "owner": "src/v47/71-art-v1-architecture-runtime.js",
+  "roles": {
+    "cottage": {"source_file":"project-artifact:cottage-v4.png","source_dimensions":[508,641],"source_sha256":"ea44fc98273f515a8d23e22f3de1903eb64e23d523dffa2260c4533ebd2697b5","anchor":"bottom-center","atlas_rect":[41,18,161,209],"anchor_y":0.96,"target_visible_height":190,"status":"runtime-ready"},
+    "tavern": {"source_file":"project-artifact:tavern-v4.png","source_dimensions":[613,515],"source_sha256":"991307da21a6ca61ddbf8ade9e72351d74338f4fd75545aeaf3fcd8ac4a06f19","anchor":"bottom-center","atlas_rect":[253,18,254,209],"anchor_y":0.96,"target_visible_height":210,"status":"runtime-ready"},
+    "board": {"source_file":"project-artifact:board-v4.png","source_dimensions":[300,212],"source_sha256":"7428a9364170cac327eb597f0164c88b47998b79fa6fd8882c6aad6cb61cb9a9","anchor":"bottom-center","atlas_rect":[554,42,198,130],"anchor_y":0.93,"target_visible_height":118,"status":"runtime-ready"},
+    "forge": {"source_file":"project-artifact:forge-v4.png","source_dimensions":[424,464],"source_sha256":"b7775d4a424f8050560768e49766e1c02678dc1e5b16e8867ff6358f920631e0","anchor":"bottom-center","atlas_rect":[25,258,217,241],"anchor_y":0.97,"target_visible_height":190,"status":"runtime-ready"},
+    "market": {"source_file":"project-artifact:market-v4.png","source_dimensions":[546,394],"source_sha256":"75401f290dcfbbc3e73c012b9e3380f99ab2af8890e88408a3439a632f8cb7ac","anchor":"bottom-center","atlas_rect":[269,272,228,154],"anchor_y":0.94,"target_visible_height":135,"status":"runtime-ready"},
+    "alchemy": {"source_file":"project-artifact:alchemy-v4.png","source_dimensions":[447,292],"source_sha256":"f9d9e63964cd3460546b913e2cbf9583a0247ad956d23dba47dd14423c8d3b57","anchor":"bottom-center","atlas_rect":[524,281,231,138],"anchor_y":0.94,"target_visible_height":122,"status":"runtime-ready"},
+    "well": {"source_file":"project-artifact:well-v4.png","source_dimensions":[285,300],"source_sha256":"b3f4aad6cf567e0dd54c1a78b8c6e346fd1146f772c7f08f4670dde139b80a12","anchor":"bottom-center","atlas_rect":[29,552,168,178],"anchor_y":0.94,"target_visible_height":125,"status":"runtime-ready"},
+    "gate": {"source_file":"project-artifact:gate-v4.png","source_dimensions":[538,234],"source_sha256":"24207aba152f2916a77cf84e98c85ce83896b49b37de1c2b89c1a403f9cdf2ef","anchor":"bottom-center","atlas_rect":[231,575,348,118],"anchor_y":0.92,"target_visible_height":108,"status":"runtime-ready"}
+  },
+  "scope_lock": {
+    "gameplay_entities_unchanged": true,
+    "world_layout_coordinates_unchanged": true,
+    "collisions_and_interactables_unchanged": true,
+    "combat_economy_progression_unchanged": true,
+    "approved_ui_unchanged": true,
+    "save_key_schema_unchanged": true,
+    "fail_closed": true,
+    "hidden_fallback": false
+  }
+}
