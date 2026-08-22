@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 const root=process.cwd();
-const parts=Array.from({length:7},(_,i)=>path.join(root,'tools','art_v1',`architecture-atlas-v2.part${String(i+1).padStart(2,'0')}.b64`));
+const parts=Array.from({length:2},(_,i)=>path.join(root,'tools','art_v1',`architecture-atlas-v2.part${String(i+1).padStart(2,'0')}.b64`));
 const output=path.join(root,'assets','art-v1','architecture','architecture-atlas-v2.webp');
 const expectedSha256='63a9ffe87ff97cfed1fd60d62bb1381a671705bc2a2de4964b44cca1db87b5ec';
 const expectedBytes=91784,expectedWidth=768,expectedHeight=768;
