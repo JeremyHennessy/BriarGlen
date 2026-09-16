@@ -16,7 +16,9 @@ jobs:
         with:
           node-version: '24'
       - name: Static integrity and syntax gate
-        run: node tests/static-sanity.mjs
+        run: |
+          node tests/static-sanity.mjs
+          node tests/map-summary-data.mjs
       - name: Install Chromium test runtime
         run: |
           npm install --no-save playwright@1.55.0
