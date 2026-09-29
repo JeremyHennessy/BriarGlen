@@ -12,7 +12,7 @@ try{
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
-    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.4.0',{timeout:5000});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.5.0',{timeout:5000});
     let state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.length!==4)throw new Error(`${vp.name}: expected four autonomous NPCs`);
     if(!state.npcs.every(n=>n.goalText&&Array.isArray(n.memory)))throw new Error(`${vp.name}: NPC cognition surface missing`);
@@ -81,6 +81,21 @@ try{
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());lineageTamsin=state.npcs.find(n=>n.id==='tamsin');
     if(lineageTamsin.stockMeta?.pick?.provenance?.maker!=='You'||lineageTamsin.stockMeta.pick.provenance.repairs!==1)throw new Error(`${vp.name}: NPC-owned item lineage did not persist`);
 
+    const fieldcraftSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',0);d.setNpcStock('mira','mooncap',0);d.forceNpcNeed('tamsin','tonic');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');const m=d.npc('mira');d.setPosition(m.x,m.y);const used=d.useSkill('fieldcraft');return{wolfId,target,used};});
+    if(!fieldcraftSetup.used)throw new Error(`${vp.name}: Fieldcraft Survey could not be used on a blocked worker`);
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
+    let routeMira=state.npcs.find(n=>n.id==='mira');
+    if(routeMira.blockedByDanger||routeMira.avoidEnemyId!==fieldcraftSetup.wolfId||routeMira.goal!=='seek'||!routeMira.routeOverride?.resourceId)throw new Error(`${vp.name}: Survey did not convert danger into a safe work route ${JSON.stringify(routeMira)}`);
+    if(!routeMira.memory.some(m=>m.text.includes('surveyed a safer route'))||routeMira.trust<=0||state.player.skills.fieldcraft.xp<7)throw new Error(`${vp.name}: Fieldcraft solution left no social/skill consequence ${JSON.stringify(routeMira)}`);
+    for(let i=0;i<15;i++){
+      const gathered=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npc('mira').memory.some(m=>m.text.includes('Gathered Briarleaf to make Field Tonic for a shortage')));
+      if(gathered)break;
+      await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(10));
+    }
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());routeMira=state.npcs.find(n=>n.id==='mira');
+    const detourWolfAlive=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===false,fieldcraftSetup.wolfId);
+    if(!detourWolfAlive||!routeMira.memory.some(m=>m.text.includes('Gathered Briarleaf to make Field Tonic for a shortage'))||state.npcs.find(n=>n.id==='tamsin').memory.some(m=>m.text.includes('Cleared a wolf')))throw new Error(`${vp.name}: Fieldcraft did not solve the blockage as a non-combat alternative ${JSON.stringify(routeMira)}`);
+
     const dangerSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',0);d.setNpcStock('mira','mooncap',0);d.forceNpcNeed('tamsin','tonic');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');return{wolfId,target};});
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     let riskMira=state.npcs.find(n=>n.id==='mira');
@@ -107,7 +122,7 @@ try{
 
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
-    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production planning + risk-aware work + Warden response + social memory + item lineage + Smithing repair history + meaningful items + skills + persistence`);
+    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production planning + risk-aware work + Fieldcraft detours + Warden response + social memory + item lineage + Smithing repair history + meaningful items + skills + persistence`);
     await context.close();
   }
 } finally { await browser.close(); }
