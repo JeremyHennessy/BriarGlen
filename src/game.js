@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const BUILD = Object.freeze({version:'0.2.0',id:'living-world-reboot',saveKey:'briar-glen-reboot-v1'});
+  const BUILD = Object.freeze({version:'0.3.0',id:'living-world-reboot',saveKey:'briar-glen-reboot-v1'});
   const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
   const UI={clock:document.getElementById('clock'),coins:document.getElementById('coins'),hp:document.getElementById('hp'),energy:document.getElementById('energy'),standing:document.getElementById('standing'),knownFor:document.getElementById('known-for'),skills:document.getElementById('skills'),inventory:document.getElementById('inventory'),packWeight:document.getElementById('pack-weight'),nearby:document.getElementById('nearby'),nearbyType:document.getElementById('nearby-type'),log:document.getElementById('log'),toast:document.getElementById('toast'),worldLine:document.getElementById('world-line')};
   const TAU=Math.PI*2,clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -12,6 +12,7 @@
     mooncap:{name:'Mooncap',weight:.2,base:9,kind:'herb',color:'#b9a3d9'},
     iron:{name:'Iron Ore',weight:1.2,base:12,kind:'ore',color:'#9fa8ad'},
     wood:{name:'Ashwood',weight:.8,base:7,kind:'wood',color:'#aa8457'},
+    grain:{name:'Oat Grain',weight:.25,base:3,kind:'grain',color:'#c9b86c'},
     hide:{name:'Wolf Hide',weight:.7,base:15,kind:'hide',color:'#b99878'},
     bread:{name:'Brown Bread',weight:.3,base:6,kind:'food',color:'#d7ad69'},
     tonic:{name:'Field Tonic',weight:.2,base:22,kind:'medicine',color:'#7fcaad'},
@@ -56,12 +57,12 @@
   const npcTemplates=[
     {id:'alden',name:'Alden',role:'smith',home:{x:812,y:545},work:{x:812,y:545},color:'#c48b63',needBias:{iron:1.8,wood:1.1,bread:1}},
     {id:'mira',name:'Mira',role:'herbalist',home:{x:985,y:520},work:{x:985,y:520},color:'#8fb783',needBias:{briarleaf:1.4,mooncap:1.8,bread:1}},
-    {id:'rowan',name:'Rowan',role:'trader',home:{x:870,y:680},work:{x:870,y:680},color:'#d1b26c',needBias:{bread:1.7,tonic:1,wood:.8}},
+    {id:'rowan',name:'Rowan',role:'trader',home:{x:870,y:680},work:{x:870,y:680},color:'#d1b26c',needBias:{grain:2.2,bread:.8,tonic:1}},
     {id:'tamsin',name:'Tamsin',role:'warden',home:{x:1030,y:670},work:{x:1110,y:570},color:'#7aa2c3',needBias:{tonic:1.5,hide:1.3,bread:1}},
   ];
 
   let npcs=[];
-  function newNPC(t){return{...t,x:t.home.x,y:t.home.y,r:11,energy:80,hunger:20,mood:60,trust:0,goal:'idle',goalText:'Taking stock',target:{...t.home},memory:[],relations:{},stock:{bread:1},request:null,think:0,productionCooldown:0,exchangeCooldown:0,seekSource:null,trades:0,lastPlayerHelp:0};}
+  function newNPC(t){return{...t,x:t.home.x,y:t.home.y,r:11,energy:80,hunger:20,mood:60,trust:0,goal:'idle',goalText:'Taking stock',target:{...t.home},memory:[],relations:{},stock:t.id==='rowan'?{bread:2,grain:2}:{bread:1},request:null,think:0,productionCooldown:0,exchangeCooldown:0,seekSource:null,trades:0,lastPlayerHelp:0};}
 
   function qualityLabel(q){return q>=2.6?'fine':q>=1.7?'good':'plain';}
   function itemCount(id){return player.inventory[id]?.qty||0;}
@@ -91,6 +92,7 @@
     for(let i=0;i<10;i++)spawnResource('mooncap',rand(1220,1660),rand(780,1080),rand(1.1,2.4));
     for(let i=0;i<14;i++)spawnResource('iron',rand(140,540),rand(250,610),rand(.8,2.5));
     for(let i=0;i<14;i++)spawnResource('wood',rand(1210,1680),rand(270,640),rand(.8,2.2));
+    for(let i=0;i<18;i++)spawnResource('grain',rand(240,820),rand(790,1070),rand(.9,2.1));
   }
   function spawnWolf(x,y){world.enemies.push({id:`w${world.serial++}`,type:'wolf',x,y,r:12,hp:36,maxHp:36,attackCd:0,wander:rand(0,10),dead:false});}
   function seedEnemies(){world.enemies.length=0;for(let i=0;i<6;i++)spawnWolf(rand(1240,1670),rand(300,650));for(let i=0;i<3;i++)spawnWolf(rand(350,800),rand(820,1040));}
@@ -102,14 +104,14 @@
   function topNeed(n){let best={id:'bread',score:0};for(const id of Object.keys(n.needBias)){const score=npcNeedScore(n,id);if(score>best.score)best={id,score};}return best;}
   function npcNeedText(n){const need=topNeed(n);return need.score>.6?`${itemDefs[need.id].name} matters most right now.`:'No urgent shortage.';}
   function requestFor(n){const need=topNeed(n);if(need.score<1.1)return null;const qty=need.score>3?2:1;const reward=Math.round(itemDefs[need.id].base*qty*(1.35+need.score*.08));return{id:need.id,qty,reward,createdDay:world.day};}
-  function fieldSpot(id){return id==='iron'?{x:360,y:430}:id==='wood'?{x:1430,y:450}:id==='mooncap'?{x:1370,y:930}:id==='briarleaf'?{x:520,y:900}:null;}
+  function fieldSpot(id){return id==='iron'?{x:360,y:430}:id==='wood'?{x:1430,y:450}:id==='mooncap'?{x:1370,y:930}:id==='briarleaf'?{x:520,y:900}:id==='grain'?{x:560,y:910}:null;}
   function supplierFor(seeker,id){const preferred=id==='bread'?'rowan':id==='tonic'?'mira':id==='pick'||id==='blade'?'alden':null;const candidates=npcs.filter(o=>o!==seeker&&(o.stock?.[id]||0)>0);candidates.sort((a,b)=>((b.id===preferred)- (a.id===preferred))||((b.stock[id]||0)-(a.stock[id]||0)));return candidates[0]||null;}
   function relation(a,b,delta){a.relations??={};a.relations[b.id]=clamp((a.relations[b.id]||0)+delta,-5,10);}
-  function chooseNpcGoal(n){const hour=(world.minute/60)%24;const need=topNeed(n);const night=hour>=21||hour<6;const scores={sleep:night?6+(100-n.energy)/15:(100-n.energy)/40,work:(hour>=7&&hour<18?4:0)+(n.role==='trader'?1:0),eat:n.hunger/14,seek:need.score*1.6,social:n.mood<45?2.5:0,idle:1};let goal=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
+  function chooseNpcGoal(n){const hour=(world.minute/60)%24;const need=topNeed(n);const night=hour>=21||hour<6;const scores={sleep:night?6+(100-n.energy)/15:(100-n.energy)/40,work:(hour>=7&&hour<18?4:0)+(n.role==='trader'?1:0),eat:n.hunger/14+(need.id==='bread'&&n.hunger>35?need.score:0),seek:need.score*(need.id==='bread'?.8:1.6),social:n.mood<45?2.5:0,idle:1};let goal=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
     n.seekSource=null;
     if(goal==='sleep'){n.target={...n.home};n.goalText='Heading home to rest';}
     else if(goal==='work'){n.target={...n.work};n.goalText=`Working as the ${n.role}`;}
-    else if(goal==='eat'){const rowan=npcs.find(x=>x.id==='rowan');n.target=rowan?{x:rowan.x,y:rowan.y}:{x:870,y:680};n.goalText='Looking for food';}
+    else if(goal==='eat'){const rowan=npcs.find(x=>x.id==='rowan');n.seekSource=rowan&&rowan!==n?rowan.id:null;n.target=rowan?{x:rowan.x,y:rowan.y}:{x:870,y:680};n.goalText='Looking for food';}
     else if(goal==='seek'){const id=need.id,supplier=supplierFor(n,id),spot=fieldSpot(id);if(supplier){n.seekSource=supplier.id;n.target={x:supplier.x,y:supplier.y};n.goalText=`Going to ${supplier.name} for ${itemDefs[id].name}`;}else if(spot){n.target=spot;n.goalText=`Going out for ${itemDefs[id].name}`;}else{n.target={x:870,y:680};n.goalText=`Trying to source ${itemDefs[id].name}`;}}
     else if(goal==='social'){const others=npcs.filter(o=>o!==n).sort((a,b)=>(n.relations?.[b.id]||0)-(n.relations?.[a.id]||0));const other=others[0]||n;n.target={x:other.x+25,y:other.y};n.goalText=`Checking in with ${other.name}`;}
     else{n.target={x:clamp(n.x+rand(-90,90),20,world.w-20),y:clamp(n.y+rand(-90,90),20,world.h-20)};n.goalText='Watching the day unfold';}
@@ -118,11 +120,11 @@
 
   function npcExchange(n,need){const supplier=n.seekSource&&npcs.find(x=>x.id===n.seekSource);if(!supplier||supplier===n||n.exchangeCooldown>0||supplier.exchangeCooldown>0||dist(n,supplier)>50||(supplier.stock[need.id]||0)<1)return false;supplier.stock[need.id]--;n.stock[need.id]=(n.stock[need.id]||0)+1;n.trades=(n.trades||0)+1;supplier.trades=(supplier.trades||0)+1;n.exchangeCooldown=supplier.exchangeCooldown=9;relation(n,supplier,.25);relation(supplier,n,.15);memory(n,`${supplier.name} supplied ${itemDefs[need.id].name} when it mattered.`);memory(supplier,`${n.name} came to me for ${itemDefs[need.id].name}.`);log(`${supplier.name} supplied ${n.name} with ${itemDefs[need.id].name}.`,'npc');n.request=requestFor(n);return true;}
   function npcEconomy(n){
-    if(n.goal==='eat'){const rowan=npcs.find(x=>x.id==='rowan');if(rowan&&rowan!==n&&dist(n,rowan)<55&&n.exchangeCooldown<=0&&(rowan.stock.bread||0)>0){rowan.stock.bread--;n.stock.bread=(n.stock.bread||0)+1;n.exchangeCooldown=5;memory(n,`${rowan.name} shared bread when supplies were thin.`);}if((n.stock.bread||0)>0&&n.hunger>35){n.stock.bread--;n.hunger=Math.max(0,n.hunger-60);n.mood=Math.min(100,n.mood+5);}}
+    if(n.goal==='eat'){if((n.stock.bread||0)<1&&n.seekSource)npcExchange(n,{id:'bread',score:n.hunger/35});if((n.stock.bread||0)>0&&n.hunger>35){n.stock.bread--;n.hunger=Math.max(0,n.hunger-60);n.mood=Math.min(100,n.mood+5);memory(n,'A real meal let me get back to work.');}}
     if(n.goal==='seek'){const need=topNeed(n);if(need.score>.8&&!npcExchange(n,need)){const node=world.resources.find(r=>r.available&&r.type===need.id&&dist(n,r)<55);if(node){node.available=false;node.respawn=rand(80,140);n.stock[need.id]=(n.stock[need.id]||0)+1;memory(n,`Found ${itemDefs[need.id].name} without waiting for help.`);n.request=requestFor(n);}}}
     if(n.role==='herbalist'&&n.productionCooldown<=0&&(n.stock.briarleaf||0)>=2&&(n.stock.mooncap||0)>=1){n.stock.briarleaf-=2;n.stock.mooncap-=1;n.stock.tonic=(n.stock.tonic||0)+1;n.productionCooldown=18;memory(n,'Prepared a Field Tonic from gathered plants.');}
     if(n.role==='smith'&&n.productionCooldown<=0&&(n.stock.iron||0)>=3&&(n.stock.wood||0)>=1){n.stock.iron-=3;n.stock.wood-=1;n.stock.pick=(n.stock.pick||0)+1;n.productionCooldown=24;memory(n,'Forged an Iron Pick for the Glen.');}
-    if(n.role==='trader'&&n.productionCooldown<=0){n.stock.bread=(n.stock.bread||0)+1;n.productionCooldown=45;}
+    if(n.role==='trader'&&n.productionCooldown<=0&&dist(n,n.work)<65&&(n.stock.grain||0)>=2&&(n.stock.bread||0)<4){n.stock.grain-=2;n.stock.bread=(n.stock.bread||0)+2;n.productionCooldown=30;memory(n,'Baked two Brown Bread from South Meadow oat grain.');log(`${n.name} baked bread from the grain on hand.`,'npc');}
   }
 
   function updateNPC(n,dt){n.relations??={};n.productionCooldown=Math.max(0,(n.productionCooldown||0)-dt);n.exchangeCooldown=Math.max(0,(n.exchangeCooldown||0)-dt);n.think=(n.think||0)-dt;n.hunger=clamp(n.hunger+dt*.45,0,100);n.energy=clamp(n.energy-dt*(n.goal==='sleep'?-2.5:.18),0,100);n.mood=clamp(n.mood+dt*((n.hunger<55?1:-1)*.08),0,100);if(n.think<=0){chooseNpcGoal(n);n.think=rand(3,7);}const dx=n.target.x-n.x,dy=n.target.y-n.y,d=Math.hypot(dx,dy);if(d>4){const speed=n.goal==='sleep'?65:45;n.x+=dx/d*speed*dt;n.y+=dy/d*speed*dt;}npcEconomy(n);}
@@ -132,7 +134,7 @@
   function sellToNPC(n){const need=topNeed(n);const id=need.id;if(itemCount(id)<1){toast(`You have no ${itemDefs[id].name}`);return false;}const price=priceFor(n,id,'sell');const q=avgQuality(id);removeItem(id,1);n.stock[id]=(n.stock[id]||0)+1;player.coins+=Math.round(price*q);n.trust=clamp(n.trust+.15,0,10);memory(n,`Bought ${itemDefs[id].name} from you.`);deriveIdentity();save();toast(`Sold ${itemDefs[id].name} for ${Math.round(price*q)}c`);return true;}
   function buyFromNPC(n){const entries=Object.entries(n.stock).filter(([id,q])=>q>0&&itemDefs[id]);if(!entries.length){toast(`${n.name} has nothing spare`);return false;}entries.sort((a,b)=>priceFor(n,a[0],'buy')-priceFor(n,b[0],'buy'));const [id]=entries[0];const price=priceFor(n,id,'buy');if(player.coins<price){toast(`Need ${price}c`);return false;}player.coins-=price;n.stock[id]--;addItem(id,1,1+n.trust*.03);save();toast(`Bought ${itemDefs[id].name} for ${price}c`);return true;}
 
-  function townNeedState(){const out={food:0,medicine:0,metal:0,materials:0};for(const n of npcs){for(const id of Object.keys(n.needBias||{})){const score=npcNeedScore(n,id),kind=itemDefs[id]?.kind;if(kind==='food')out.food+=score;else if(kind==='medicine'||kind==='herb')out.medicine+=score;else if(kind==='ore'||kind==='tool'||kind==='weapon')out.metal+=score;else out.materials+=score;}}world.townNeeds=out;return out;}
+  function townNeedState(){const out={food:0,medicine:0,metal:0,materials:0};for(const n of npcs){for(const id of Object.keys(n.needBias||{})){const score=npcNeedScore(n,id),kind=itemDefs[id]?.kind;if(kind==='food'||kind==='grain')out.food+=score;else if(kind==='medicine'||kind==='herb')out.medicine+=score;else if(kind==='ore'||kind==='tool'||kind==='weapon')out.metal+=score;else out.materials+=score;}}world.townNeeds=out;return out;}
   function dominantTownNeed(){const needs=townNeedState(),[key,value]=Object.entries(needs).sort((a,b)=>b[1]-a[1])[0];return{key,value,label:{food:'food',medicine:'medicine and herbs',metal:'metal and tools',materials:'field materials'}[key]};}
   function deriveIdentity(){const totalTrust=npcs.reduce((s,n)=>s+n.trust,0),helped=npcs.filter(n=>n.trust>=1).length,craft=player.skills.smithing.level+player.skills.herbcraft.level,field=player.skills.fieldcraft.level,guard=player.skills.guard.level;player.standing=totalTrust>=16?'Mainstay':totalTrust>=9?'Trusted':totalTrust>=4?'Known':'Unknown';const scores=[['keeping people supplied',totalTrust+helped*2],['making useful things',craft*2],['bringing back what the Glen needs',field*2],['keeping the roads safe',guard*2]];scores.sort((a,b)=>b[1]-a[1]);player.knownFor=scores[0][1]>4?scores[0][0]:'nothing yet';}
 
@@ -178,8 +180,9 @@
   function renderLog(){UI.log.innerHTML=world.events.slice(-18).map(e=>`<div class="log-entry ${e.type}"><b>D${e.day}</b> ${e.text}</div>`).join('');}
   function renderUI(){const h=Math.floor(world.minute/60)%24,m=Math.floor(world.minute%60);UI.clock.textContent=`Day ${world.day} · ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;UI.coins.textContent=`${player.coins}c`;UI.hp.value=player.hp;UI.energy.value=player.energy;UI.standing.textContent=player.standing;UI.knownFor.textContent=`Known for: ${player.knownFor}`;const need=dominantTownNeed();UI.worldLine.textContent=world.weather==='rain'?`Rain enriches the fields. Briar Glen is watching ${need.label}.`:need.value>2?`Briar Glen is short on ${need.label}. People are already reacting.`:'Briar Glen is supplied for now. People are pursuing their own work.';renderSkills();renderInventory();renderNearby();}
 
+  function hydrateFoodChain(){for(const n of npcs){n.stock??={};n.needBias??={};if(n.id==='rowan'){n.needBias.grain=Math.max(2.2,Number(n.needBias.grain)||0);if(n.stock.grain==null)n.stock.grain=0;}}if(!world.resources.some(r=>r.type==='grain'))for(let i=0;i<18;i++)spawnResource('grain',rand(240,820),rand(790,1070),rand(.9,2.1));}
   function save(){try{localStorage.setItem(BUILD.saveKey,JSON.stringify({build:BUILD.version,world:{minute:world.minute,day:world.day,weather:world.weather,weatherTimer:world.weatherTimer,events:world.events,resources:world.resources,enemies:world.enemies,drops:world.drops,serial:world.serial},player:{...player},npcs}));}catch(_){}}
-  function load(){try{const raw=localStorage.getItem(BUILD.saveKey);if(!raw)return false;const s=JSON.parse(raw);if(!s?.player||!s?.world||!Array.isArray(s.npcs))return false;Object.assign(world,s.world);Object.assign(player,s.player);npcs=s.npcs;return true;}catch(_){return false;}}
+  function load(){try{const raw=localStorage.getItem(BUILD.saveKey);if(!raw)return false;const s=JSON.parse(raw);if(!s?.player||!s?.world||!Array.isArray(s.npcs))return false;Object.assign(world,s.world);Object.assign(player,s.player);npcs=s.npcs;hydrateFoodChain();return true;}catch(_){return false;}}
 
   let last=performance.now(),uiTimer=0,saveTimer=0;
   function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;update(dt);draw();uiTimer-=dt;saveTimer-=dt;if(uiTimer<=0){renderUI();uiTimer=.18;}if(saveTimer<=0){save();saveTimer=5;}requestAnimationFrame(frame);}
