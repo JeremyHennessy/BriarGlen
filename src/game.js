@@ -60,8 +60,13 @@
     {id:'tamsin',name:'Tamsin',role:'warden',home:{x:1030,y:670},work:{x:1110,y:570},color:'#7aa2c3',needBias:{tonic:1.5,hide:1.3,bread:1}},
   ];
 
+  const productionRecipes=Object.freeze({
+    herbalist:Object.freeze({output:'tonic',req:Object.freeze({briarleaf:2,mooncap:1})}),
+    smith:Object.freeze({output:'pick',req:Object.freeze({iron:3,wood:1})}),
+  });
+
   let npcs=[];
-  function newNPC(t){return{...t,x:t.home.x,y:t.home.y,r:11,energy:80,hunger:20,mood:60,trust:0,goal:'idle',goalText:'Taking stock',target:{...t.home},memory:[],relations:{},stock:{bread:1},request:null,think:0,productionCooldown:0,exchangeCooldown:0,seekSource:null,trades:0,lastPlayerHelp:0};}
+  function newNPC(t){return{...t,x:t.home.x,y:t.home.y,r:11,energy:80,hunger:20,mood:60,trust:0,goal:'idle',goalText:'Taking stock',target:{...t.home},memory:[],relations:{},stock:{bread:1},request:null,think:0,productionCooldown:0,exchangeCooldown:0,seekSource:null,productionPlan:null,trades:0,lastPlayerHelp:0};}
 
   function qualityLabel(q){return q>=2.6?'fine':q>=1.7?'good':'plain';}
   function itemCount(id){return player.inventory[id]?.qty||0;}
@@ -102,15 +107,16 @@
   function topNeed(n){let best={id:'bread',score:0};for(const id of Object.keys(n.needBias)){const score=npcNeedScore(n,id);if(score>best.score)best={id,score};}return best;}
   function npcNeedText(n){const need=topNeed(n);return need.score>.6?`${itemDefs[need.id].name} matters most right now.`:'No urgent shortage.';}
   function requestFor(n){const need=topNeed(n);if(need.score<1.1)return null;const qty=need.score>3?2:1;const reward=Math.round(itemDefs[need.id].base*qty*(1.35+need.score*.08));return{id:need.id,qty,reward,createdDay:world.day};}
-  function fieldSpot(id){return id==='iron'?{x:360,y:430}:id==='wood'?{x:1430,y:450}:id==='mooncap'?{x:1370,y:930}:id==='briarleaf'?{x:520,y:900}:null;}
+  function fieldSpot(id,seeker=null){const nodes=world.resources.filter(r=>r.available&&r.type===id);if(nodes.length){nodes.sort((a,b)=>(seeker?dist(seeker,a):0)-(seeker?dist(seeker,b):0));return{x:nodes[0].x,y:nodes[0].y};}return id==='iron'?{x:360,y:430}:id==='wood'?{x:1430,y:450}:id==='mooncap'?{x:1370,y:930}:id==='briarleaf'?{x:520,y:900}:null;}
   function supplierFor(seeker,id){const preferred=id==='bread'?'rowan':id==='tonic'?'mira':id==='pick'||id==='blade'?'alden':null;const candidates=npcs.filter(o=>o!==seeker&&(o.stock?.[id]||0)>0);candidates.sort((a,b)=>((b.id===preferred)- (a.id===preferred))||((b.stock[id]||0)-(a.stock[id]||0)));return candidates[0]||null;}
   function relation(a,b,delta){a.relations??={};a.relations[b.id]=clamp((a.relations[b.id]||0)+delta,-5,10);}
-  function chooseNpcGoal(n){const hour=(world.minute/60)%24;const need=topNeed(n);const night=hour>=21||hour<6;const scores={sleep:night?6+(100-n.energy)/15:(100-n.energy)/40,work:(hour>=7&&hour<18?4:0)+(n.role==='trader'?1:0),eat:n.hunger/14,seek:need.score*1.6,social:n.mood<45?2.5:0,idle:1};let goal=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
+  function productionNeed(n){const recipe=productionRecipes[n.role];if(!recipe)return null;let demand=0;for(const other of npcs){if(other===n)continue;const need=topNeed(other);if(need.id===recipe.output)demand+=need.score;}if(demand<1||(n.stock[recipe.output]||0)>0)return null;const missing=Object.entries(recipe.req).map(([id,qty])=>({id,qty,have:n.stock[id]||0,short:Math.max(0,qty-(n.stock[id]||0))})).filter(x=>x.short>0).sort((a,b)=>(b.short/b.qty)-(a.short/a.qty))[0];return missing?{...missing,output:recipe.output,score:demand*1.25+1}:null;}
+  function chooseNpcGoal(n){const hour=(world.minute/60)%24;const directNeed=topNeed(n),production=productionNeed(n),need=production&&production.score>directNeed.score?production:directNeed;n.productionPlan=need===production?{...production}:null;const night=hour>=21||hour<6;const scores={sleep:night?6+(100-n.energy)/15:(100-n.energy)/40,work:(hour>=7&&hour<18?4:0)+(n.role==='trader'?1:0),eat:n.hunger/14,seek:need.score*1.6,social:n.mood<45?2.5:0,idle:1};let goal=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
     n.seekSource=null;
     if(goal==='sleep'){n.target={...n.home};n.goalText='Heading home to rest';}
     else if(goal==='work'){n.target={...n.work};n.goalText=`Working as the ${n.role}`;}
     else if(goal==='eat'){const rowan=npcs.find(x=>x.id==='rowan');n.target=rowan?{x:rowan.x,y:rowan.y}:{x:870,y:680};n.goalText='Looking for food';}
-    else if(goal==='seek'){const id=need.id,supplier=supplierFor(n,id),spot=fieldSpot(id);if(supplier){n.seekSource=supplier.id;n.target={x:supplier.x,y:supplier.y};n.goalText=`Going to ${supplier.name} for ${itemDefs[id].name}`;}else if(spot){n.target=spot;n.goalText=`Going out for ${itemDefs[id].name}`;}else{n.target={x:870,y:680};n.goalText=`Trying to source ${itemDefs[id].name}`;}}
+    else if(goal==='seek'){const id=need.id,supplier=supplierFor(n,id),spot=fieldSpot(id,n),purpose=n.productionPlan?` to make ${itemDefs[n.productionPlan.output].name}`:'';if(supplier){n.seekSource=supplier.id;n.target={x:supplier.x,y:supplier.y};n.goalText=`Going to ${supplier.name} for ${itemDefs[id].name}${purpose}`;}else if(spot){n.target=spot;n.goalText=`Sourcing ${itemDefs[id].name}${purpose}`;}else{n.target={x:870,y:680};n.goalText=`Trying to source ${itemDefs[id].name}${purpose}`;}}
     else if(goal==='social'){const others=npcs.filter(o=>o!==n).sort((a,b)=>(n.relations?.[b.id]||0)-(n.relations?.[a.id]||0));const other=others[0]||n;n.target={x:other.x+25,y:other.y};n.goalText=`Checking in with ${other.name}`;}
     else{n.target={x:clamp(n.x+rand(-90,90),20,world.w-20),y:clamp(n.y+rand(-90,90),20,world.h-20)};n.goalText='Watching the day unfold';}
     n.goal=goal;n.request=requestFor(n);
@@ -119,7 +125,7 @@
   function npcExchange(n,need){const supplier=n.seekSource&&npcs.find(x=>x.id===n.seekSource);if(!supplier||supplier===n||n.exchangeCooldown>0||supplier.exchangeCooldown>0||dist(n,supplier)>50||(supplier.stock[need.id]||0)<1)return false;supplier.stock[need.id]--;n.stock[need.id]=(n.stock[need.id]||0)+1;n.trades=(n.trades||0)+1;supplier.trades=(supplier.trades||0)+1;n.exchangeCooldown=supplier.exchangeCooldown=9;relation(n,supplier,.25);relation(supplier,n,.15);memory(n,`${supplier.name} supplied ${itemDefs[need.id].name} when it mattered.`);memory(supplier,`${n.name} came to me for ${itemDefs[need.id].name}.`);log(`${supplier.name} supplied ${n.name} with ${itemDefs[need.id].name}.`,'npc');n.request=requestFor(n);return true;}
   function npcEconomy(n){
     if(n.goal==='eat'){const rowan=npcs.find(x=>x.id==='rowan');if(rowan&&rowan!==n&&dist(n,rowan)<55&&n.exchangeCooldown<=0&&(rowan.stock.bread||0)>0){rowan.stock.bread--;n.stock.bread=(n.stock.bread||0)+1;n.exchangeCooldown=5;memory(n,`${rowan.name} shared bread when supplies were thin.`);}if((n.stock.bread||0)>0&&n.hunger>35){n.stock.bread--;n.hunger=Math.max(0,n.hunger-60);n.mood=Math.min(100,n.mood+5);}}
-    if(n.goal==='seek'){const need=topNeed(n);if(need.score>.8&&!npcExchange(n,need)){const node=world.resources.find(r=>r.available&&r.type===need.id&&dist(n,r)<55);if(node){node.available=false;node.respawn=rand(80,140);n.stock[need.id]=(n.stock[need.id]||0)+1;memory(n,`Found ${itemDefs[need.id].name} without waiting for help.`);n.request=requestFor(n);}}}
+    if(n.goal==='seek'){const need=topNeed(n);if(need.score>.8&&!npcExchange(n,need)){const node=world.resources.find(r=>r.available&&r.type===need.id&&dist(n,r)<55);if(node){node.available=false;node.respawn=rand(80,140);n.stock[need.id]=(n.stock[need.id]||0)+1;memory(n,n.productionPlan?`Gathered ${itemDefs[need.id].name} to make ${itemDefs[n.productionPlan.output].name} for a shortage.`:`Found ${itemDefs[need.id].name} without waiting for help.`);n.request=requestFor(n);}}}
     if(n.role==='herbalist'&&n.productionCooldown<=0&&(n.stock.briarleaf||0)>=2&&(n.stock.mooncap||0)>=1){n.stock.briarleaf-=2;n.stock.mooncap-=1;n.stock.tonic=(n.stock.tonic||0)+1;n.productionCooldown=18;memory(n,'Prepared a Field Tonic from gathered plants.');}
     if(n.role==='smith'&&n.productionCooldown<=0&&(n.stock.iron||0)>=3&&(n.stock.wood||0)>=1){n.stock.iron-=3;n.stock.wood-=1;n.stock.pick=(n.stock.pick||0)+1;n.productionCooldown=24;memory(n,'Forged an Iron Pick for the Glen.');}
     if(n.role==='trader'&&n.productionCooldown<=0){n.stock.bread=(n.stock.bread||0)+1;n.productionCooldown=45;}
