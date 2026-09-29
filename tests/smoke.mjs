@@ -12,7 +12,7 @@ try{
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
-    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.6.0',{timeout:5000});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.7.0',{timeout:5000});
     let state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.length!==4)throw new Error(`${vp.name}: expected four autonomous NPCs`);
     if(!state.npcs.every(n=>n.goalText&&Array.isArray(n.memory)))throw new Error(`${vp.name}: NPC cognition surface missing`);
@@ -138,9 +138,34 @@ try{
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());brokerTamsin=state.npcs.find(n=>n.id==='tamsin');brokerMira=state.npcs.find(n=>n.id==='mira');
     if(!(brokerTamsin.relations?.mira>0)||!brokerTamsin.memory.some(m=>m.text.includes('promise you brokered'))||!brokerMira.memory.some(m=>m.text.includes('after you connected us')))throw new Error(`${vp.name}: brokered social history did not persist`);
 
+    const equipmentSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();const issued=d.npcArtifact('tamsin','blade');d.setNpcArtifactDurability('tamsin','blade',0);d.forceNpcNeed('mira','briarleaf');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');d.rethink('tamsin');d.advance(4);return{issued,wolfId,target};});
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
+    let equippedTamsin=state.npcs.find(n=>n.id==='tamsin'),equippedMira=state.npcs.find(n=>n.id==='mira');
+    const blockedWolfAlive=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===false,equipmentSetup.wolfId);
+    if(equipmentSetup.issued?.provenance?.maker!=='Alden'||!blockedWolfAlive||equippedTamsin.goal!=='gear'||equippedTamsin.request?.id!=='blade')throw new Error(`${vp.name}: broken Warden equipment did not block capability/create replacement need ${JSON.stringify({equipmentSetup,equippedTamsin})}`);
+    if(!equippedMira.blockedByDanger)throw new Error(`${vp.name}: danger report vanished while Warden lacked usable gear`);
+
+    const replacement=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setSkillLevel('smithing',2);d.give('iron',4,2.8);d.give('wood',1,2.5);d.give('hide',1,2.4);const crafted=d.craft('blade');const before=d.artifact('blade');const t=d.npc('tamsin');d.setPosition(t.x,t.y);const helped=d.help('tamsin');d.rethink('tamsin');return{crafted,helped,before,owned:d.npcArtifact('tamsin','blade')};});
+    if(!replacement.crafted||!replacement.helped||replacement.before?.provenance?.maker!=='You'||replacement.owned?.provenance?.maker!=='You')throw new Error(`${vp.name}: player-forged replacement blade did not transfer as the same living item ${JSON.stringify(replacement)}`);
+
+    for(let i=0;i<10;i++){
+      const dead=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===true,equipmentSetup.wolfId);
+      if(dead)break;
+      await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(4));
+    }
+    const replacementWolfDead=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===true,equipmentSetup.wolfId);
+    const usedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());equippedTamsin=state.npcs.find(n=>n.id==='tamsin');equippedMira=state.npcs.find(n=>n.id==='mira');
+    if(!replacementWolfDead||usedBlade?.provenance?.maker!=='You'||usedBlade.durability>=usedBlade.maxDurability||!usedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: owned Warden Blade did not determine/usefully wear through NPC capability ${JSON.stringify({usedBlade,equippedTamsin})}`);
+    if(!equippedTamsin.memory.some(m=>m.text.includes('blade you forged'))||!equippedMira.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!(equippedMira.relations?.tamsin>0))throw new Error(`${vp.name}: NPC capability use left no social/maker consequence ${JSON.stringify({equippedTamsin,equippedMira})}`);
+
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.7.0',{timeout:5000});
+    const persistedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
+    if(persistedBlade?.provenance?.maker!=='You'||persistedBlade.durability!==usedBlade.durability||!persistedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: NPC capability item history/condition did not persist ${JSON.stringify(persistedBlade)}`);
+
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
-    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production planning + risk-aware work + Fieldcraft detours + Rapport brokerage + Warden response + social memory + item lineage + Smithing repair history + meaningful items + skills + persistence`);
+    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production + risk-aware work + skill alternatives + social promises + equipment-dependent NPC capability + living item lineage + persistence`);
     await context.close();
   }
 } finally { await browser.close(); }
