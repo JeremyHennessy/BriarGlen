@@ -8,7 +8,7 @@ try{
     {name:'phone-portrait',width:390,height:844,touch:true},
   ]){
     const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch});
-    await context.addInitScript(()=>localStorage.clear());
+    await context.addInitScript(()=>{if(!sessionStorage.getItem('briar-reboot-smoke-init')){localStorage.clear();sessionStorage.setItem('briar-reboot-smoke-init','1')}});
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
