@@ -12,7 +12,7 @@ try{
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
-    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.5.0',{timeout:5000});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.6.0',{timeout:5000});
     let state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.length!==4)throw new Error(`${vp.name}: expected four autonomous NPCs`);
     if(!state.npcs.every(n=>n.goalText&&Array.isArray(n.memory)))throw new Error(`${vp.name}: NPC cognition surface missing`);
@@ -120,9 +120,27 @@ try{
     const tonicInTown=state.npcs.reduce((sum,n)=>sum+(n.stock.tonic||0),0);
     if(tonicInTown<1||!riskMira.memory.some(m=>m.text.includes('Gathered Briarleaf to make Field Tonic for a shortage'))||!riskMira.memory.some(m=>m.text.includes('Prepared a Field Tonic')))throw new Error(`${vp.name}: Mira did not resume and complete the interrupted production task after danger cleared ${JSON.stringify({riskMira,resumedTamsin})}`);
 
+    const brokered=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',1);d.setNpcStock('tamsin','tonic',0);d.forceNpcNeed('tamsin','tonic');const t=d.npc('tamsin');d.setPosition(t.x,t.y);return d.useSkill('rapport');});
+    if(!brokered)throw new Error(`${vp.name}: Rapport could not broker a live need`);
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
+    let brokerTamsin=state.npcs.find(n=>n.id==='tamsin'),brokerMira=state.npcs.find(n=>n.id==='mira');
+    if(brokerTamsin.goal!=='await'||brokerTamsin.brokeredNeed?.supplierId!=='mira'||brokerMira.goal!=='deliver'||brokerMira.socialCommitment?.requesterId!=='tamsin'||brokerMira.socialCommitment?.itemId!=='tonic')throw new Error(`${vp.name}: Rapport did not create a two-sided social commitment ${JSON.stringify({brokerTamsin,brokerMira})}`);
+    if(state.player.skills.rapport.xp<7||!brokerTamsin.memory.some(m=>m.text.includes('connected Mira'))||!brokerMira.memory.some(m=>m.text.includes("Tamsin's need")))throw new Error(`${vp.name}: Rapport commitment left no skill/social memory ${JSON.stringify({brokerTamsin,brokerMira})}`);
+    for(let i=0;i<8;i++){
+      const delivered=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npc('tamsin').memory.some(m=>m.text.includes('kept the Field Tonic promise you brokered')));
+      if(delivered)break;
+      await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(3));
+    }
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());brokerTamsin=state.npcs.find(n=>n.id==='tamsin');brokerMira=state.npcs.find(n=>n.id==='mira');
+    if((brokerTamsin.stock.tonic||0)<1||brokerTamsin.brokeredNeed||brokerMira.socialCommitment||!(brokerTamsin.relations?.mira>0)||!(brokerMira.relations?.tamsin>0)||brokerTamsin.trust<=0||brokerMira.trust<=0)throw new Error(`${vp.name}: brokered delivery did not resolve into real inventory/relationship consequences ${JSON.stringify({brokerTamsin,brokerMira})}`);
+    if(!brokerTamsin.memory.some(m=>m.text.includes('promise you brokered'))||!brokerMira.memory.some(m=>m.text.includes('after you connected us')))throw new Error(`${vp.name}: NPCs did not remember the player's brokerage ${JSON.stringify({brokerTamsin,brokerMira})}`);
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.snapshot?.().npcs?.length===4,{timeout:5000});
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());brokerTamsin=state.npcs.find(n=>n.id==='tamsin');brokerMira=state.npcs.find(n=>n.id==='mira');
+    if(!(brokerTamsin.relations?.mira>0)||!brokerTamsin.memory.some(m=>m.text.includes('promise you brokered'))||!brokerMira.memory.some(m=>m.text.includes('after you connected us')))throw new Error(`${vp.name}: brokered social history did not persist`);
+
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
-    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production planning + risk-aware work + Fieldcraft detours + Warden response + social memory + item lineage + Smithing repair history + meaningful items + skills + persistence`);
+    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production planning + risk-aware work + Fieldcraft detours + Rapport brokerage + Warden response + social memory + item lineage + Smithing repair history + meaningful items + skills + persistence`);
     await context.close();
   }
 } finally { await browser.close(); }
