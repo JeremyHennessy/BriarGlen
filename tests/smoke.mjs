@@ -12,7 +12,7 @@ try{
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
-    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.7.0',{timeout:5000});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.7.1',{timeout:5000});
     let state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.length!==4)throw new Error(`${vp.name}: expected four autonomous NPCs`);
     if(!state.npcs.every(n=>n.goalText&&Array.isArray(n.memory)))throw new Error(`${vp.name}: NPC cognition surface missing`);
@@ -75,6 +75,9 @@ try{
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     let lineageTamsin=state.npcs.find(n=>n.id==='tamsin');
     if(state.player.inventory.pick||lineageTamsin.stock.pick!==1||lineageTamsin.stockMeta?.pick?.provenance?.maker!=='You'||lineageTamsin.stockMeta.pick.provenance.repairs!==1||!lineageTamsin.memory.some(m=>m.text.includes('you made')))throw new Error(`${vp.name}: exact crafted item history did not transfer to NPC ownership ${JSON.stringify(lineageTamsin)}`);
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(8));
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());lineageTamsin=state.npcs.find(n=>n.id==='tamsin');
+    if(lineageTamsin.stock.pick!==1||lineageTamsin.stockMeta?.pick?.provenance?.maker!=='You'||lineageTamsin.stockMeta.pick.provenance.repairs!==1)throw new Error(`${vp.name}: stale artifact procurement replaced a fulfilled singular gear need ${JSON.stringify(lineageTamsin)}`);
     await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.snapshot?.().npcs?.length===4,{timeout:5000});
@@ -159,7 +162,7 @@ try{
     if(!replacementWolfDead||usedBlade?.provenance?.maker!=='You'||usedBlade.durability>=usedBlade.maxDurability||!usedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: owned Warden Blade did not determine/usefully wear through NPC capability ${JSON.stringify({usedBlade,equippedTamsin})}`);
     if(!equippedTamsin.memory.some(m=>m.text.includes('blade you forged'))||!equippedMira.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!(equippedMira.relations?.tamsin>0))throw new Error(`${vp.name}: NPC capability use left no social/maker consequence ${JSON.stringify({equippedTamsin,equippedMira})}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.7.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.7.1',{timeout:5000});
     const persistedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(persistedBlade?.provenance?.maker!=='You'||persistedBlade.durability!==usedBlade.durability||!persistedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: NPC capability item history/condition did not persist ${JSON.stringify(persistedBlade)}`);
 
