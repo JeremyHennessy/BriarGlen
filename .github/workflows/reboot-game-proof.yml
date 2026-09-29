@@ -1,0 +1,30 @@
+name: Reboot game proof
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax check
+        run: node --check src/game.js && node --check tests/smoke.mjs
+      - name: Install browser
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Serve game
+        run: |
+          python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
+          sleep 2
+      - name: Browser proof
+        run: node tests/smoke.mjs http://127.0.0.1:4173/
+      - name: Hosted proof
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: node tests/smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
