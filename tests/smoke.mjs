@@ -12,7 +12,7 @@ try{
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
-    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.2.0',{timeout:5000});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.3.0',{timeout:5000});
     let state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.length!==4)throw new Error(`${vp.name}: expected four autonomous NPCs`);
     if(!state.npcs.every(n=>n.goalText&&Array.isArray(n.memory)))throw new Error(`${vp.name}: NPC cognition surface missing`);
@@ -60,9 +60,28 @@ try{
     if(state.npcs.find(n=>n.id==='alden').trust<=0)throw new Error(`${vp.name}: NPC memory/trust did not persist`);
     if(state.player.inventory.pick?.qty!==1||state.player.inventory.blade?.durability!==0)throw new Error(`${vp.name}: important item state did not persist`);
     if(!(state.npcs.find(n=>n.id==='tamsin').relations?.mira>0))throw new Error(`${vp.name}: NPC relationship memory did not persist`);
+
+    const dangerSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',0);d.setNpcStock('mira','mooncap',0);d.forceNpcNeed('tamsin','tonic');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');return{wolfId,target};});
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
+    let riskMira=state.npcs.find(n=>n.id==='mira');
+    if(riskMira.goal!=='avoid'||riskMira.blockedByDanger?.enemyId!==dangerSetup.wolfId)throw new Error(`${vp.name}: civilian did not defer dangerous work ${JSON.stringify(riskMira)}`);
+    if(!riskMira.memory.some(m=>m.text.includes('wolf blocked the work')))throw new Error(`${vp.name}: civilian did not remember why work stopped`);
+
+    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.rethink('tamsin');d.advance(12);});
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
+    riskMira=state.npcs.find(n=>n.id==='mira');const riskTamsin=state.npcs.find(n=>n.id==='tamsin');
+    const wolfCleared=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===true,dangerSetup.wolfId);
+    if(!wolfCleared)throw new Error(`${vp.name}: Warden did not clear reported danger`);
+    if(riskMira.blockedByDanger)throw new Error(`${vp.name}: civilian danger block was not released`);
+    if(!(riskMira.relations?.tamsin>0)||!riskMira.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!riskTamsin.memory.some(m=>m.text.includes("blocking Mira's work")))throw new Error(`${vp.name}: danger response did not create social memory ${JSON.stringify({riskMira,riskTamsin})}`);
+
+    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.rethink('mira');d.advance(20);});
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());riskMira=state.npcs.find(n=>n.id==='mira');
+    if((riskMira.stock.briarleaf||0)<1)throw new Error(`${vp.name}: Mira did not resume the interrupted production task after danger cleared ${JSON.stringify(riskMira)}`);
+
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
-    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production planning + inter-NPC supply + memory + meaningful item condition + skill use + persistence`);
+    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production planning + risk-aware work + Warden response + social memory + meaningful items + skills + persistence`);
     await context.close();
   }
 } finally { await browser.close(); }
