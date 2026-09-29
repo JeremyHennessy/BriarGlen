@@ -217,7 +217,7 @@
     give:(id,qty=1,quality=1)=>{addItem(id,qty,quality);renderUI();save();return itemCount(id);},
     setPosition:(x,y)=>{player.x=x;player.y=y;return{x:player.x,y:player.y};},
     npc:(id)=>npcs.find(n=>n.id===id)||null,
-    forceNpcNeed:(npcId,itemId)=>{const n=npcs.find(x=>x.id===npcId);if(!n||!itemDefs[itemId])return false;const maxBias=Math.max(0,...Object.values(n.needBias||{}).map(v=>Number(v)||0));n.needBias[itemId]=maxBias+10;n.stock[itemId]=0;chooseNpcGoal(n);renderNearby(n,true);return true;},
+    forceNpcNeed:(npcId,itemId)=>{const n=npcs.find(x=>x.id===npcId);if(!n||!itemDefs[itemId])return false;const otherMax=Math.max(0,...Object.keys(n.needBias||{}).filter(id=>id!==itemId).map(id=>npcNeedScore(n,id)));n.stock[itemId]=0;const deficit=isArtifact(itemId)?1:3;n.needBias[itemId]=(otherMax+10)/deficit;chooseNpcGoal(n);renderNearby(n,true);return true;},
     setNpcStock:(npcId,itemId,qty)=>{const n=npcs.find(x=>x.id===npcId);if(!n||!itemDefs[itemId])return false;n.stock[itemId]=Math.max(0,Number(qty)||0);if(isArtifact(itemId)&&n.stock[itemId]<=0&&n.stockMeta)delete n.stockMeta[itemId];return true;},
     npcArtifact:(npcId,itemId)=>{const n=npcs.find(x=>x.id===npcId);return n?npcArtifactSnapshot(n,itemId):null;},
     setNpcArtifactDurability:(npcId,itemId,value)=>{const n=npcs.find(x=>x.id===npcId);if(!n)return false;const meta=npcArtifactState(n,itemId);if(!meta)return false;meta.durability=clamp(Number(value)||0,0,meta.maxDurability);return meta.durability;},
