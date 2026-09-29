@@ -1,871 +1,211 @@
 (() => {
   'use strict';
 
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d', { alpha: false });
-  const ui = {
-    zone: document.getElementById('zone-name'),
-    healthFill: document.getElementById('health-fill'),
-    healthLabel: document.getElementById('health-label'),
-    weapon: document.getElementById('weapon-label'),
-    coins: document.getElementById('coins-label'),
-    questText: document.getElementById('quest-text'),
-    questProgress: document.getElementById('quest-progress'),
-    herb: document.getElementById('herb-count'),
-    ore: document.getElementById('ore-count'),
-    tusk: document.getElementById('tusk-count'),
-    context: document.getElementById('context-prompt'),
-    toasts: document.getElementById('toast-stack'),
-    movePad: document.getElementById('move-pad'),
-    moveStick: document.getElementById('move-stick'),
-    attack: document.getElementById('attack-btn'),
-    dash: document.getElementById('dash-btn'),
-    interact: document.getElementById('interact-btn'),
-    reset: document.getElementById('reset-btn'),
-  };
-
-  const TAU = Math.PI * 2;
-  const SAVE_KEY = 'briar-glen-vslice-v1';
-  const WORLD = { minX: -1000, maxX: 2160, minY: -650, maxY: 650 };
-  const viewport = { w: innerWidth, h: innerHeight, dpr: 1 };
-  const camera = { x: -650, y: 0, zoom: 1, shake: 0 };
-  const keys = new Set();
-  const touchMove = { x: 0, y: 0, pointerId: null };
-
-  const player = {
-    x: -720, y: 30, vx: 0, vy: 0, radius: 23,
-    hp: 100, maxHp: 100, speed: 245,
-    facingX: 1, facingY: 0,
-    attackCd: 0, attackAnim: 0, dashCd: 0, dashTimer: 0,
-    invuln: 0, damage: 24, weapon: 'Worn Sword', coins: 100,
-    inventory: { herb: 0, ore: 0, tusk: 0 },
-    reinforced: false,
-  };
-
-  const progress = {
-    step: 0,
-    bossDefeated: false,
-    shortcutUnlocked: false,
-    contractComplete: false,
-    tipShown: false,
-  };
-
-  const particles = [];
-  const floaters = [];
-  const slashes = [];
-  const worldObjects = [];
-  const resources = [];
-  const enemies = [];
-
-  const zones = [
-    { name: 'BRIAR GLEN', min: -1000, max: -210, tint: '#49633d' },
-    { name: 'MEADOW ROAD', min: -210, max: 660, tint: '#536d3d' },
-    { name: 'COPPER HOLLOW', min: 660, max: 1430, tint: '#4d5540' },
-    { name: 'EMBERBACK DEN', min: 1430, max: 2160, tint: '#493c31' },
-  ];
-
-  const blockers = [
-    { x: -765, y: -285, r: 86 },
-    { x: -475, y: 280, r: 74 },
-    { x: -395, y: -265, r: 68 },
-    { x: 70, y: -360, r: 55 }, { x: 200, y: 330, r: 54 },
-    { x: 420, y: -350, r: 61 }, { x: 550, y: 330, r: 51 },
-    { x: 820, y: -320, r: 68 }, { x: 965, y: 340, r: 68 },
-    { x: 1170, y: -340, r: 85 }, { x: 1305, y: 335, r: 78 },
-    { x: 1575, y: -330, r: 67 }, { x: 1650, y: 320, r: 67 },
-    { x: 1865, y: -340, r: 72 }, { x: 1975, y: 330, r: 72 },
-  ];
-
-  function addObject(type, x, y, extra = {}) {
-    const o = { type, x, y, ...extra };
-    worldObjects.push(o);
-    return o;
-  }
-
-  function addResource(type, x, y) {
-    const r = { type, x, y, radius: 28, active: true, cooldown: 0 };
-    resources.push(r);
-    return r;
-  }
-
-  function addEnemy(type, x, y, opts = {}) {
-    const defaults = type === 'boss'
-      ? { name: 'Emberback', hp: 260, speed: 80, damage: 17, aggro: 410, attackRange: 66, scale: 1.75, color: '#8e4934' }
-      : type === 'boar'
-        ? { name: 'Hollow Boar', hp: 70, speed: 100, damage: 11, aggro: 300, attackRange: 52, scale: 1.05, color: '#725241' }
-        : { name: 'Briar Wolf', hp: 52, speed: 118, damage: 9, aggro: 280, attackRange: 47, scale: .9, color: '#596056' };
-    const e = {
-      type, x, y, homeX: x, homeY: y, radius: type === 'boss' ? 42 : 25,
-      hp: defaults.hp, maxHp: defaults.hp, speed: defaults.speed,
-      damage: defaults.damage, aggro: defaults.aggro, attackRange: defaults.attackRange,
-      scale: defaults.scale, color: defaults.color, name: defaults.name,
-      attackCd: Math.random() * .6, hurt: 0, dead: false, respawn: 0,
-      facingX: -1, facingY: 0, ...opts,
-    };
-    enemies.push(e);
-    return e;
-  }
-
-  addObject('forge', -470, 255, { label: 'Alden the Smith' });
-  addObject('board', -615, -118, { label: 'Contract Board' });
-  addObject('well', -800, 150);
-  addObject('banner', -260, 20);
-  addObject('shortcut', -845, -205, { destination: 'den', active: false, label: 'Old Rootway' });
-  addObject('shortcut', 2070, 115, { destination: 'town', active: false, label: 'Rootway Home' });
-
-  [[-55,-170],[110,140],[275,-110],[455,135],[575,-105]].forEach(([x,y]) => addResource('herb', x, y));
-  [[775,150],[900,-140],[1040,90],[1185,120],[1340,-105]].forEach(([x,y]) => addResource('ore', x, y));
-
-  addEnemy('wolf', 210, -230);
-  addEnemy('wolf', 450, 230);
-  addEnemy('boar', 950, 235);
-  addEnemy('boar', 1240, -205);
-  addEnemy('boss', 1900, 0);
-
-  const rand = mulberry32(4319);
-  for (let i = 0; i < 70; i++) {
-    const x = -930 + rand() * 1530;
-    const y = -560 + rand() * 1120;
-    if (Math.abs(y) < 105 && x > -250) continue;
-    addObject(rand() > .28 ? 'tree' : 'bush', x, y, { s: .7 + rand() * .7 });
-  }
-  for (let i = 0; i < 36; i++) {
-    const x = 690 + rand() * 720;
-    const y = -550 + rand() * 1100;
-    if (Math.abs(y) < 100) continue;
-    addObject(rand() > .4 ? 'rock' : 'deadTree', x, y, { s: .7 + rand() * .65 });
-  }
-  for (let i = 0; i < 24; i++) {
-    const x = 1450 + rand() * 650;
-    const y = -525 + rand() * 1050;
-    if (Math.abs(y) < 125) continue;
-    addObject(rand() > .35 ? 'denRock' : 'ember', x, y, { s: .7 + rand() * .7 });
-  }
-
-  function mulberry32(a) {
-    return function randFn() {
-      let t = a += 0x6D2B79F5;
-      t = Math.imul(t ^ t >>> 15, t | 1);
-      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-  }
-
-  function resize() {
-    viewport.w = innerWidth;
-    viewport.h = innerHeight;
-    viewport.dpr = Math.min(devicePixelRatio || 1, 2);
-    canvas.width = Math.floor(viewport.w * viewport.dpr);
-    canvas.height = Math.floor(viewport.h * viewport.dpr);
-    canvas.style.width = `${viewport.w}px`;
-    canvas.style.height = `${viewport.h}px`;
-    ctx.setTransform(viewport.dpr, 0, 0, viewport.dpr, 0, 0);
-    camera.zoom = viewport.w < 700 ? Math.max(.78, Math.min(1, viewport.w / 760)) : Math.min(1.12, viewport.w / 1450 + .28);
-  }
-
-  addEventListener('resize', resize, { passive: true });
-  resize();
-
-  function worldToScreen(x, y) {
-    const isoX = (x - y) * .78;
-    const isoY = (x + y) * .39;
-    const camIsoX = (camera.x - camera.y) * .78;
-    const camIsoY = (camera.x + camera.y) * .39;
-    const shakeX = camera.shake ? (Math.random() - .5) * camera.shake : 0;
-    const shakeY = camera.shake ? (Math.random() - .5) * camera.shake : 0;
-    return {
-      x: viewport.w / 2 + (isoX - camIsoX) * camera.zoom + shakeX,
-      y: viewport.h / 2 + (isoY - camIsoY) * camera.zoom + shakeY,
-    };
-  }
-
-  function zoneFor(x) {
-    return zones.find(z => x >= z.min && x < z.max) || zones[zones.length - 1];
-  }
-
-  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-  function norm(x, y) {
-    const d = Math.hypot(x, y) || 1;
-    return { x: x / d, y: y / d };
-  }
-
-  function collideMove(entity, dx, dy) {
-    let nx = clamp(entity.x + dx, WORLD.minX, WORLD.maxX);
-    let ny = clamp(entity.y + dy, WORLD.minY, WORLD.maxY);
-    for (const b of blockers) {
-      const vx = nx - b.x, vy = ny - b.y;
-      const minD = b.r + entity.radius;
-      const d = Math.hypot(vx, vy);
-      if (d < minD) {
-        const n = norm(vx, vy);
-        nx = b.x + n.x * minD;
-        ny = b.y + n.y * minD;
-      }
-    }
-    entity.x = nx;
-    entity.y = ny;
-  }
-
-  function spawnParticles(x, y, color, count = 8, force = 1) {
-    for (let i = 0; i < count; i++) {
-      const a = Math.random() * TAU;
-      const speed = (35 + Math.random() * 100) * force;
-      particles.push({
-        x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
-        z: 5 + Math.random() * 18, vz: 45 + Math.random() * 80,
-        life: .45 + Math.random() * .5, maxLife: 1, color,
-      });
-    }
-  }
-
-  function addFloater(x, y, text, color = '#f4e7c8') {
-    floaters.push({ x, y, text, color, life: 1, maxLife: 1 });
-  }
-
-  function toast(text) {
-    const el = document.createElement('div');
-    el.className = 'toast';
-    el.textContent = text;
-    ui.toasts.appendChild(el);
-    setTimeout(() => el.remove(), 2600);
-  }
-
-  function vibrate(ms = 20) {
-    if (navigator.vibrate) navigator.vibrate(ms);
-  }
-
-  function attack() {
-    if (player.attackCd > 0 || player.dashTimer > 0) return;
-    player.attackCd = player.reinforced ? .34 : .42;
-    player.attackAnim = .24;
-    const reach = player.reinforced ? 105 : 92;
-    slashes.push({ x: player.x, y: player.y, facingX: player.facingX, facingY: player.facingY, life: .22, maxLife: .22, reach });
-    let connected = false;
-    for (const e of enemies) {
-      if (e.dead) continue;
-      const d = dist(player, e);
-      if (d > reach + e.radius) continue;
-      const to = norm(e.x - player.x, e.y - player.y);
-      const dot = to.x * player.facingX + to.y * player.facingY;
-      if (dot < -.15) continue;
-      e.hp -= player.damage;
-      e.hurt = .16;
-      connected = true;
-      addFloater(e.x, e.y - 15, `-${player.damage}`, '#ffd49b');
-      spawnParticles(e.x, e.y, '#d6b178', 7, .8);
-      const knock = norm(e.x - player.x, e.y - player.y);
-      e.x += knock.x * 18;
-      e.y += knock.y * 18;
-      if (e.hp <= 0) killEnemy(e);
-    }
-    if (connected) {
-      camera.shake = 5;
-      vibrate(18);
-    }
-  }
-
-  function dash() {
-    if (player.dashCd > 0 || player.dashTimer > 0) return;
-    player.dashCd = 1.15;
-    player.dashTimer = .17;
-    player.invuln = .27;
-    spawnParticles(player.x, player.y, '#d7d0b8', 9, .7);
-    vibrate(12);
-  }
-
-  function killEnemy(e) {
-    e.dead = true;
-    e.respawn = e.type === 'boss' ? 99999 : 13 + Math.random() * 5;
-    e.hp = 0;
-    spawnParticles(e.x, e.y, e.type === 'boss' ? '#e1794e' : '#a69576', e.type === 'boss' ? 28 : 14, e.type === 'boss' ? 1.5 : 1);
-    if (e.type === 'boss') {
-      progress.bossDefeated = true;
-      progress.shortcutUnlocked = true;
-      player.inventory.tusk += 1;
-      player.coins += 75;
-      progress.step = Math.max(progress.step, 4);
-      worldObjects.filter(o => o.type === 'shortcut').forEach(o => o.active = true);
-      toast('Emberback defeated — Rootway shortcut unlocked');
-      addFloater(e.x, e.y - 35, 'EMBER TUSK +1', '#f4d49a');
-      camera.shake = 14;
-      saveGame();
-    } else {
-      player.coins += e.type === 'boar' ? 8 : 6;
-    }
-  }
-
-  function damagePlayer(amount, source) {
-    if (player.invuln > 0) return;
-    player.hp = Math.max(0, player.hp - amount);
-    player.invuln = .55;
-    camera.shake = 8;
-    addFloater(player.x, player.y - 20, `-${amount}`, '#ff9780');
-    spawnParticles(player.x, player.y, '#b65643', 8, .8);
-    vibrate(35);
-    if (source) {
-      const n = norm(player.x - source.x, player.y - source.y);
-      collideMove(player, n.x * 35, n.y * 35);
-    }
-    if (player.hp <= 0) {
-      toast('You were carried back to Briar Glen');
-      player.x = -720; player.y = 30; player.hp = player.maxHp; player.invuln = 1.4;
-    }
-  }
-
-  function nearestInteractable() {
-    const candidates = [];
-    for (const r of resources) if (r.active) candidates.push({ kind: 'resource', obj: r, d: dist(player, r) });
-    for (const o of worldObjects) {
-      if (['forge','board','shortcut'].includes(o.type)) candidates.push({ kind: o.type, obj: o, d: dist(player, o) });
-    }
-    candidates.sort((a, b) => a.d - b.d);
-    const c = candidates[0];
-    if (!c) return null;
-    const range = c.kind === 'shortcut' ? 105 : 90;
-    return c.d <= range ? c : null;
-  }
-
-  function interact() {
-    const near = nearestInteractable();
-    if (!near) {
-      toast('Nothing close enough to use');
-      return;
-    }
-    const { kind, obj } = near;
-    if (kind === 'resource') {
-      if (obj.type === 'herb') {
-        obj.active = false; obj.cooldown = 18;
-        player.inventory.herb += 1;
-        spawnParticles(obj.x, obj.y, '#7fbd62', 12, .7);
-        addFloater(obj.x, obj.y - 10, 'BRIARLEAF +1', '#b8e891');
-        if (player.inventory.herb >= 3 && progress.step === 0) {
-          progress.step = 1;
-          toast('Enough Briarleaf — continue to Copper Hollow');
-        }
-      } else {
-        obj.active = false; obj.cooldown = 22;
-        player.inventory.ore += 1;
-        spawnParticles(obj.x, obj.y, '#ba704d', 12, .75);
-        addFloater(obj.x, obj.y - 10, 'COPPER +1', '#e7a17b');
-        if (player.inventory.ore >= 3 && progress.step <= 1) {
-          progress.step = 2;
-          toast('Copper secured — return to Alden the Smith');
-        }
-      }
-      saveGame();
-      return;
-    }
-    if (kind === 'forge') {
-      craftSword();
-      return;
-    }
-    if (kind === 'board') {
-      if (progress.bossDefeated && player.inventory.tusk > 0 && !progress.contractComplete) {
-        progress.contractComplete = true;
-        progress.step = 5;
-        player.coins += 150;
-        toast('Contract complete — Smoke in the Hollow');
-        addFloater(obj.x, obj.y - 20, '+150 COINS', '#f4d49a');
-        saveGame();
-      } else if (progress.contractComplete) {
-        toast('Smoke in the Hollow — COMPLETE');
-      } else {
-        toast(objectiveText());
-      }
-      return;
-    }
-    if (kind === 'shortcut') {
-      if (!progress.shortcutUnlocked || !obj.active) {
-        toast('The Old Rootway is sealed');
-        return;
-      }
-      if (obj.destination === 'town') {
-        player.x = -860; player.y = -160;
-        progress.step = Math.max(progress.step, 4);
-        toast('Rootway → Briar Glen');
-      } else {
-        player.x = 2035; player.y = 90;
-        toast('Rootway → Emberback Den');
-      }
-      camera.x = player.x; camera.y = player.y;
-      saveGame();
-    }
-  }
-
-  function craftSword() {
-    if (player.reinforced) {
-      toast('Your Reinforced Sword is already equipped');
-      return;
-    }
-    if (player.inventory.ore < 3) {
-      toast(`Alden needs 3 Copper (${player.inventory.ore}/3)`);
-      return;
-    }
-    if (progress.step < 2) {
-      toast('Gather Briarleaf and Copper before forging');
-      return;
-    }
-    player.inventory.ore -= 3;
-    player.reinforced = true;
-    player.weapon = 'Reinforced Sword';
-    player.damage = 38;
-    progress.step = 3;
-    spawnParticles(-470, 255, '#f0b15e', 22, 1.1);
-    toast('Reinforced Sword forged — Emberback waits in the east');
-    saveGame();
-  }
-
-  function objectiveText() {
-    if (progress.contractComplete) return 'Contract complete. Briar Glen is safe for now.';
-    if (progress.step === 0) return 'Gather 3 Briarleaf along Meadow Road.';
-    if (progress.step === 1) return 'Mine 3 Copper in Copper Hollow.';
-    if (progress.step === 2) return 'Return to Alden the Smith and forge a Reinforced Sword.';
-    if (progress.step === 3) return 'Enter Emberback Den and defeat Emberback.';
-    if (progress.step === 4) return 'Use the Rootway shortcut home, then report to the Contract Board.';
-    return 'Return to the Contract Board in Briar Glen.';
-  }
-
-  function objectiveProgress() {
-    if (progress.step === 0) return `${Math.min(player.inventory.herb, 3)} / 3 BRIARLEAF`;
-    if (progress.step === 1) return `${Math.min(player.inventory.ore, 3)} / 3 COPPER`;
-    if (progress.step === 2) return `${player.inventory.ore} COPPER • ALDEN IN BRIAR GLEN`;
-    if (progress.step === 3) return player.reinforced ? 'REINFORCED SWORD EQUIPPED' : 'FORGE THE SWORD FIRST';
-    if (progress.step === 4) return 'ROOTWAY UNLOCKED';
-    if (progress.contractComplete) return 'COMPLETE • 150 COINS AWARDED';
-    return 'REPORT TO CONTRACT BOARD';
-  }
-
-  function update(dt) {
-    player.attackCd = Math.max(0, player.attackCd - dt);
-    player.attackAnim = Math.max(0, player.attackAnim - dt);
-    player.dashCd = Math.max(0, player.dashCd - dt);
-    player.dashTimer = Math.max(0, player.dashTimer - dt);
-    player.invuln = Math.max(0, player.invuln - dt);
-    camera.shake = Math.max(0, camera.shake - dt * 34);
-
-    let mx = 0, my = 0;
-    if (keys.has('KeyW') || keys.has('ArrowUp')) my -= 1;
-    if (keys.has('KeyS') || keys.has('ArrowDown')) my += 1;
-    if (keys.has('KeyA') || keys.has('ArrowLeft')) mx -= 1;
-    if (keys.has('KeyD') || keys.has('ArrowRight')) mx += 1;
-    mx += touchMove.x; my += touchMove.y;
-    if (mx || my) {
-      const n = norm(mx, my);
-      mx = n.x; my = n.y;
-      player.facingX = mx; player.facingY = my;
-    }
-    const moveSpeed = player.speed * (player.dashTimer > 0 ? 2.65 : 1);
-    collideMove(player, mx * moveSpeed * dt, my * moveSpeed * dt);
-
-    for (const r of resources) {
-      if (!r.active) {
-        r.cooldown -= dt;
-        if (r.cooldown <= 0) r.active = true;
-      }
-    }
-
-    for (const e of enemies) updateEnemy(e, dt);
-
-    for (const p of particles) {
-      p.x += p.vx * dt; p.y += p.vy * dt;
-      p.z += p.vz * dt; p.vz -= 180 * dt;
-      p.vx *= Math.pow(.2, dt); p.vy *= Math.pow(.2, dt);
-      p.life -= dt;
-    }
-    for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
-    for (const f of floaters) f.life -= dt;
-    for (let i = floaters.length - 1; i >= 0; i--) if (floaters[i].life <= 0) floaters.splice(i, 1);
-    for (const s of slashes) s.life -= dt;
-    for (let i = slashes.length - 1; i >= 0; i--) if (slashes[i].life <= 0) slashes.splice(i, 1);
-
-    const follow = 1 - Math.pow(.001, dt);
-    camera.x += (player.x - camera.x) * follow;
-    camera.y += (player.y - camera.y) * follow;
-
-    updateUI();
-  }
-
-  function updateEnemy(e, dt) {
-    e.attackCd = Math.max(0, e.attackCd - dt);
-    e.hurt = Math.max(0, e.hurt - dt);
-    if (e.dead) {
-      e.respawn -= dt;
-      if (e.respawn <= 0 && e.type !== 'boss') {
-        e.dead = false; e.hp = e.maxHp; e.x = e.homeX; e.y = e.homeY;
-      }
-      return;
-    }
-    const d = dist(e, player);
-    let tx = e.homeX, ty = e.homeY;
-    if (d < e.aggro) { tx = player.x; ty = player.y; }
-    const td = Math.hypot(tx - e.x, ty - e.y);
-    if (d < e.attackRange + player.radius && e.attackCd <= 0) {
-      e.attackCd = e.type === 'boss' ? .92 : 1.15;
-      damagePlayer(e.damage, e);
-      if (e.type === 'boss') {
-        spawnParticles(e.x, e.y, '#d56743', 10, 1.1);
-      }
-      return;
-    }
-    if (td > 12 && d > e.attackRange * .9) {
-      const n = norm(tx - e.x, ty - e.y);
-      e.facingX = n.x; e.facingY = n.y;
-      const slow = e.hurt > 0 ? .25 : 1;
-      collideMove(e, n.x * e.speed * slow * dt, n.y * e.speed * slow * dt);
-    }
-  }
-
-  function updateUI() {
-    const zone = zoneFor(player.x);
-    ui.zone.textContent = zone.name;
-    ui.healthFill.style.width = `${player.hp / player.maxHp * 100}%`;
-    ui.healthLabel.textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
-    ui.weapon.textContent = player.weapon;
-    ui.coins.textContent = `${player.coins} c`;
-    ui.questText.textContent = objectiveText();
-    ui.questProgress.textContent = objectiveProgress();
-    ui.herb.textContent = player.inventory.herb;
-    ui.ore.textContent = player.inventory.ore;
-    ui.tusk.textContent = player.inventory.tusk;
-
-    const near = nearestInteractable();
-    if (near) {
-      ui.context.hidden = false;
-      if (near.kind === 'resource') ui.context.textContent = near.obj.type === 'herb' ? 'USE • Gather Briarleaf' : 'USE • Mine Copper';
-      else if (near.kind === 'forge') ui.context.textContent = player.reinforced ? 'USE • Talk to Alden' : 'USE / C • Forge Reinforced Sword';
-      else if (near.kind === 'board') ui.context.textContent = progress.bossDefeated ? 'USE • Turn in contract' : 'USE • Read contract';
-      else ui.context.textContent = near.obj.active ? `USE • ${near.obj.label}` : 'Old Rootway • Sealed';
-    } else {
-      ui.context.hidden = true;
-    }
-  }
-
-  function draw() {
-    ctx.setTransform(viewport.dpr, 0, 0, viewport.dpr, 0, 0);
-    const zone = zoneFor(player.x);
-    ctx.fillStyle = '#111a14';
-    ctx.fillRect(0, 0, viewport.w, viewport.h);
-
-    drawGround(zone);
-    drawRoute();
-
-    const renderables = [];
-    for (const o of worldObjects) renderables.push({ depth: o.x + o.y, kind: 'object', obj: o });
-    for (const r of resources) if (r.active) renderables.push({ depth: r.x + r.y, kind: 'resource', obj: r });
-    for (const e of enemies) if (!e.dead) renderables.push({ depth: e.x + e.y, kind: 'enemy', obj: e });
-    renderables.push({ depth: player.x + player.y, kind: 'player', obj: player });
-    renderables.sort((a, b) => a.depth - b.depth);
-
-    for (const r of renderables) {
-      if (r.kind === 'object') drawObject(r.obj);
-      else if (r.kind === 'resource') drawResource(r.obj);
-      else if (r.kind === 'enemy') drawEnemy(r.obj);
-      else drawPlayer();
-    }
-
-    drawSlashes();
-    drawParticles();
-    drawFloaters();
-    drawVignette();
-  }
-
-  function drawGround(zone) {
-    const bg = zone.tint;
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, viewport.w, viewport.h);
-
-    for (const z of zones) {
-      const c1 = worldToScreen(z.min, -650);
-      const c2 = worldToScreen(z.max, -650);
-      const c3 = worldToScreen(z.max, 650);
-      const c4 = worldToScreen(z.min, 650);
-      ctx.beginPath(); ctx.moveTo(c1.x,c1.y); ctx.lineTo(c2.x,c2.y); ctx.lineTo(c3.x,c3.y); ctx.lineTo(c4.x,c4.y); ctx.closePath();
-      ctx.fillStyle = z.tint;
-      ctx.fill();
-    }
-
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(240,225,188,.055)';
-    for (let x = -1000; x <= 2200; x += 120) {
-      const a = worldToScreen(x, -650), b = worldToScreen(x, 650);
-      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-    }
-    for (let y = -650; y <= 650; y += 120) {
-      const a = worldToScreen(-1000, y), b = worldToScreen(2200, y);
-      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-    }
-
-    if (player.x > 1370) {
-      const g = ctx.createRadialGradient(viewport.w/2, viewport.h/2, 80, viewport.w/2, viewport.h/2, Math.max(viewport.w,viewport.h)*.8);
-      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(35,15,10,.34)');
-      ctx.fillStyle = g; ctx.fillRect(0,0,viewport.w,viewport.h);
-    }
-  }
-
-  function drawRoute() {
-    const pts = [
-      [-940,0],[-720,5],[-560,0],[-350,10],[-170,0],[120,-15],[380,15],[650,0],[880,5],[1130,-5],[1410,0],[1600,0],[1850,0],[2130,0]
-    ].map(([x,y]) => worldToScreen(x,y));
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = player.x > 1420 ? 'rgba(128,91,66,.65)' : 'rgba(155,133,91,.45)';
-    ctx.lineWidth = 58 * camera.zoom;
-    ctx.beginPath();
-    pts.forEach((p,i) => i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y));
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(232,213,171,.13)';
-    ctx.lineWidth = 4 * camera.zoom;
-    ctx.setLineDash([16 * camera.zoom, 20 * camera.zoom]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  function shadow(x, y, rx, ry, alpha = .28) {
-    const p = worldToScreen(x, y);
-    ctx.save();
-    ctx.translate(p.x, p.y + 7 * camera.zoom);
-    ctx.scale(1, .48);
-    ctx.beginPath(); ctx.ellipse(0,0,rx*camera.zoom,ry*camera.zoom,0,0,TAU);
-    ctx.fillStyle = `rgba(0,0,0,${alpha})`; ctx.fill(); ctx.restore();
-  }
-
-  function drawObject(o) {
-    const p = worldToScreen(o.x, o.y);
-    if (p.x < -180 || p.x > viewport.w + 180 || p.y < -200 || p.y > viewport.h + 180) return;
-    const z = camera.zoom;
-    const s = (o.s || 1) * z;
-
-    if (o.type === 'tree') {
-      shadow(o.x,o.y,26*s/z,17*s/z,.22);
-      ctx.fillStyle = '#493b2d'; ctx.fillRect(p.x-5*s,p.y-32*s,10*s,38*s);
-      circle(p.x-13*s,p.y-50*s,24*s,'#344d32');
-      circle(p.x+13*s,p.y-55*s,27*s,'#3e5b36');
-      circle(p.x,p.y-72*s,25*s,'#49683d');
-    } else if (o.type === 'bush') {
-      shadow(o.x,o.y,22*s/z,12*s/z,.18);
-      circle(p.x-10*s,p.y-16*s,16*s,'#3f6338'); circle(p.x+9*s,p.y-16*s,18*s,'#4e743f');
-    } else if (o.type === 'deadTree') {
-      shadow(o.x,o.y,25*s/z,14*s/z,.24);
-      ctx.strokeStyle='#50463a';ctx.lineWidth=9*s;ctx.lineCap='round';
-      ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x,p.y-55*s);ctx.lineTo(p.x-18*s,p.y-72*s);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(p.x,p.y-44*s);ctx.lineTo(p.x+21*s,p.y-63*s);ctx.stroke();
-    } else if (o.type === 'rock' || o.type === 'denRock') {
-      shadow(o.x,o.y,28*s/z,15*s/z,.28);
-      ctx.beginPath();
-      ctx.moveTo(p.x-27*s,p.y);ctx.lineTo(p.x-17*s,p.y-29*s);ctx.lineTo(p.x+7*s,p.y-38*s);ctx.lineTo(p.x+29*s,p.y-10*s);ctx.lineTo(p.x+20*s,p.y+2*s);ctx.closePath();
-      ctx.fillStyle=o.type==='denRock'?'#453b36':'#5f6254';ctx.fill();
-      ctx.strokeStyle='rgba(255,255,255,.08)';ctx.lineWidth=2;ctx.stroke();
-    } else if (o.type === 'ember') {
-      shadow(o.x,o.y,10*s/z,7*s/z,.12);
-      const flicker = Math.sin(performance.now()/170 + o.x)*3*s;
-      circle(p.x,p.y-8*s,7*s+flicker*.15,'rgba(221,98,56,.65)');
-      circle(p.x,p.y-11*s,3*s,'rgba(255,193,96,.9)');
-    } else if (o.type === 'forge') {
-      shadow(o.x,o.y,50,28,.3);
-      ctx.fillStyle='#5d4a37';ctx.fillRect(p.x-32*z,p.y-43*z,64*z,43*z);
-      ctx.fillStyle='#2d3028';ctx.beginPath();ctx.moveTo(p.x-40*z,p.y-42*z);ctx.lineTo(p.x,p.y-67*z);ctx.lineTo(p.x+40*z,p.y-42*z);ctx.closePath();ctx.fill();
-      ctx.fillStyle='#c06a3e';ctx.fillRect(p.x+17*z,p.y-24*z,9*z,16*z);
-      labelAt(p.x,p.y-78*z,'ALDEN • SMITH');
-    } else if (o.type === 'board') {
-      shadow(o.x,o.y,24,11,.2);
-      ctx.fillStyle='#5a4431';ctx.fillRect(p.x-4*z,p.y-34*z,8*z,34*z);ctx.fillRect(p.x-29*z,p.y-51*z,58*z,31*z);
-      ctx.strokeStyle='#a47b4b';ctx.lineWidth=2*z;ctx.strokeRect(p.x-25*z,p.y-47*z,50*z,23*z);
-      labelAt(p.x,p.y-61*z,'CONTRACT BOARD');
-    } else if (o.type === 'well') {
-      shadow(o.x,o.y,35,18,.25);
-      ctx.strokeStyle='#72725f';ctx.lineWidth=10*z;ctx.beginPath();ctx.ellipse(p.x,p.y-4*z,29*z,14*z,0,0,TAU);ctx.stroke();
-    } else if (o.type === 'banner') {
-      ctx.strokeStyle='#574636';ctx.lineWidth=5*z;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x,p.y-77*z);ctx.stroke();
-      ctx.fillStyle='#8a5741';ctx.beginPath();ctx.moveTo(p.x+3*z,p.y-72*z);ctx.lineTo(p.x+43*z,p.y-65*z);ctx.lineTo(p.x+32*z,p.y-39*z);ctx.lineTo(p.x+3*z,p.y-45*z);ctx.closePath();ctx.fill();
-    } else if (o.type === 'shortcut') {
-      shadow(o.x,o.y,34,18,.28);
-      ctx.strokeStyle=o.active?'rgba(191,213,137,.9)':'rgba(100,104,83,.75)';
-      ctx.lineWidth=8*z;ctx.beginPath();ctx.arc(p.x,p.y-18*z,25*z,Math.PI,TAU);ctx.stroke();
-      ctx.fillStyle=o.active?'rgba(129,169,89,.2)':'rgba(20,25,19,.28)';ctx.beginPath();ctx.ellipse(p.x,p.y-5*z,30*z,13*z,0,0,TAU);ctx.fill();
-      if(o.active){
-        ctx.strokeStyle='rgba(189,224,128,.4)';ctx.lineWidth=2*z;ctx.beginPath();ctx.arc(p.x,p.y-17*z,(16+Math.sin(performance.now()/250)*3)*z,0,TAU);ctx.stroke();
-      }
-      labelAt(p.x,p.y-55*z,o.destination==='town'?'ROOTWAY HOME':'OLD ROOTWAY');
-    }
-  }
-
-  function drawResource(r) {
-    const p = worldToScreen(r.x,r.y); const z = camera.zoom;
-    shadow(r.x,r.y,18,10,.18);
-    if(r.type==='herb'){
-      ctx.strokeStyle='#345632';ctx.lineWidth=4*z;ctx.lineCap='round';
-      for(let i=-2;i<=2;i++){
-        ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.quadraticCurveTo(p.x+i*5*z,p.y-12*z,p.x+i*8*z,p.y-(20+Math.abs(i)*2)*z);ctx.stroke();
-      }
-      circle(p.x-8*z,p.y-16*z,5*z,'#78b45f');circle(p.x+8*z,p.y-20*z,5*z,'#88c56a');
-    }else{
-      ctx.fillStyle='#6c6252';ctx.beginPath();ctx.moveTo(p.x-18*z,p.y);ctx.lineTo(p.x-12*z,p.y-22*z);ctx.lineTo(p.x+6*z,p.y-29*z);ctx.lineTo(p.x+20*z,p.y-8*z);ctx.lineTo(p.x+14*z,p.y+3*z);ctx.closePath();ctx.fill();
-      circle(p.x-5*z,p.y-12*z,5*z,'#b76f4b');circle(p.x+8*z,p.y-17*z,4*z,'#d08055');
-    }
-  }
-
-  function drawEnemy(e) {
-    const p=worldToScreen(e.x,e.y), z=camera.zoom*e.scale;
-    shadow(e.x,e.y,26*e.scale,15*e.scale,.3);
-    ctx.save();ctx.translate(p.x,p.y);
-    if(e.hurt>0) ctx.globalAlpha=.72;
-    ctx.fillStyle=e.hurt>0?'#e9c7a6':e.color;
-    ctx.beginPath();ctx.ellipse(0,-17*z,28*z,18*z,0,0,TAU);ctx.fill();
-    const fx=e.facingX*10*z, fy=e.facingY*4*z;
-    circle(fx+17*z, -25*z+fy, 14*z, e.hurt>0?'#efd0ad':e.color);
-    ctx.strokeStyle=e.color;ctx.lineWidth=6*z;ctx.lineCap='round';
-    for(const lx of [-14,11]){ctx.beginPath();ctx.moveTo(lx*z,-7*z);ctx.lineTo((lx-2)*z,6*z);ctx.stroke();}
-    if(e.type==='boss'){
-      ctx.fillStyle='#e2c397';
-      ctx.beginPath();ctx.moveTo(fx+22*z,-36*z+fy);ctx.lineTo(fx+35*z,-47*z+fy);ctx.lineTo(fx+30*z,-29*z+fy);ctx.closePath();ctx.fill();
-      ctx.beginPath();ctx.moveTo(fx+8*z,-36*z+fy);ctx.lineTo(fx+2*z,-50*z+fy);ctx.lineTo(fx+17*z,-31*z+fy);ctx.closePath();ctx.fill();
-    }
-    ctx.restore();
-
-    if(e.hp<e.maxHp || e.type==='boss'){
-      const w=(e.type==='boss'?110:58)*camera.zoom;
-      const y=p.y-(e.type==='boss'?90:58)*camera.zoom;
-      ctx.fillStyle='rgba(0,0,0,.45)';roundRect(p.x-w/2,y,w,7*camera.zoom,4*camera.zoom);ctx.fill();
-      ctx.fillStyle=e.type==='boss'?'#b9543d':'#b86a50';roundRect(p.x-w/2,y,w*(e.hp/e.maxHp),7*camera.zoom,4*camera.zoom);ctx.fill();
-      if(e.type==='boss') labelAt(p.x,y-9*camera.zoom,'EMBERBACK');
-    }
-  }
-
-  function drawPlayer() {
-    const p=worldToScreen(player.x,player.y), z=camera.zoom;
-    shadow(player.x,player.y,22,13,.32);
-    const blink=player.invuln>0 && Math.floor(player.invuln*18)%2===0;
-    ctx.save();ctx.translate(p.x,p.y);ctx.globalAlpha=blink?.55:1;
-    ctx.fillStyle='#3f604a';ctx.beginPath();ctx.moveTo(-16*z,0);ctx.lineTo(-12*z,-37*z);ctx.lineTo(0,-48*z);ctx.lineTo(14*z,-37*z);ctx.lineTo(18*z,2*z);ctx.closePath();ctx.fill();
-    circle(0,-48*z,11*z,'#c6a47f');
-    ctx.fillStyle='#2c362f';ctx.beginPath();ctx.arc(0,-50*z,12*z,Math.PI,TAU);ctx.fill();
-    const a=Math.atan2(player.facingY,player.facingX);
-    ctx.save();ctx.translate(player.facingX*10*z,-22*z+player.facingY*4*z);ctx.rotate(a*.55+.15);
-    ctx.strokeStyle=player.reinforced?'#e1d6b7':'#b5b0a0';ctx.lineWidth=(player.reinforced?5:4)*z;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(25*z,-15*z);ctx.stroke();
-    ctx.strokeStyle='#8d623c';ctx.lineWidth=5*z;ctx.beginPath();ctx.moveTo(-3*z,2*z);ctx.lineTo(4*z,-3*z);ctx.stroke();ctx.restore();
-    ctx.restore();
-  }
-
-  function drawSlashes(){
-    for(const s of slashes){
-      const p=worldToScreen(s.x,s.y), a=Math.atan2(s.facingY,s.facingX), t=s.life/s.maxLife;
-      ctx.save();ctx.translate(p.x,p.y-20*camera.zoom);ctx.rotate(a*.6);
-      ctx.strokeStyle=`rgba(247,226,177,${t*.75})`;ctx.lineWidth=6*camera.zoom;ctx.lineCap='round';
-      ctx.beginPath();ctx.arc(0,0,s.reach*.58*camera.zoom,-1.1,.65);ctx.stroke();ctx.restore();
-    }
-  }
-
-  function drawParticles(){
-    for(const p of particles){
-      const s=worldToScreen(p.x,p.y);const alpha=clamp(p.life/.5,0,1);
-      ctx.globalAlpha=alpha;circle(s.x,s.y-p.z*camera.zoom,2.5*camera.zoom,p.color);ctx.globalAlpha=1;
-    }
-  }
-
-  function drawFloaters(){
-    ctx.textAlign='center';ctx.font=`800 ${Math.max(10,12*camera.zoom)}px system-ui`;
-    for(const f of floaters){
-      const p=worldToScreen(f.x,f.y);const age=1-f.life/f.maxLife;
-      ctx.globalAlpha=clamp(f.life*1.5,0,1);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(f.text,p.x+1,p.y-32-age*28+1);ctx.fillStyle=f.color;ctx.fillText(f.text,p.x,p.y-32-age*28);ctx.globalAlpha=1;
-    }
-  }
-
-  function drawVignette(){
-    const g=ctx.createRadialGradient(viewport.w/2,viewport.h/2,Math.min(viewport.w,viewport.h)*.25,viewport.w/2,viewport.h/2,Math.max(viewport.w,viewport.h)*.72);
-    g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(4,9,6,.32)');ctx.fillStyle=g;ctx.fillRect(0,0,viewport.w,viewport.h);
-  }
-
-  function circle(x,y,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();}
-  function roundRect(x,y,w,h,r){
-    const rr=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath();
-  }
-  function labelAt(x,y,text){
-    ctx.font=`800 ${Math.max(8,9*camera.zoom)}px system-ui`;ctx.textAlign='center';ctx.fillStyle='rgba(244,233,208,.84)';ctx.fillText(text,x,y);
-  }
-
-  function saveGame(){
-    const state={
-      player:{x:player.x,y:player.y,hp:player.hp,coins:player.coins,inventory:player.inventory,reinforced:player.reinforced},
-      progress:{...progress}
-    };
-    try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));}catch(_){ }
-  }
-
-  function loadGame(){
-    try{
-      const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;
-      const state=JSON.parse(raw);
-      if(state.player){
-        player.x=Number.isFinite(state.player.x)?state.player.x:player.x;
-        player.y=Number.isFinite(state.player.y)?state.player.y:player.y;
-        player.hp=state.player.hp||player.maxHp;
-        player.coins=state.player.coins??player.coins;
-        player.inventory={...player.inventory,...state.player.inventory};
-        player.reinforced=!!state.player.reinforced;
-        if(player.reinforced){player.weapon='Reinforced Sword';player.damage=38;}
-      }
-      if(state.progress)Object.assign(progress,state.progress);
-      if(progress.shortcutUnlocked)worldObjects.filter(o=>o.type==='shortcut').forEach(o=>o.active=true);
-      const boss=enemies.find(e=>e.type==='boss');if(progress.bossDefeated&&boss){boss.dead=true;boss.hp=0;boss.respawn=99999;}
-      camera.x=player.x;camera.y=player.y;
-    }catch(_){ }
-  }
-
-  loadGame();
-  updateUI();
-
-  addEventListener('keydown',e=>{
-    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
-    keys.add(e.code);
-    if(!e.repeat){
-      if(e.code==='Space'||e.code==='KeyJ')attack();
-      if(e.code==='ShiftLeft'||e.code==='ShiftRight'||e.code==='KeyK')dash();
-      if(e.code==='KeyE')interact();
-      if(e.code==='KeyC')craftSword();
-    }
+  const BUILD = Object.freeze({version:'0.2.0',id:'living-world-reboot',saveKey:'briar-glen-reboot-v1'});
+  const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+  const UI={clock:document.getElementById('clock'),coins:document.getElementById('coins'),hp:document.getElementById('hp'),energy:document.getElementById('energy'),standing:document.getElementById('standing'),knownFor:document.getElementById('known-for'),skills:document.getElementById('skills'),inventory:document.getElementById('inventory'),packWeight:document.getElementById('pack-weight'),nearby:document.getElementById('nearby'),nearbyType:document.getElementById('nearby-type'),log:document.getElementById('log'),toast:document.getElementById('toast'),worldLine:document.getElementById('world-line')};
+  const TAU=Math.PI*2,clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  const rand=(a,b)=>a+Math.random()*(b-a);
+
+  const itemDefs=Object.freeze({
+    briarleaf:{name:'Briarleaf',weight:.2,base:4,kind:'herb',color:'#8fcf72'},
+    mooncap:{name:'Mooncap',weight:.2,base:9,kind:'herb',color:'#b9a3d9'},
+    iron:{name:'Iron Ore',weight:1.2,base:12,kind:'ore',color:'#9fa8ad'},
+    wood:{name:'Ashwood',weight:.8,base:7,kind:'wood',color:'#aa8457'},
+    hide:{name:'Wolf Hide',weight:.7,base:15,kind:'hide',color:'#b99878'},
+    bread:{name:'Brown Bread',weight:.3,base:6,kind:'food',color:'#d7ad69'},
+    tonic:{name:'Field Tonic',weight:.2,base:22,kind:'medicine',color:'#7fcaad'},
+    pick:{name:'Iron Pick',weight:2,base:50,kind:'tool',color:'#b9c1c4'},
+    blade:{name:'Warden Blade',weight:2.4,base:80,kind:'weapon',color:'#d2d6d7'},
   });
+
+  const recipes=Object.freeze({
+    tonic:{skill:'herbcraft',level:1,input:{briarleaf:2,mooncap:1},output:'tonic'},
+    pick:{skill:'smithing',level:1,input:{iron:3,wood:1},output:'pick'},
+    blade:{skill:'smithing',level:2,input:{iron:4,wood:1,hide:1},output:'blade'},
+  });
+
+  const skillDefs=Object.freeze({
+    fieldcraft:{name:'Fieldcraft',key:'1',active:'Survey',desc:'See nearby resources and their quality.'},
+    smithing:{name:'Smithing',key:'2',active:'Mend',desc:'Repair your tool or blade using iron.'},
+    guard:{name:'Guard',key:'3',active:'Brace',desc:'Block the next hit and counter.'},
+    rapport:{name:'Rapport',key:'4',active:'Read Need',desc:'Reveal what a nearby person actually wants.'},
+    herbcraft:{name:'Herbcraft',key:null,active:null,desc:'Brew useful medicine from plants.'},
+  });
+
+  const world={w:1800,h:1200,minute:8*60,day:1,weather:'clear',weatherTimer:220,events:[],resources:[],enemies:[],drops:[],townNeeds:{food:0,medicine:0,metal:0},serial:1};
+  const camera={x:0,y:0};
+  const player={x:900,y:600,r:12,speed:170,hp:100,maxHp:100,energy:100,maxEnergy:100,coins:24,attackCd:0,attackArc:0,guarded:false,surveyUntil:0,readNeedUntil:0,equippedTool:null,equippedWeapon:null,knownFor:'nothing yet',standing:'Unknown',inventory:{},skills:{}};
+  for(const key of Object.keys(skillDefs))player.skills[key]={xp:0,level:1};
+
+  const zones=[
+    {id:'village',name:'Briar Glen',x:650,y:390,w:500,h:420,color:'#596c4e'},
+    {id:'forest',name:'Greenwood',x:1160,y:220,w:560,h:470,color:'#354b34'},
+    {id:'quarry',name:'Old Quarry',x:80,y:180,w:520,h:470,color:'#51504c'},
+    {id:'marsh',name:'Moss Fen',x:1020,y:760,w:640,h:360,color:'#3a5550'},
+    {id:'meadow',name:'South Meadow',x:160,y:720,w:720,h:390,color:'#60784f'},
+  ];
+
+  const buildings=[
+    {id:'forge',name:'Alden’s Forge',x:760,y:500,w:105,h:80,color:'#714a36'},
+    {id:'apothecary',name:'Mira’s Garden',x:930,y:465,w:110,h:75,color:'#4e704a'},
+    {id:'market',name:'Rowan’s Stall',x:820,y:650,w:120,h:62,color:'#7b6741'},
+    {id:'hall',name:'Warden Hall',x:990,y:625,w:110,h:78,color:'#5d615f'},
+  ];
+
+  const npcTemplates=[
+    {id:'alden',name:'Alden',role:'smith',home:{x:812,y:545},work:{x:812,y:545},color:'#c48b63',needBias:{iron:1.8,wood:1.1,bread:1}},
+    {id:'mira',name:'Mira',role:'herbalist',home:{x:985,y:520},work:{x:985,y:520},color:'#8fb783',needBias:{briarleaf:1.4,mooncap:1.8,bread:1}},
+    {id:'rowan',name:'Rowan',role:'trader',home:{x:870,y:680},work:{x:870,y:680},color:'#d1b26c',needBias:{bread:1.7,tonic:1,wood:.8}},
+    {id:'tamsin',name:'Tamsin',role:'warden',home:{x:1030,y:670},work:{x:1110,y:570},color:'#7aa2c3',needBias:{tonic:1.5,hide:1.3,bread:1}},
+  ];
+
+  let npcs=[];
+  function newNPC(t){return{...t,x:t.home.x,y:t.home.y,r:11,energy:80,hunger:20,mood:60,trust:0,goal:'idle',goalText:'Taking stock',target:{...t.home},memory:[],relations:{},stock:{bread:1},request:null,think:0,productionCooldown:0,exchangeCooldown:0,seekSource:null,trades:0,lastPlayerHelp:0};}
+
+  function qualityLabel(q){return q>=2.6?'fine':q>=1.7?'good':'plain';}
+  function itemCount(id){return player.inventory[id]?.qty||0;}
+  function addItem(id,qty=1,quality=1){if(!itemDefs[id])return;const slot=player.inventory[id]||(player.inventory[id]={qty:0,qualitySum:0,durability:itemDefs[id].kind==='tool'||itemDefs[id].kind==='weapon'?100:null});slot.qty+=qty;slot.qualitySum+=quality*qty;if(slot.durability==null&&(itemDefs[id].kind==='tool'||itemDefs[id].kind==='weapon'))slot.durability=100;log(`Picked up ${qty} ${itemDefs[id].name}${quality>1.05?` (${qualityLabel(quality)})`:''}.`,'world');}
+  function removeItem(id,qty=1){const slot=player.inventory[id];if(!slot||slot.qty<qty)return false;const avg=slot.qualitySum/slot.qty;slot.qty-=qty;slot.qualitySum=Math.max(0,slot.qualitySum-avg*qty);if(slot.qty<=0){delete player.inventory[id];if(player.equippedTool===id)player.equippedTool=null;if(player.equippedWeapon===id)player.equippedWeapon=null;}return true;}
+  function avgQuality(id){const s=player.inventory[id];return s&&s.qty?s.qualitySum/s.qty:1;}
+  function hasItems(req){return Object.entries(req).every(([id,q])=>itemCount(id)>=q);}
+  function consume(req){if(!hasItems(req))return false;for(const [id,q] of Object.entries(req))removeItem(id,q);return true;}
+  function inventoryWeight(){return Object.entries(player.inventory).reduce((sum,[id,s])=>sum+(itemDefs[id]?.weight||0)*s.qty,0);}
+
+  function skillXp(id,amount){const s=player.skills[id];if(!s)return;const before=s.level;s.xp+=amount;while(s.xp>=s.level*40&&s.level<5){s.xp-=s.level*40;s.level++;}if(s.level>before){toast(`${skillDefs[id].name} reached ${s.level}`);log(`${skillDefs[id].name} improved. New actions may be stronger.`,'world');}}
+  function useSkill(id){const s=player.skills[id];if(!s)return false;
+    if(id==='fieldcraft'){if(player.energy<8){toast('Too tired to survey');return false;}player.surveyUntil=performance.now()+7000;player.energy-=8;skillXp(id,3);toast('Survey: quality and resources revealed');return true;}
+    if(id==='smithing'){const target=player.equippedWeapon||player.equippedTool;if(!target||!player.inventory[target]){toast('Equip a tool or blade first');return false;}if(itemCount('iron')<1){toast('Mend needs 1 Iron Ore');return false;}removeItem('iron',1);player.inventory[target].durability=clamp((player.inventory[target].durability||0)+35,0,100);skillXp(id,4);save();toast(`${itemDefs[target].name} mended`);return true;}
+    if(id==='guard'){if(player.energy<10){toast('Too tired to brace');return false;}player.energy-=10;player.guarded=true;skillXp(id,2);toast('Braced: next hit will be blocked');return true;}
+    if(id==='rapport'){const n=nearestNPC(110);if(!n){toast('No one close enough to read');return false;}player.readNeedUntil=performance.now()+8000;n.memory.push({day:world.day,text:`You paid attention when ${n.goalText.toLowerCase()}.`});skillXp(id,3);toast(`${n.name}: ${npcNeedText(n)}`);return true;}
+    return false;
+  }
+
+  function log(text,type='world'){world.events.push({id:world.serial++,text,type,day:world.day,minute:world.minute});if(world.events.length>70)world.events.shift();renderLog();}
+  let toastTimer=0;function toast(text){UI.toast.textContent=text;UI.toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>UI.toast.classList.remove('show'),1500);}
+
+  function zoneAt(x,y){return zones.find(z=>x>=z.x&&x<=z.x+z.w&&y>=z.y&&y<=z.y+z.h)||null;}
+  function spawnResource(type,x,y,quality=1){world.resources.push({id:`r${world.serial++}`,type,x,y,r:type==='iron'?12:9,quality,respawn:0,available:true});}
+  function seedResources(){world.resources.length=0;
+    for(let i=0;i<16;i++)spawnResource('briarleaf',rand(180,830),rand(760,1060),rand(.9,1.8));
+    for(let i=0;i<10;i++)spawnResource('mooncap',rand(1220,1660),rand(780,1080),rand(1.1,2.4));
+    for(let i=0;i<14;i++)spawnResource('iron',rand(140,540),rand(250,610),rand(.8,2.5));
+    for(let i=0;i<14;i++)spawnResource('wood',rand(1210,1680),rand(270,640),rand(.8,2.2));
+  }
+  function spawnWolf(x,y){world.enemies.push({id:`w${world.serial++}`,type:'wolf',x,y,r:12,hp:36,maxHp:36,attackCd:0,wander:rand(0,10),dead:false});}
+  function seedEnemies(){world.enemies.length=0;for(let i=0;i<6;i++)spawnWolf(rand(1240,1670),rand(300,650));for(let i=0;i<3;i++)spawnWolf(rand(350,800),rand(820,1040));}
+
+  function reset(){world.minute=8*60;world.day=1;world.weather='clear';world.weatherTimer=220;world.events=[];world.serial=1;player.x=900;player.y=600;player.hp=100;player.energy=100;player.coins=24;player.inventory={};player.equippedTool=null;player.equippedWeapon=null;player.knownFor='nothing yet';player.standing='Unknown';for(const k of Object.keys(player.skills))player.skills[k]={xp:0,level:1};npcs=npcTemplates.map(newNPC);seedResources();seedEnemies();addItem('bread',2,1);log('A new day begins in Briar Glen. Everyone here has needs of their own.','world');save();}
+
+  function memory(n,text){n.memory.push({day:world.day,text});if(n.memory.length>12)n.memory.shift();}
+  function npcNeedScore(n,id){const stock=n.stock[id]||0,bias=n.needBias[id]||0;return bias*Math.max(0,3-stock)+(id==='bread'?n.hunger/35:0);}
+  function topNeed(n){let best={id:'bread',score:0};for(const id of Object.keys(n.needBias)){const score=npcNeedScore(n,id);if(score>best.score)best={id,score};}return best;}
+  function npcNeedText(n){const need=topNeed(n);return need.score>.6?`${itemDefs[need.id].name} matters most right now.`:'No urgent shortage.';}
+  function requestFor(n){const need=topNeed(n);if(need.score<1.1)return null;const qty=need.score>3?2:1;const reward=Math.round(itemDefs[need.id].base*qty*(1.35+need.score*.08));return{id:need.id,qty,reward,createdDay:world.day};}
+  function fieldSpot(id){return id==='iron'?{x:360,y:430}:id==='wood'?{x:1430,y:450}:id==='mooncap'?{x:1370,y:930}:id==='briarleaf'?{x:520,y:900}:null;}
+  function supplierFor(seeker,id){const preferred=id==='bread'?'rowan':id==='tonic'?'mira':id==='pick'||id==='blade'?'alden':null;const candidates=npcs.filter(o=>o!==seeker&&(o.stock?.[id]||0)>0);candidates.sort((a,b)=>((b.id===preferred)- (a.id===preferred))||((b.stock[id]||0)-(a.stock[id]||0)));return candidates[0]||null;}
+  function relation(a,b,delta){a.relations??={};a.relations[b.id]=clamp((a.relations[b.id]||0)+delta,-5,10);}
+  function chooseNpcGoal(n){const hour=(world.minute/60)%24;const need=topNeed(n);const night=hour>=21||hour<6;const scores={sleep:night?6+(100-n.energy)/15:(100-n.energy)/40,work:(hour>=7&&hour<18?4:0)+(n.role==='trader'?1:0),eat:n.hunger/14,seek:need.score*1.6,social:n.mood<45?2.5:0,idle:1};let goal=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
+    n.seekSource=null;
+    if(goal==='sleep'){n.target={...n.home};n.goalText='Heading home to rest';}
+    else if(goal==='work'){n.target={...n.work};n.goalText=`Working as the ${n.role}`;}
+    else if(goal==='eat'){const rowan=npcs.find(x=>x.id==='rowan');n.target=rowan?{x:rowan.x,y:rowan.y}:{x:870,y:680};n.goalText='Looking for food';}
+    else if(goal==='seek'){const id=need.id,supplier=supplierFor(n,id),spot=fieldSpot(id);if(supplier){n.seekSource=supplier.id;n.target={x:supplier.x,y:supplier.y};n.goalText=`Going to ${supplier.name} for ${itemDefs[id].name}`;}else if(spot){n.target=spot;n.goalText=`Going out for ${itemDefs[id].name}`;}else{n.target={x:870,y:680};n.goalText=`Trying to source ${itemDefs[id].name}`;}}
+    else if(goal==='social'){const others=npcs.filter(o=>o!==n).sort((a,b)=>(n.relations?.[b.id]||0)-(n.relations?.[a.id]||0));const other=others[0]||n;n.target={x:other.x+25,y:other.y};n.goalText=`Checking in with ${other.name}`;}
+    else{n.target={x:clamp(n.x+rand(-90,90),20,world.w-20),y:clamp(n.y+rand(-90,90),20,world.h-20)};n.goalText='Watching the day unfold';}
+    n.goal=goal;n.request=requestFor(n);
+  }
+
+  function npcExchange(n,need){const supplier=n.seekSource&&npcs.find(x=>x.id===n.seekSource);if(!supplier||supplier===n||n.exchangeCooldown>0||supplier.exchangeCooldown>0||dist(n,supplier)>50||(supplier.stock[need.id]||0)<1)return false;supplier.stock[need.id]--;n.stock[need.id]=(n.stock[need.id]||0)+1;n.trades=(n.trades||0)+1;supplier.trades=(supplier.trades||0)+1;n.exchangeCooldown=supplier.exchangeCooldown=9;relation(n,supplier,.25);relation(supplier,n,.15);memory(n,`${supplier.name} supplied ${itemDefs[need.id].name} when it mattered.`);memory(supplier,`${n.name} came to me for ${itemDefs[need.id].name}.`);log(`${supplier.name} supplied ${n.name} with ${itemDefs[need.id].name}.`,'npc');n.request=requestFor(n);return true;}
+  function npcEconomy(n){
+    if(n.goal==='eat'){const rowan=npcs.find(x=>x.id==='rowan');if(rowan&&rowan!==n&&dist(n,rowan)<55&&n.exchangeCooldown<=0&&(rowan.stock.bread||0)>0){rowan.stock.bread--;n.stock.bread=(n.stock.bread||0)+1;n.exchangeCooldown=5;memory(n,`${rowan.name} shared bread when supplies were thin.`);}if((n.stock.bread||0)>0&&n.hunger>35){n.stock.bread--;n.hunger=Math.max(0,n.hunger-60);n.mood=Math.min(100,n.mood+5);}}
+    if(n.goal==='seek'){const need=topNeed(n);if(need.score>.8&&!npcExchange(n,need)){const node=world.resources.find(r=>r.available&&r.type===need.id&&dist(n,r)<55);if(node){node.available=false;node.respawn=rand(80,140);n.stock[need.id]=(n.stock[need.id]||0)+1;memory(n,`Found ${itemDefs[need.id].name} without waiting for help.`);n.request=requestFor(n);}}}
+    if(n.role==='herbalist'&&n.productionCooldown<=0&&(n.stock.briarleaf||0)>=2&&(n.stock.mooncap||0)>=1){n.stock.briarleaf-=2;n.stock.mooncap-=1;n.stock.tonic=(n.stock.tonic||0)+1;n.productionCooldown=18;memory(n,'Prepared a Field Tonic from gathered plants.');}
+    if(n.role==='smith'&&n.productionCooldown<=0&&(n.stock.iron||0)>=3&&(n.stock.wood||0)>=1){n.stock.iron-=3;n.stock.wood-=1;n.stock.pick=(n.stock.pick||0)+1;n.productionCooldown=24;memory(n,'Forged an Iron Pick for the Glen.');}
+    if(n.role==='trader'&&n.productionCooldown<=0){n.stock.bread=(n.stock.bread||0)+1;n.productionCooldown=45;}
+  }
+
+  function updateNPC(n,dt){n.relations??={};n.productionCooldown=Math.max(0,(n.productionCooldown||0)-dt);n.exchangeCooldown=Math.max(0,(n.exchangeCooldown||0)-dt);n.think=(n.think||0)-dt;n.hunger=clamp(n.hunger+dt*.45,0,100);n.energy=clamp(n.energy-dt*(n.goal==='sleep'?-2.5:.18),0,100);n.mood=clamp(n.mood+dt*((n.hunger<55?1:-1)*.08),0,100);if(n.think<=0){chooseNpcGoal(n);n.think=rand(3,7);}const dx=n.target.x-n.x,dy=n.target.y-n.y,d=Math.hypot(dx,dy);if(d>4){const speed=n.goal==='sleep'?65:45;n.x+=dx/d*speed*dt;n.y+=dy/d*speed*dt;}npcEconomy(n);}
+
+  function priceFor(n,id,mode='buy'){const def=itemDefs[id],need=npcNeedScore(n,id),stock=n.stock[id]||0,trust=n.trust;let p=def.base*(1+need*.12)*(1+Math.max(0,2-stock)*.08);if(mode==='sell')p*=.62+Math.min(.18,trust*.01);else p*=1.2-Math.min(.18,trust*.01);return Math.max(1,Math.round(p));}
+  function helpNPC(n){const r=n.request||requestFor(n);if(!r){toast(`${n.name} has no urgent request`);return false;}if(itemCount(r.id)<r.qty){toast(`Need ${r.qty} ${itemDefs[r.id].name}`);return false;}const q=avgQuality(r.id);removeItem(r.id,r.qty);n.stock[r.id]=(n.stock[r.id]||0)+r.qty;n.trust=clamp(n.trust+1+Math.max(0,q-1)*.4,0,10);player.coins+=r.reward+Math.round((q-1)*3);n.lastPlayerHelp=world.day;memory(n,`You brought ${r.qty} ${itemDefs[r.id].name} when it was needed.`);skillXp('rapport',8);deriveIdentity();toast(`${n.name} remembers that help`);log(`${n.name}'s shortage eased because you brought ${itemDefs[r.id].name}.`,'npc');n.request=null;save();return true;}
+  function sellToNPC(n){const need=topNeed(n);const id=need.id;if(itemCount(id)<1){toast(`You have no ${itemDefs[id].name}`);return false;}const price=priceFor(n,id,'sell');const q=avgQuality(id);removeItem(id,1);n.stock[id]=(n.stock[id]||0)+1;player.coins+=Math.round(price*q);n.trust=clamp(n.trust+.15,0,10);memory(n,`Bought ${itemDefs[id].name} from you.`);deriveIdentity();save();toast(`Sold ${itemDefs[id].name} for ${Math.round(price*q)}c`);return true;}
+  function buyFromNPC(n){const entries=Object.entries(n.stock).filter(([id,q])=>q>0&&itemDefs[id]);if(!entries.length){toast(`${n.name} has nothing spare`);return false;}entries.sort((a,b)=>priceFor(n,a[0],'buy')-priceFor(n,b[0],'buy'));const [id]=entries[0];const price=priceFor(n,id,'buy');if(player.coins<price){toast(`Need ${price}c`);return false;}player.coins-=price;n.stock[id]--;addItem(id,1,1+n.trust*.03);save();toast(`Bought ${itemDefs[id].name} for ${price}c`);return true;}
+
+  function townNeedState(){const out={food:0,medicine:0,metal:0,materials:0};for(const n of npcs){for(const id of Object.keys(n.needBias||{})){const score=npcNeedScore(n,id),kind=itemDefs[id]?.kind;if(kind==='food')out.food+=score;else if(kind==='medicine'||kind==='herb')out.medicine+=score;else if(kind==='ore'||kind==='tool'||kind==='weapon')out.metal+=score;else out.materials+=score;}}world.townNeeds=out;return out;}
+  function dominantTownNeed(){const needs=townNeedState(),[key,value]=Object.entries(needs).sort((a,b)=>b[1]-a[1])[0];return{key,value,label:{food:'food',medicine:'medicine and herbs',metal:'metal and tools',materials:'field materials'}[key]};}
+  function deriveIdentity(){const totalTrust=npcs.reduce((s,n)=>s+n.trust,0),helped=npcs.filter(n=>n.trust>=1).length,craft=player.skills.smithing.level+player.skills.herbcraft.level,field=player.skills.fieldcraft.level,guard=player.skills.guard.level;player.standing=totalTrust>=16?'Mainstay':totalTrust>=9?'Trusted':totalTrust>=4?'Known':'Unknown';const scores=[['keeping people supplied',totalTrust+helped*2],['making useful things',craft*2],['bringing back what the Glen needs',field*2],['keeping the roads safe',guard*2]];scores.sort((a,b)=>b[1]-a[1]);player.knownFor=scores[0][1]>4?scores[0][0]:'nothing yet';}
+
+  function gather(node){if(!node.available)return false;const pick=player.inventory.pick,pickReady=player.equippedTool==='pick'&&pick?.durability>0,pickQuality=pickReady?avgQuality('pick'):1;let q=node.quality+(player.skills.fieldcraft.level-1)*.12+(world.weather==='rain'&&itemDefs[node.type].kind==='herb'?.18:0);let qty=1;if(node.type==='iron'){if(pickReady){qty+=player.skills.fieldcraft.level>=3?1:0;q+=(pickQuality-1)*.18;pick.durability=Math.max(0,pick.durability-Math.max(2,6-Math.floor(pickQuality)));}else q-=.35;}if(node.type==='wood'&&pickReady)q-=.2;addItem(node.type,qty,clamp(q,.7,3));node.available=false;node.respawn=rand(60,120);player.energy=Math.max(0,player.energy-(node.type==='iron'?(pickReady?8:12):4));skillXp('fieldcraft',node.type==='iron'?5:3);if(player.equippedTool==='pick'&&pick&&!pick.durability)toast('Iron Pick broke — Mend it before the next hard job');save();return true;}
+  function craft(id){const r=recipes[id];if(!r)return false;if(player.skills[r.skill].level<r.level){toast(`${skillDefs[r.skill].name} ${r.level} required`);return false;}if(!hasItems(r.input)){toast(`Missing materials for ${itemDefs[id].name}`);return false;}let total=0,count=0;for(const [mat,q] of Object.entries(r.input)){total+=avgQuality(mat)*q;count+=q;}consume(r.input);const quality=clamp(total/count+(player.skills[r.skill].level-1)*.15,.8,3);addItem(id,1,quality);skillXp(r.skill,10);if(id==='pick')player.equippedTool='pick';if(id==='blade')player.equippedWeapon='blade';deriveIdentity();save();toast(`Crafted ${qualityLabel(quality)} ${itemDefs[id].name}`);return true;}
+  function drinkTonic(){if(itemCount('tonic')<1){toast('No Field Tonic');return false;}removeItem('tonic',1);player.hp=clamp(player.hp+35+player.skills.herbcraft.level*3,0,player.maxHp);save();toast('Field Tonic restored health');return true;}
+
+  function nearestNPC(range=70){let best=null,bd=range;for(const n of npcs){const d=dist(player,n);if(d<bd){best=n;bd=d;}}return best;}
+  function nearestResource(range=44){let best=null,bd=range;for(const r of world.resources){if(!r.available)continue;const d=dist(player,r);if(d<bd){best=r;bd=d;}}return best;}
+  function nearestDrop(range=38){let best=null,bd=range;for(const d of world.drops){const dd=dist(player,d);if(dd<bd){best=d;bd=dd;}}return best;}
+  function interact(){const n=nearestNPC();if(n){renderNearby(n,true);return true;}const r=nearestResource();if(r)return gather(r);const d=nearestDrop();if(d){addItem(d.item,1,d.quality);world.drops=world.drops.filter(x=>x!==d);save();return true;}toast('Nothing useful within reach');return false;}
+
+  function combatProfile(){const blade=player.inventory.blade,bladeReady=player.equippedWeapon==='blade'&&blade?.durability>0,bladeQuality=bladeReady?avgQuality('blade'):1;return{bladeReady,bladeQuality,range:bladeReady?58:42,damage:bladeReady?Math.round((18+player.skills.guard.level*2)*(1+(bladeQuality-1)*.18)):9+player.skills.guard.level};}
+  function attack(){if(player.attackCd>0||player.energy<4)return;player.attackCd=.38;player.attackArc=.14;player.energy-=4;const profile=combatProfile(),blade=player.inventory.blade;if(player.equippedWeapon==='blade'&&blade&&!profile.bladeReady)toast('The Warden Blade is broken — fighting without its edge');for(const e of world.enemies){if(e.dead)continue;if(dist(player,e)<=profile.range){e.hp-=profile.damage;skillXp('guard',2);if(profile.bladeReady)blade.durability=Math.max(0,blade.durability-1);if(e.hp<=0){e.dead=true;world.drops.push({x:e.x,y:e.y,item:'hide',quality:rand(1,2.2)});player.coins+=3;log('A wolf fell. Its hide may matter more to someone than the coins.','combat');}break;}}}
+  function updateEnemy(e,dt){if(e.dead)return;e.attackCd=Math.max(0,e.attackCd-dt);const d=dist(player,e);if(d<230){const dx=player.x-e.x,dy=player.y-e.y,dd=Math.max(1,Math.hypot(dx,dy));e.x+=dx/dd*72*dt;e.y+=dy/dd*72*dt;if(dd<28&&e.attackCd<=0){e.attackCd=1.1;let dmg=10;if(player.guarded){dmg=1;player.guarded=false;e.hp-=6+player.skills.guard.level*2;toast('Brace held — countered');}player.hp=Math.max(0,player.hp-dmg);if(player.hp<=0){player.hp=player.maxHp;player.energy=50;player.x=900;player.y=600;player.coins=Math.max(0,player.coins-10);log('You were carried back to Briar Glen. The wilds collected their price.','combat');}}}else{e.wander-=dt;if(e.wander<=0){e.vx=rand(-1,1);e.vy=rand(-1,1);e.wander=rand(2,6);}e.x+=e.vx*18*dt;e.y+=e.vy*18*dt;}}
+
+  function respawn(dt){for(const r of world.resources){if(r.available)continue;r.respawn-=dt;if(r.respawn<=0){r.available=true;r.quality=clamp(r.quality+rand(-.25,.25),.7,2.8);}}if(world.enemies.filter(e=>!e.dead).length<7&&Math.random()<dt*.03)spawnWolf(rand(1220,1690),rand(270,680));}
+  function updateWeather(dt){world.weatherTimer-=dt;if(world.weatherTimer<=0){const old=world.weather;world.weather=Math.random()<.38?'rain':'clear';world.weatherTimer=rand(160,300);if(old!==world.weather)log(world.weather==='rain'?'Rain settles over Briar Glen. Herbs will come up richer.':'The rain clears. Roads dry and travel quickens.','world');}}
+  function updateClock(dt){world.minute+=dt*5.2;if(world.minute>=1440){world.minute-=1440;world.day++;log(`Day ${world.day} begins. Prices and shortages have shifted.`,'world');for(const n of npcs)n.trust=clamp(n.trust-.03,0,10);}world.minute=Math.max(0,world.minute);}
+
+  const keys=new Set();
+  addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();keys.add(e.code);if(e.repeat)return;if(e.code==='Space')attack();if(e.code==='KeyE')interact();if(e.code==='Digit1')useSkill('fieldcraft');if(e.code==='Digit2')useSkill('smithing');if(e.code==='Digit3')useSkill('guard');if(e.code==='Digit4')useSkill('rapport');if(e.code==='KeyQ')drinkTonic();});
   addEventListener('keyup',e=>keys.delete(e.code));
-  addEventListener('blur',()=>keys.clear());
+  document.getElementById('attack-btn').addEventListener('click',attack);document.getElementById('interact-btn').addEventListener('click',interact);document.getElementById('clear-log').addEventListener('click',()=>{world.events=[];renderLog();});
+  for(const b of document.querySelectorAll('[data-move]')){const code={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}[b.dataset.move];const on=()=>keys.add(code),off=()=>keys.delete(code);b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off);}
 
-  function updateStick(e){
-    const rect=ui.movePad.getBoundingClientRect();
-    const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
-    let dx=e.clientX-cx,dy=e.clientY-cy;const max=rect.width*.32;
-    const d=Math.hypot(dx,dy);if(d>max){dx=dx/d*max;dy=dy/d*max;}
-    touchMove.x=dx/max;touchMove.y=dy/max;
-    ui.moveStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-  }
-  ui.movePad.addEventListener('pointerdown',e=>{touchMove.pointerId=e.pointerId;ui.movePad.setPointerCapture(e.pointerId);updateStick(e);});
-  ui.movePad.addEventListener('pointermove',e=>{if(e.pointerId===touchMove.pointerId)updateStick(e);});
-  function releaseStick(e){if(e.pointerId!==touchMove.pointerId)return;touchMove.pointerId=null;touchMove.x=touchMove.y=0;ui.moveStick.style.transform='translate(-50%,-50%)';}
-  ui.movePad.addEventListener('pointerup',releaseStick);ui.movePad.addEventListener('pointercancel',releaseStick);
-  ui.attack.addEventListener('pointerdown',e=>{e.preventDefault();attack();});
-  ui.dash.addEventListener('pointerdown',e=>{e.preventDefault();dash();});
-  ui.interact.addEventListener('pointerdown',e=>{e.preventDefault();interact();});
-  ui.reset.addEventListener('click',()=>{
-    if(confirm('Reset Briar Glen progress?')){try{localStorage.removeItem(SAVE_KEY);}catch(_){}location.reload();}
-  });
+  function updatePlayer(dt){let dx=0,dy=0;if(keys.has('KeyW')||keys.has('ArrowUp'))dy--;if(keys.has('KeyS')||keys.has('ArrowDown'))dy++;if(keys.has('KeyA')||keys.has('ArrowLeft'))dx--;if(keys.has('KeyD')||keys.has('ArrowRight'))dx++;if(dx||dy){const len=Math.hypot(dx,dy);let speed=player.speed*(world.weather==='rain'?.93:1);if(inventoryWeight()>18)speed*=.78;player.x=clamp(player.x+dx/len*speed*dt,18,world.w-18);player.y=clamp(player.y+dy/len*speed*dt,18,world.h-18);player.energy=Math.max(0,player.energy-dt*.7);}else player.energy=Math.min(player.maxEnergy,player.energy+dt*2.2);player.attackCd=Math.max(0,player.attackCd-dt);player.attackArc=Math.max(0,player.attackArc-dt);}
 
-  setInterval(saveGame, 8000);
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)saveGame();});
+  function update(dt){updatePlayer(dt);updateClock(dt);updateWeather(dt);for(const n of npcs)updateNPC(n,dt);for(const e of world.enemies)updateEnemy(e,dt);respawn(dt);deriveIdentity();}
 
-  let last=performance.now();
-  function frame(now){
-    const dt=Math.min(.033,(now-last)/1000);last=now;
-    update(dt);draw();requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
+  function worldToScreen(x,y){return{x:x-camera.x,y:y-camera.y};}
+  function drawGround(){ctx.fillStyle=world.weather==='rain'?'#27332d':'#2d3a2c';ctx.fillRect(0,0,canvas.width,canvas.height);for(const z of zones){const p=worldToScreen(z.x,z.y);ctx.fillStyle=z.color;ctx.globalAlpha=.58;ctx.fillRect(p.x,p.y,z.w,z.h);ctx.globalAlpha=1;ctx.fillStyle='rgba(240,239,228,.65)';ctx.font='12px system-ui';ctx.fillText(z.name,p.x+10,p.y+18);}if(world.weather==='rain'){ctx.strokeStyle='rgba(184,208,220,.22)';ctx.lineWidth=1;for(let i=0;i<80;i++){const x=(i*83+performance.now()*.12)%canvas.width,y=(i*47+performance.now()*.22)%canvas.height;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-4,y+10);ctx.stroke();}}}
+  function drawBuildings(){for(const b of buildings){const p=worldToScreen(b.x,b.y);ctx.fillStyle=b.color;ctx.fillRect(p.x,p.y,b.w,b.h);ctx.strokeStyle='rgba(0,0,0,.35)';ctx.strokeRect(p.x,p.y,b.w,b.h);ctx.fillStyle='#f0efe4';ctx.font='11px system-ui';ctx.fillText(b.name,p.x+7,p.y+16);}}
+  function drawResources(){const survey=performance.now()<player.surveyUntil;for(const r of world.resources){if(!r.available)continue;const p=worldToScreen(r.x,r.y);if(p.x<-20||p.y<-20||p.x>canvas.width+20||p.y>canvas.height+20)continue;ctx.fillStyle=itemDefs[r.type].color;ctx.beginPath();ctx.arc(p.x,p.y,r.r,0,TAU);ctx.fill();if(survey){ctx.strokeStyle=r.quality>=2?'#f3df88':'rgba(255,255,255,.55)';ctx.lineWidth=r.quality>=2?3:1;ctx.beginPath();ctx.arc(p.x,p.y,r.r+5,0,TAU);ctx.stroke();ctx.fillStyle='#fff';ctx.font='10px system-ui';ctx.fillText(`${qualityLabel(r.quality)} ${itemDefs[r.type].name}`,p.x+12,p.y-10);}}}
+  function drawNPCs(){for(const n of npcs){const p=worldToScreen(n.x,n.y);ctx.fillStyle=n.color;ctx.beginPath();ctx.arc(p.x,p.y,n.r,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.font='11px system-ui';ctx.fillText(n.name,p.x-18,p.y-17);if(n.request){ctx.fillStyle='#efc96f';ctx.fillText('!',p.x-2,p.y+4);}if(performance.now()<player.readNeedUntil&&dist(player,n)<240){ctx.fillStyle='rgba(14,17,13,.86)';ctx.fillRect(p.x-55,p.y+18,110,28);ctx.fillStyle='#fff';ctx.font='10px system-ui';ctx.fillText(npcNeedText(n).slice(0,25),p.x-50,p.y+35);}}}
+  function drawEnemies(){for(const e of world.enemies){if(e.dead)continue;const p=worldToScreen(e.x,e.y);ctx.fillStyle='#8b6b5d';ctx.beginPath();ctx.arc(p.x,p.y,e.r,0,TAU);ctx.fill();if(e.hp<e.maxHp){ctx.fillStyle='#1b1614';ctx.fillRect(p.x-15,p.y-20,30,4);ctx.fillStyle='#d57a6f';ctx.fillRect(p.x-15,p.y-20,30*(e.hp/e.maxHp),4);}}for(const d of world.drops){const p=worldToScreen(d.x,d.y);ctx.fillStyle=itemDefs[d.item].color;ctx.fillRect(p.x-5,p.y-5,10,10);}}
+  function drawPlayer(){const p=worldToScreen(player.x,player.y);ctx.fillStyle='#f0efe4';ctx.beginPath();ctx.arc(p.x,p.y,player.r,0,TAU);ctx.fill();ctx.strokeStyle=player.guarded?'#c7d77b':'#263025';ctx.lineWidth=player.guarded?4:2;ctx.stroke();if(player.attackArc>0){ctx.strokeStyle='#f4e3af';ctx.lineWidth=4;ctx.beginPath();ctx.arc(p.x,p.y,player.equippedWeapon==='blade'?58:42,-.6,.6);ctx.stroke();}}
+  function draw(){camera.x=clamp(player.x-canvas.width/2,0,world.w-canvas.width);camera.y=clamp(player.y-canvas.height/2,0,world.h-canvas.height);drawGround();drawBuildings();drawResources();drawNPCs();drawEnemies();drawPlayer();const z=zoneAt(player.x,player.y);ctx.fillStyle='rgba(0,0,0,.46)';ctx.fillRect(10,10,210,42);ctx.fillStyle='#fff';ctx.font='bold 13px system-ui';ctx.fillText(z?.name||'Open Country',20,27);ctx.font='11px system-ui';ctx.fillStyle='#cfd7c8';ctx.fillText(world.weather==='rain'?'Rain · wet roads':'Clear · fair roads',20,44);}
 
-  window.__BRIAR_GLENDebug={
-    getState:()=>({player:{x:player.x,y:player.y,hp:player.hp,inventory:{...player.inventory},weapon:player.weapon,coins:player.coins},progress:{...progress},zone:zoneFor(player.x).name}),
-    teleport:(x,y)=>{player.x=x;player.y=y;camera.x=x;camera.y=y;},
-    interact,attack,dash,craftSword,
-    setInventory:(patch)=>Object.assign(player.inventory,patch),
-    setProgress:(patch)=>Object.assign(progress,patch),
+  function renderSkills(){UI.skills.innerHTML=Object.entries(skillDefs).filter(([,d])=>d.key).map(([id,d])=>{const s=player.skills[id];return`<div class="skill"><button data-skill="${id}">${d.key}</button><div><strong>${d.active}</strong><small>${d.desc}</small></div><span class="lvl">${d.name} ${s.level}</span></div>`}).join('');for(const b of UI.skills.querySelectorAll('[data-skill]'))b.addEventListener('click',()=>useSkill(b.dataset.skill));}
+  function renderInventory(){const rows=Object.entries(player.inventory).sort((a,b)=>itemDefs[a[0]].name.localeCompare(itemDefs[b[0]].name));UI.inventory.innerHTML=rows.length?rows.map(([id,s])=>{const q=s.qualitySum/s.qty;const equip=player.equippedTool===id||player.equippedWeapon===id?' · equipped':'';const dur=s.durability!=null?` · ${Math.round(s.durability)}%`:'';return`<div class="item-row"><b>${itemDefs[id].name}${equip}</b><span class="q">${qualityLabel(q)}${dur}</span><span>×${s.qty}</span></div>`}).join(''):'Your pack is empty.';UI.packWeight.textContent=`${inventoryWeight().toFixed(1)} / 22 weight`;}
+  function renderNearby(n=nearestNPC(85),force=false){const r=nearestResource(48),d=nearestDrop(42);if(n){UI.nearbyType.textContent=n.role;const req=n.request||requestFor(n);const remember=n.memory.at(-1)?.text||'No history with you yet.';UI.nearby.innerHTML=`<b>${n.name}</b> · trust ${n.trust.toFixed(1)}<br>${n.goalText}<div class="need">${performance.now()<player.readNeedUntil||force?npcNeedText(n):'Use Read Need (4) to understand priorities.'}</div><small>${remember}</small><div>${req?`Request: ${req.qty} ${itemDefs[req.id].name} · ${req.reward}c`: 'No urgent request.'}</div><button data-near="help" ${req&&itemCount(req.id)>=req.qty?'':'disabled'}>Help</button><button data-near="sell">Sell need</button><button data-near="buy">Buy spare</button>`;UI.nearby.querySelector('[data-near=help]')?.addEventListener('click',()=>helpNPC(n));UI.nearby.querySelector('[data-near=sell]')?.addEventListener('click',()=>sellToNPC(n));UI.nearby.querySelector('[data-near=buy]')?.addEventListener('click',()=>buyFromNPC(n));return;}if(r){UI.nearbyType.textContent='resource';UI.nearby.innerHTML=`<b>${itemDefs[r.type].name}</b><br>${performance.now()<player.surveyUntil?`${qualityLabel(r.quality)} quality · `:''}Use E to gather.`;return;}if(d){UI.nearbyType.textContent='drop';UI.nearby.innerHTML=`<b>${itemDefs[d.item].name}</b><br>Use E to pick it up.`;return;}UI.nearbyType.textContent='';UI.nearby.textContent='Walk up to someone or something useful.';}
+  function renderLog(){UI.log.innerHTML=world.events.slice(-18).map(e=>`<div class="log-entry ${e.type}"><b>D${e.day}</b> ${e.text}</div>`).join('');}
+  function renderUI(){const h=Math.floor(world.minute/60)%24,m=Math.floor(world.minute%60);UI.clock.textContent=`Day ${world.day} · ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;UI.coins.textContent=`${player.coins}c`;UI.hp.value=player.hp;UI.energy.value=player.energy;UI.standing.textContent=player.standing;UI.knownFor.textContent=`Known for: ${player.knownFor}`;const need=dominantTownNeed();UI.worldLine.textContent=world.weather==='rain'?`Rain enriches the fields. Briar Glen is watching ${need.label}.`:need.value>2?`Briar Glen is short on ${need.label}. People are already reacting.`:'Briar Glen is supplied for now. People are pursuing their own work.';renderSkills();renderInventory();renderNearby();}
+
+  function save(){try{localStorage.setItem(BUILD.saveKey,JSON.stringify({build:BUILD.version,world:{minute:world.minute,day:world.day,weather:world.weather,weatherTimer:world.weatherTimer,events:world.events,resources:world.resources,enemies:world.enemies,drops:world.drops,serial:world.serial},player:{...player},npcs}));}catch(_){}}
+  function load(){try{const raw=localStorage.getItem(BUILD.saveKey);if(!raw)return false;const s=JSON.parse(raw);if(!s?.player||!s?.world||!Array.isArray(s.npcs))return false;Object.assign(world,s.world);Object.assign(player,s.player);npcs=s.npcs;return true;}catch(_){return false;}}
+
+  let last=performance.now(),uiTimer=0,saveTimer=0;
+  function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;update(dt);draw();uiTimer-=dt;saveTimer-=dt;if(uiTimer<=0){renderUI();uiTimer=.18;}if(saveTimer<=0){save();saveTimer=5;}requestAnimationFrame(frame);}
+
+  window.__BRIAR_GLEN_DEBUG__={
+    build:()=>({...BUILD}),snapshot:()=>({day:world.day,minute:world.minute,weather:world.weather,townNeeds:{...townNeedState()},player:JSON.parse(JSON.stringify(player)),npcs:JSON.parse(JSON.stringify(npcs)),resources:world.resources.filter(r=>r.available).length,enemies:world.enemies.filter(e=>!e.dead).length}),
+    reset:()=>{localStorage.removeItem(BUILD.saveKey);reset();renderUI();},
+    give:(id,qty=1,quality=1)=>{addItem(id,qty,quality);renderUI();save();return itemCount(id);},
+    setPosition:(x,y)=>{player.x=x;player.y=y;return{x:player.x,y:player.y};},
+    npc:(id)=>npcs.find(n=>n.id===id)||null,
+    forceNpcNeed:(npcId,itemId)=>{const n=npcs.find(x=>x.id===npcId);if(!n||!itemDefs[itemId])return false;n.needBias[itemId]=9;n.stock[itemId]=0;chooseNpcGoal(n);renderNearby(n,true);return true;},
+    setNpcStock:(npcId,itemId,qty)=>{const n=npcs.find(x=>x.id===npcId);if(!n||!itemDefs[itemId])return false;n.stock[itemId]=Math.max(0,Number(qty)||0);return true;},
+    rethink:(npcId)=>{const n=npcs.find(x=>x.id===npcId);if(!n)return false;chooseNpcGoal(n);return n.goal;},
+    setDurability:(id,value)=>{const slot=player.inventory[id];if(!slot||slot.durability==null)return false;slot.durability=clamp(Number(value)||0,0,100);return slot.durability;},
+    equip:(id)=>{if(!player.inventory[id])return false;if(itemDefs[id].kind==='tool')player.equippedTool=id;if(itemDefs[id].kind==='weapon')player.equippedWeapon=id;return true;},
+    combatProfile:()=>({...combatProfile()}),
+    advance:(seconds=1)=>{const steps=Math.max(1,Math.ceil(seconds/.1)),dt=seconds/steps;for(let i=0;i<steps;i++)update(dt);renderUI();save();return window.__BRIAR_GLEN_DEBUG__.snapshot();},
+    help:(npcId)=>{const n=npcs.find(x=>x.id===npcId);return n?helpNPC(n):false;},
+    craft,
+    useSkill,
+    attack,
+    save,
   };
 
-  setTimeout(()=>{
-    if(!progress.tipShown){toast('Follow the road east • gather 3 Briarleaf');progress.tipShown=true;saveGame();}
-  },700);
+  document.addEventListener('click',e=>{const target=e.target.closest?.('[data-craft]');if(target)craft(target.dataset.craft);});
+  const craftBox=document.createElement('section');craftBox.className='card';craftBox.innerHTML='<div class="card-title"><span>Make</span><small>items exist to solve problems</small></div><div class="nearby"><button data-craft="tonic">Brew Tonic</button><button data-craft="pick">Forge Pick</button><button data-craft="blade">Forge Blade</button><button id="drink-tonic">Drink Tonic (Q)</button></div>';document.querySelector('.sidebar').insertBefore(craftBox,document.querySelector('.log-card'));document.getElementById('drink-tonic').addEventListener('click',drinkTonic);
+
+  if(!load())reset();deriveIdentity();renderLog();renderUI();requestAnimationFrame(frame);
 })();
