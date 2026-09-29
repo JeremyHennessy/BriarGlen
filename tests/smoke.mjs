@@ -77,7 +77,7 @@ try{
 
     await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.rethink('mira');d.advance(20);});
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());riskMira=state.npcs.find(n=>n.id==='mira');
-    if((riskMira.stock.briarleaf||0)<1)throw new Error(`${vp.name}: Mira did not resume the interrupted production task after danger cleared ${JSON.stringify(riskMira)}`);
+    if((riskMira.stock.tonic||0)<1||!riskMira.memory.some(m=>m.text.includes('Gathered Briarleaf to make Field Tonic for a shortage'))||!riskMira.memory.some(m=>m.text.includes('Prepared a Field Tonic')))throw new Error(`${vp.name}: Mira did not resume and complete the interrupted production task after danger cleared ${JSON.stringify(riskMira)}`);
 
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
