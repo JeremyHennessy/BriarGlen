@@ -75,10 +75,15 @@ try{
     if(riskMira.blockedByDanger)throw new Error(`${vp.name}: civilian danger block was not released`);
     if(!(riskMira.relations?.tamsin>0)||!riskMira.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!riskTamsin.memory.some(m=>m.text.includes("blocking Mira's work")))throw new Error(`${vp.name}: danger response did not create social memory ${JSON.stringify({riskMira,riskTamsin})}`);
 
-    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.rethink('mira');d.advance(20);});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.rethink('mira'));
+    for(let i=0;i<12;i++){
+      const done=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npc('mira').memory.some(m=>m.text.includes('Prepared a Field Tonic')));
+      if(done)break;
+      await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(10));
+    }
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());riskMira=state.npcs.find(n=>n.id==='mira');const resumedTamsin=state.npcs.find(n=>n.id==='tamsin');
-    const tonicReachedNeed=(riskMira.stock.tonic||0)>0||(resumedTamsin.stock.tonic||0)>0;
-    if(!tonicReachedNeed||!riskMira.memory.some(m=>m.text.includes('Gathered Briarleaf to make Field Tonic for a shortage'))||!riskMira.memory.some(m=>m.text.includes('Prepared a Field Tonic')))throw new Error(`${vp.name}: Mira did not resume and complete the interrupted production task after danger cleared ${JSON.stringify({riskMira,resumedTamsin})}`);
+    const tonicInTown=state.npcs.reduce((sum,n)=>sum+(n.stock.tonic||0),0);
+    if(tonicInTown<1||!riskMira.memory.some(m=>m.text.includes('Gathered Briarleaf to make Field Tonic for a shortage'))||!riskMira.memory.some(m=>m.text.includes('Prepared a Field Tonic')))throw new Error(`${vp.name}: Mira did not resume and complete the interrupted production task after danger cleared ${JSON.stringify({riskMira,resumedTamsin})}`);
 
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
