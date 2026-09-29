@@ -12,7 +12,7 @@ try{
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
-    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.3.0',{timeout:5000});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.4.0',{timeout:5000});
     let state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.length!==4)throw new Error(`${vp.name}: expected four autonomous NPCs`);
     if(!state.npcs.every(n=>n.goalText&&Array.isArray(n.memory)))throw new Error(`${vp.name}: NPC cognition surface missing`);
@@ -22,6 +22,13 @@ try{
     if(!await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.craft('pick')))throw new Error(`${vp.name}: meaningful tool craft failed`);
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.player.equippedTool!=='pick'||state.player.inventory.pick.qty!==1)throw new Error(`${vp.name}: crafted tool not equipped`);
+    let pickStory=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.artifact('pick'));
+    if(pickStory?.provenance?.maker!=='You'||pickStory.provenance.madeDay!==1||!pickStory.provenance.history.some(x=>x.includes('Forged by You')))throw new Error(`${vp.name}: crafted tool has no maker/material lineage ${JSON.stringify(pickStory)}`);
+    const duplicatePick=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.craft('pick'));
+    if(duplicatePick)throw new Error(`${vp.name}: singular equipment was incorrectly collapsed into an anonymous stack`);
+    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setDurability('pick',40);d.useSkill('smithing');});
+    pickStory=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.artifact('pick'));
+    if(pickStory.provenance.repairs!==1||pickStory.maxDurability!==98||pickStory.durability<=40||!pickStory.provenance.history.some(x=>x.includes('Mended by You')))throw new Error(`${vp.name}: Smithing did not leave a persistent repair history ${JSON.stringify(pickStory)}`);
 
     await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.forceNpcNeed('alden','iron');d.give('iron',2,1.8);d.setPosition(812,545);});
     const helped=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.help('alden'));
@@ -59,7 +66,20 @@ try{
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.find(n=>n.id==='alden').trust<=0)throw new Error(`${vp.name}: NPC memory/trust did not persist`);
     if(state.player.inventory.pick?.qty!==1||state.player.inventory.blade?.durability!==0)throw new Error(`${vp.name}: important item state did not persist`);
+    pickStory=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.artifact('pick'));
+    if(pickStory?.provenance?.maker!=='You'||pickStory.provenance.repairs!==1||pickStory.maxDurability!==98)throw new Error(`${vp.name}: item lineage/repair history did not persist ${JSON.stringify(pickStory)}`);
     if(!(state.npcs.find(n=>n.id==='tamsin').relations?.mira>0))throw new Error(`${vp.name}: NPC relationship memory did not persist`);
+
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.forceNpcNeed('tamsin','pick'));
+    if(!await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.help('tamsin')))throw new Error(`${vp.name}: crafted tool could not become part of NPC life`);
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
+    let lineageTamsin=state.npcs.find(n=>n.id==='tamsin');
+    if(state.player.inventory.pick||lineageTamsin.stock.pick!==1||lineageTamsin.stockMeta?.pick?.provenance?.maker!=='You'||lineageTamsin.stockMeta.pick.provenance.repairs!==1||!lineageTamsin.memory.some(m=>m.text.includes('you made')))throw new Error(`${vp.name}: exact crafted item history did not transfer to NPC ownership ${JSON.stringify(lineageTamsin)}`);
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.snapshot?.().npcs?.length===4,{timeout:5000});
+    state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());lineageTamsin=state.npcs.find(n=>n.id==='tamsin');
+    if(lineageTamsin.stockMeta?.pick?.provenance?.maker!=='You'||lineageTamsin.stockMeta.pick.provenance.repairs!==1)throw new Error(`${vp.name}: NPC-owned item lineage did not persist`);
 
     const dangerSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',0);d.setNpcStock('mira','mooncap',0);d.forceNpcNeed('tamsin','tonic');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');return{wolfId,target};});
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
@@ -87,7 +107,7 @@ try{
 
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
-    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production planning + risk-aware work + Warden response + social memory + meaningful items + skills + persistence`);
+    console.log(`PASS ${vp.name}: autonomous NPC goals + causal production planning + risk-aware work + Warden response + social memory + item lineage + Smithing repair history + meaningful items + skills + persistence`);
     await context.close();
   }
 } finally { await browser.close(); }
