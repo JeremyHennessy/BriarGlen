@@ -70,8 +70,8 @@ try{
     if(pickStory?.provenance?.maker!=='You'||pickStory.provenance.repairs!==1||pickStory.maxDurability!==98)throw new Error(`${vp.name}: item lineage/repair history did not persist ${JSON.stringify(pickStory)}`);
     if(!(state.npcs.find(n=>n.id==='tamsin').relations?.mira>0))throw new Error(`${vp.name}: NPC relationship memory did not persist`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.forceNpcNeed('tamsin','pick'));
-    if(!await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.help('tamsin')))throw new Error(`${vp.name}: crafted tool could not become part of NPC life`);
+    const transferredPick=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.forceNpcNeed('tamsin','pick');return d.help('tamsin');});
+    if(!transferredPick)throw new Error(`${vp.name}: crafted tool could not become part of NPC life`);
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     let lineageTamsin=state.npcs.find(n=>n.id==='tamsin');
     if(state.player.inventory.pick||lineageTamsin.stock.pick!==1||lineageTamsin.stockMeta?.pick?.provenance?.maker!=='You'||lineageTamsin.stockMeta.pick.provenance.repairs!==1||!lineageTamsin.memory.some(m=>m.text.includes('you made')))throw new Error(`${vp.name}: exact crafted item history did not transfer to NPC ownership ${JSON.stringify(lineageTamsin)}`);
