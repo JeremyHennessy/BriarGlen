@@ -12,7 +12,7 @@ try{
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
-    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.14.0',{timeout:5000});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.15.0',{timeout:5000});
     let state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.length!==4)throw new Error(`${vp.name}: expected four autonomous NPCs`);
     if(!state.npcs.every(n=>n.goalText&&Array.isArray(n.memory)))throw new Error(`${vp.name}: NPC cognition surface missing`);
@@ -190,7 +190,7 @@ try{
     if(!replacementWolfDead||usedBlade?.provenance?.maker!=='You'||usedBlade.durability>=usedBlade.maxDurability||!usedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: owned Warden Blade did not determine/usefully wear through NPC capability ${JSON.stringify({usedBlade,equippedTamsin})}`);
     if(!equippedTamsin.memory.some(m=>m.text.includes('blade you forged'))||!equippedMira.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!(equippedMira.relations?.tamsin>0))throw new Error(`${vp.name}: NPC capability use left no social/maker consequence ${JSON.stringify({equippedTamsin,equippedMira})}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.14.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.15.0',{timeout:5000});
     const persistedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(persistedBlade?.provenance?.maker!=='You'||persistedBlade.durability!==usedBlade.durability||!persistedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: NPC capability item history/condition did not persist ${JSON.stringify(persistedBlade)}`);
 
@@ -208,7 +208,7 @@ try{
     const servicedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(!servicedWolfDead||servicedBlade?.provenance?.maker!=='Alden'||servicedBlade.provenance.repairs!==1||servicedBlade.durability>=serviceSetup.after.durability||!servicedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: repaired NPC equipment did not restore real Warden capability ${JSON.stringify(servicedBlade)}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.14.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.15.0',{timeout:5000});
     const persistedServiceBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(persistedServiceBlade?.provenance?.maker!=='Alden'||persistedServiceBlade.provenance.repairs!==1||persistedServiceBlade.durability!==servicedBlade.durability||!persistedServiceBlade.provenance.history.some(x=>x.includes('Serviced by You for Tamsin')))throw new Error(`${vp.name}: NPC Smithing service history did not persist ${JSON.stringify(persistedServiceBlade)}`);
 
@@ -231,7 +231,7 @@ try{
     if(!forgeRepair.used.provenance.history.some(x=>x.includes('Used by Alden to forge an Iron Pick'))||forgeRepair.used.durability>=forgeRepair.after.durability||forgeRepair.state.player.coins<=forgeRepair.coinsBefore||professionAlden.trust<=0)throw new Error(`${vp.name}: repaired Forge Hammer did not restore productive/economic capability ${JSON.stringify(forgeRepair)}`);
     if((professionTamsin.stock.pick||0)<1||!professionTamsin.memory.some(m=>m.text.includes('Alden supplied Iron Pick')))throw new Error(`${vp.name}: restored forge production did not propagate to downstream NPC need ${JSON.stringify({professionAlden,professionTamsin})}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.14.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.15.0',{timeout:5000});
     const persistedHammer=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('alden','hammer'));
     if(persistedHammer?.provenance?.maker!=='Alden'||persistedHammer.provenance.repairs!==1||persistedHammer.durability!==forgeRepair.used.durability||!persistedHammer.provenance.history.some(x=>x.includes('Used by Alden to forge an Iron Pick')))throw new Error(`${vp.name}: profession-tool service/use history did not persist ${JSON.stringify(persistedHammer)}`);
 
@@ -249,7 +249,7 @@ try{
     if(townCall.goal!=='seekService'||townCall.end>=townCall.start-30||townCall.end>75)throw new Error(`${vp.name}: referred unserviced NPC did not seek the player into service range ${JSON.stringify(townCall)}`);
     if(!townCall.third||townCall.final.player.servicesCompleted!==3||townAlden.seekingServiceFor||townAlden.trust<=0||!townAlden.memory.some(m=>m.text.includes('serviced my Forge Hammer'))||townCall.final.player.knownFor!=='keeping the Glen’s gear working')throw new Error(`${vp.name}: sought-out service did not resolve into specialist reputation/consequences ${JSON.stringify(townCall.final)}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.14.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.15.0',{timeout:5000});
     const persistedSpecialist=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     const persistedAlden=persistedSpecialist.npcs.find(n=>n.id==='alden'),persistedRowan=persistedSpecialist.npcs.find(n=>n.id==='rowan');
     if(persistedSpecialist.player.servicesCompleted!==3||persistedSpecialist.player.knownFor!=='keeping the Glen’s gear working'||!persistedAlden.memory.some(m=>m.text.includes('serviced my Forge Hammer'))||!persistedAlden.knowledge?.smith?.sources?.some(s=>(s.npcId||s)==='tamsin')||!persistedRowan.knowledge?.smith?.sources?.some(s=>(s.npcId||s)==='mira'))throw new Error(`${vp.name}: social specialist reputation did not persist ${JSON.stringify(persistedSpecialist.player)}`);
@@ -263,7 +263,7 @@ try{
     if(!trustedBelief.first||trustedBelief.heardEvidence<.7||trustedBelief.goal!=='seekService'||!trustedBelief.second)throw new Error(`${vp.name}: trusted referral did not drive a real specialist service decision ${JSON.stringify(trustedBelief)}`);
     if(!trustedSource||trustedSource.status!=='confirmed'||trustedSource.confidence<.7||(trustedAlden.knowledge?.smith?.direct?.confidence||0)<.65||trustedAlden.knowledge.smith.direct.services!==1||!trustedAlden.memory.some(m=>m.text.includes("Tamsin's recommendation was right"))||trustedBelief.relationAfter<=trustedBelief.relationBefore)throw new Error(`${vp.name}: direct service did not confirm referral evidence/relationship ${JSON.stringify(trustedBelief)}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.14.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.15.0',{timeout:5000});
     const persistedBelief=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot()),beliefAlden=persistedBelief.npcs.find(n=>n.id==='alden'),beliefSource=beliefAlden.knowledge?.smith?.sources?.find(s=>(s.npcId||s)==='tamsin');
     if((beliefAlden.knowledge?.smith?.direct?.confidence||0)<.65||beliefSource?.status!=='confirmed'||beliefSource.confidence<.7||!beliefAlden.memory.some(m=>m.text.includes("Tamsin's recommendation was right")))throw new Error(`${vp.name}: Smithing belief evidence did not persist ${JSON.stringify(beliefAlden.knowledge)}`);
 
@@ -277,13 +277,26 @@ try{
     if(!contradiction.recovery||!recoveredSource||recoveredSource.status!=='confirmed'||(recoveredAlden.knowledge?.smith?.direct?.confidence||0)<.65||contradiction.recoveredEvidence<.65||!recoveredAlden.memory.some(m=>m.text.includes("Tamsin's recommendation was right"))||contradiction.relationAfterRecovery<=contradiction.relationAfterBad)throw new Error(`${vp.name}: later strong work did not rehabilitate Smithing belief ${JSON.stringify(contradiction.afterRecovery)}`);
     if(contradiction.agedDirect<.5)throw new Error(`${vp.name}: first-hand evidence decayed as fast as hearsay ${JSON.stringify(contradiction)}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.14.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.15.0',{timeout:5000});
     const persistedDynamicBelief=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot()),dynamicAlden=persistedDynamicBelief.npcs.find(n=>n.id==='alden'),dynamicSource=dynamicAlden.knowledge?.smith?.sources?.find(s=>(s.npcId||s)==='tamsin');
     if(dynamicSource?.status!=='confirmed'||(dynamicAlden.knowledge?.smith?.direct?.confidence||0)<.65||persistedDynamicBelief.day!==6)throw new Error(`${vp.name}: recovered/aged reputation state did not persist ${JSON.stringify(dynamicAlden.knowledge)}`);
 
+    const friendRoute=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',1);d.setNpcStock('rowan','tonic',1);d.setNpcStock('tamsin','tonic',0);d.setRelation('tamsin','rowan',3);d.setRelation('rowan','tamsin',3);d.setRelation('tamsin','mira',0);d.setRelation('mira','tamsin',0);d.forceNpcNeed('tamsin','tonic');const goal=d.rethink('tamsin'),chosen=d.npc('tamsin').seekSource;for(let i=0;i<50&&(d.npc('tamsin').stock.tonic||0)<1;i++)d.advance(.25);return{goal,chosen,state:d.snapshot()};});
+    const friendTamsin=friendRoute.state.npcs.find(n=>n.id==='tamsin'),friendRowan=friendRoute.state.npcs.find(n=>n.id==='rowan');
+    if(friendRoute.goal!=='seek'||friendRoute.chosen!=='rowan'||(friendTamsin.stock.tonic||0)<1||!friendTamsin.memory.some(m=>m.text.includes('Rowan supplied Field Tonic'))||!friendRowan.memory.some(m=>m.text.includes('Tamsin came to me for Field Tonic')))throw new Error(`${vp.name}: strong relationship did not redirect supply toward trusted partner ${JSON.stringify(friendRoute)}`);
+
+    const damagedCooperation=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setSkillLevel('smithing',3);d.setRelation('alden','tamsin',-.8);d.setRelation('tamsin','alden',0);d.setNpcArtifactDurability('tamsin','blade',0);d.give('iron',1,1.4);const t=d.npc('tamsin');d.setPosition(t.x,t.y);const first=d.useSkill('smithing');d.rethink('tamsin');for(let i=0;i<100&&!d.npc('alden').knowledge?.smith?.sources?.some(s=>(s.npcId||s)==='tamsin');i++)d.advance(.5);const referral=d.snapshot(),refEvidence=d.smithEvidence('alden'),relationAfterReferral=d.npc('alden').relations?.tamsin||0;d.setNpcArtifactDurability('alden','hammer',0);d.setPosition(1300,545);const serviceGoal=d.rethink('alden');for(let i=0;i<220;i++){const s=d.snapshot(),a=d.npc('alden'),gap=Math.hypot(a.x-s.player.x,a.y-s.player.y);if(gap<=70)break;d.advance(.25);}d.setSkillLevel('smithing',1);d.give('iron',1,1.1);const poor=d.useSkill('smithing'),afterPoor=d.snapshot(),relationAfterPoor=d.npc('alden').relations?.tamsin||0;d.setNpcStock('alden','pick',1);d.setNpcStock('rowan','pick',1);d.setNpcStock('tamsin','pick',0);d.forceNpcNeed('tamsin','pick');const routeGoal=d.rethink('tamsin'),chosen=d.npc('tamsin').seekSource;for(let i=0;i<80&&(d.npc('tamsin').stock.pick||0)<1;i++)d.advance(.25);return{first,referral,refEvidence,relationAfterReferral,serviceGoal,poor,afterPoor,relationAfterPoor,routeGoal,chosen,final:d.snapshot()};});
+    const damagedTamsin=damagedCooperation.final.npcs.find(n=>n.id==='tamsin'),damagedAlden=damagedCooperation.final.npcs.find(n=>n.id==='alden'),damagedRowan=damagedCooperation.final.npcs.find(n=>n.id==='rowan');
+    if(!damagedCooperation.first||damagedCooperation.refEvidence<.5||damagedCooperation.serviceGoal!=='seekService'||!damagedCooperation.poor||damagedCooperation.relationAfterReferral<=-.8||damagedCooperation.relationAfterPoor> -1)throw new Error(`${vp.name}: poor recommended work did not damage referrer relationship enough to affect cooperation ${JSON.stringify(damagedCooperation)}`);
+    if(damagedCooperation.routeGoal!=='seek'||damagedCooperation.chosen!=='rowan'||(damagedTamsin.stock.pick||0)<1||!damagedTamsin.memory.some(m=>m.text.includes('Rowan supplied Iron Pick'))||damagedTamsin.memory.some(m=>m.text.includes('Alden supplied Iron Pick'))||!damagedRowan.memory.some(m=>m.text.includes('Tamsin came to me for Iron Pick')))throw new Error(`${vp.name}: damaged Alden/Tamsin relationship did not reroute tool supply through Rowan ${JSON.stringify({damagedCooperation,damagedTamsin,damagedAlden,damagedRowan})}`);
+
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.15.0',{timeout:5000});
+    const persistedCooperation=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot()),persistedCoopTamsin=persistedCooperation.npcs.find(n=>n.id==='tamsin'),persistedCoopAlden=persistedCooperation.npcs.find(n=>n.id==='alden');
+    if((persistedCoopAlden.relations?.tamsin||0)>-1||(persistedCoopTamsin.stock.pick||0)<1||!persistedCoopTamsin.memory.some(m=>m.text.includes('Rowan supplied Iron Pick')))throw new Error(`${vp.name}: relationship-driven supply reroute did not persist ${JSON.stringify(persistedCooperation.npcs)}`);
+
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
-    console.log(`PASS ${vp.name}: mobile tap play + living AI + aging hearsay + contradicted/recoverable reputation + profession dependencies + persistent item lineage`);
+    console.log(`PASS ${vp.name}: mobile tap play + living AI + dynamic reputation + relationship-driven supply cooperation + profession dependencies + persistent item lineage`);
     await context.close();
   }
 } finally { await browser.close(); }
