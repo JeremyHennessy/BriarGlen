@@ -291,8 +291,8 @@ try{
     if(damagedCooperation.routeGoal!=='seek'||damagedCooperation.chosen!=='rowan'||(damagedTamsin.stock.pick||0)<1||!damagedTamsin.memory.some(m=>m.text.includes('Rowan supplied Iron Pick'))||damagedTamsin.memory.some(m=>m.text.includes('Alden supplied Iron Pick'))||!damagedRowan.memory.some(m=>m.text.includes('Tamsin came to me for Iron Pick')))throw new Error(`${vp.name}: damaged Alden/Tamsin relationship did not reroute tool supply through Rowan ${JSON.stringify({damagedCooperation,damagedTamsin,damagedAlden,damagedRowan})}`);
 
     await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.15.0',{timeout:5000});
-    const persistedCooperation=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot()),persistedTamsin=persistedCooperation.npcs.find(n=>n.id==='tamsin'),persistedAlden=persistedCooperation.npcs.find(n=>n.id==='alden');
-    if((persistedAlden.relations?.tamsin||0)>-1||(persistedTamsin.stock.pick||0)<1||!persistedTamsin.memory.some(m=>m.text.includes('Rowan supplied Iron Pick')))throw new Error(`${vp.name}: relationship-driven supply reroute did not persist ${JSON.stringify(persistedCooperation.npcs)}`);
+    const persistedCooperation=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot()),persistedCoopTamsin=persistedCooperation.npcs.find(n=>n.id==='tamsin'),persistedCoopAlden=persistedCooperation.npcs.find(n=>n.id==='alden');
+    if((persistedCoopAlden.relations?.tamsin||0)>-1||(persistedCoopTamsin.stock.pick||0)<1||!persistedCoopTamsin.memory.some(m=>m.text.includes('Rowan supplied Iron Pick')))throw new Error(`${vp.name}: relationship-driven supply reroute did not persist ${JSON.stringify(persistedCooperation.npcs)}`);
 
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
