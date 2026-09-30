@@ -292,6 +292,7 @@ try{
     if(damagedCooperation.routeGoal!=='seek'||damagedCooperation.chosen!=='rowan'||(damagedTamsin.stock.pick||0)<1||!damagedTamsin.memory.some(m=>m.text.includes('Rowan supplied Iron Pick'))||damagedTamsin.memory.some(m=>m.text.includes('Alden supplied Iron Pick'))||!damagedRowan.memory.some(m=>m.text.includes('Tamsin came to me for Iron Pick')))throw new Error(`${vp.name}: damaged Alden/Tamsin relationship did not reroute tool supply through Rowan ${JSON.stringify({damagedCooperation,damagedTamsin,damagedAlden,damagedRowan})}`);
 
     await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.19.0',{timeout:5000});
+    // Later rescues or cooperation can legitimately heal the relationship; persist the reroute outcome/history, not a frozen trust score.
     const persistedCooperation=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot()),persistedCoopTamsin=persistedCooperation.npcs.find(n=>n.id==='tamsin');
     if((persistedCoopTamsin.stock.pick||0)<1||!persistedCoopTamsin.memory.some(m=>m.text.includes('Rowan supplied Iron Pick'))||persistedCoopTamsin.memory.some(m=>m.text.includes('Alden supplied Iron Pick')))throw new Error(`${vp.name}: relationship-driven supply reroute history did not persist ${JSON.stringify(persistedCooperation.npcs)}`);
 
