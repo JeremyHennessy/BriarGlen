@@ -70,7 +70,12 @@ try{
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.player.skills.rapport.xp<=0)throw new Error(`${vp.name}: active skill did not improve through use`);
 
-    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setNpcStock('mira','tonic',2);d.forceNpcNeed('tamsin','tonic');d.rethink('tamsin');d.advance(8);});
+    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setNpcStock('mira','tonic',2);d.forceNpcNeed('tamsin','tonic');d.rethink('tamsin');});
+    for(let i=0;i<20;i++){
+      const supplied=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,s=d.snapshot(),t=s.npcs.find(n=>n.id==='tamsin');return(t.stock.tonic||0)>=1&&(t.relations?.mira||0)>0;});
+      if(supplied)break;
+      await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(1));
+    }
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     const tamsin=state.npcs.find(n=>n.id==='tamsin'),mira=state.npcs.find(n=>n.id==='mira');
     if((tamsin.stock.tonic||0)<1||!(tamsin.relations?.mira>0))throw new Error(`${vp.name}: NPC-to-NPC supply decision failed`);
