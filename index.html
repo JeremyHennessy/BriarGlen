@@ -46,6 +46,14 @@
             <label>Energy <progress id="energy" max="100" value="100"></progress></label>
           </div>
           <div id="known-for" class="known-for">Known for: nothing yet</div>
+          <div class="apprentice-panel">
+            <div class="apprentice-head">
+              <button id="apprentice-toggle" type="button" aria-pressed="false">Autonomous Apprentice: Off</button>
+              <span id="apprentice-score">0 decisions</span>
+            </div>
+            <strong id="apprentice-goal">Manual control</strong>
+            <small id="apprentice-thought">Turn it on to let the apprentice play through the same systems you use.</small>
+          </div>
         </section>
 
         <section class="card">
@@ -76,6 +84,7 @@
       <span>Use: E</span>
       <span>Skills: 1–4</span>
       <span>Save: automatic</span>
+      <span>Autonomous Apprentice: watch or interrupt anytime</span>
     </footer>
   </main>
   <script src="src/game.js"></script>
