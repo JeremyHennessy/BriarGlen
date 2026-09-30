@@ -12,7 +12,7 @@ try{
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
-    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.8.0',{timeout:5000});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.9.0',{timeout:5000});
     let state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.length!==4)throw new Error(`${vp.name}: expected four autonomous NPCs`);
     if(!state.npcs.every(n=>n.goalText&&Array.isArray(n.memory)))throw new Error(`${vp.name}: NPC cognition surface missing`);
@@ -162,7 +162,7 @@ try{
     if(!replacementWolfDead||usedBlade?.provenance?.maker!=='You'||usedBlade.durability>=usedBlade.maxDurability||!usedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: owned Warden Blade did not determine/usefully wear through NPC capability ${JSON.stringify({usedBlade,equippedTamsin})}`);
     if(!equippedTamsin.memory.some(m=>m.text.includes('blade you forged'))||!equippedMira.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!(equippedMira.relations?.tamsin>0))throw new Error(`${vp.name}: NPC capability use left no social/maker consequence ${JSON.stringify({equippedTamsin,equippedMira})}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.8.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.9.0',{timeout:5000});
     const persistedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(persistedBlade?.provenance?.maker!=='You'||persistedBlade.durability!==usedBlade.durability||!persistedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: NPC capability item history/condition did not persist ${JSON.stringify(persistedBlade)}`);
 
@@ -180,13 +180,36 @@ try{
     const servicedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(!servicedWolfDead||servicedBlade?.provenance?.maker!=='Alden'||servicedBlade.provenance.repairs!==1||servicedBlade.durability>=serviceSetup.after.durability||!servicedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: repaired NPC equipment did not restore real Warden capability ${JSON.stringify(servicedBlade)}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.8.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.9.0',{timeout:5000});
     const persistedServiceBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(persistedServiceBlade?.provenance?.maker!=='Alden'||persistedServiceBlade.provenance.repairs!==1||persistedServiceBlade.durability!==servicedBlade.durability||!persistedServiceBlade.provenance.history.some(x=>x.includes('Serviced by You for Tamsin')))throw new Error(`${vp.name}: NPC Smithing service history did not persist ${JSON.stringify(persistedServiceBlade)}`);
 
+    const herbalToolSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',2);d.setNpcStock('mira','mooncap',1);d.forceNpcNeed('tamsin','tonic');const original=d.npcArtifact('mira','shears');d.setNpcArtifactDurability('mira','shears',0);d.rethink('mira');d.advance(1);return{original,broken:d.npcArtifact('mira','shears'),state:d.snapshot()};});
+    let professionMira=herbalToolSetup.state.npcs.find(n=>n.id==='mira');
+    if(herbalToolSetup.original?.provenance?.maker!=='Alden'||herbalToolSetup.broken?.durability!==0||(professionMira.stock.tonic||0)!==0||professionMira.goal!=='gear'||professionMira.request?.id!=='shears')throw new Error(`${vp.name}: broken Herbal Shears did not halt medicine work/create service demand ${JSON.stringify(herbalToolSetup)}`);
+
+    const herbalRepair=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('iron',1,1.5);d.setSkillLevel('smithing',3);const m=d.npc('mira');d.setPosition(m.x,m.y);const coinsBefore=d.snapshot().player.coins;const repaired=d.useSkill('smithing');const after=d.npcArtifact('mira','shears');d.advance(1);return{coinsBefore,repaired,after,used:d.npcArtifact('mira','shears'),state:d.snapshot()};});
+    professionMira=herbalRepair.state.npcs.find(n=>n.id==='mira');
+    if(!herbalRepair.repaired||herbalRepair.after?.provenance?.maker!=='Alden'||herbalRepair.after.provenance.repairs!==1||herbalRepair.after.durability<=0||!herbalRepair.after.provenance.history.some(x=>x.includes('Serviced by You for Mira')))throw new Error(`${vp.name}: Mira's exact work tool was not restored by Smithing ${JSON.stringify(herbalRepair)}`);
+    if((professionMira.stock.tonic||0)<1||herbalRepair.used.durability>=herbalRepair.after.durability||!herbalRepair.used.provenance.history.some(x=>x.includes('Used by Mira to prepare Field Tonic'))||herbalRepair.state.player.coins<=herbalRepair.coinsBefore||professionMira.trust<=0)throw new Error(`${vp.name}: repaired Herbal Shears did not restore productive/economic capability ${JSON.stringify(herbalRepair)}`);
+
+    const forgeToolSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('alden','pick',0);d.setNpcStock('alden','iron',3);d.setNpcStock('alden','wood',1);d.forceNpcNeed('tamsin','pick');const original=d.npcArtifact('alden','hammer');d.setNpcArtifactDurability('alden','hammer',0);d.rethink('alden');d.advance(1);return{original,broken:d.npcArtifact('alden','hammer'),state:d.snapshot()};});
+    let professionAlden=forgeToolSetup.state.npcs.find(n=>n.id==='alden');
+    if(forgeToolSetup.original?.provenance?.maker!=='Alden'||forgeToolSetup.broken?.durability!==0||(professionAlden.stock.pick||0)!==0||professionAlden.goal!=='gear'||professionAlden.request?.id!=='hammer')throw new Error(`${vp.name}: broken Forge Hammer did not halt smith production/create service demand ${JSON.stringify(forgeToolSetup)}`);
+
+    const forgeRepair=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('iron',1,1.5);d.setSkillLevel('smithing',4);const a=d.npc('alden');d.setPosition(a.x,a.y);const coinsBefore=d.snapshot().player.coins;const repaired=d.useSkill('smithing');const after=d.npcArtifact('alden','hammer');d.advance(1);d.rethink('tamsin');d.advance(14);return{coinsBefore,repaired,after,used:d.npcArtifact('alden','hammer'),state:d.snapshot()};});
+    professionAlden=forgeRepair.state.npcs.find(n=>n.id==='alden');const professionTamsin=forgeRepair.state.npcs.find(n=>n.id==='tamsin');
+    if(!forgeRepair.repaired||forgeRepair.after?.provenance?.maker!=='Alden'||forgeRepair.after.provenance.repairs!==1||forgeRepair.after.durability<=0||!forgeRepair.after.provenance.history.some(x=>x.includes('Serviced by You for Alden')))throw new Error(`${vp.name}: Alden's exact Forge Hammer was not restored by Smithing ${JSON.stringify(forgeRepair)}`);
+    if(!forgeRepair.used.provenance.history.some(x=>x.includes('Used by Alden to forge an Iron Pick'))||forgeRepair.used.durability>=forgeRepair.after.durability||forgeRepair.state.player.coins<=forgeRepair.coinsBefore||professionAlden.trust<=0)throw new Error(`${vp.name}: repaired Forge Hammer did not restore productive/economic capability ${JSON.stringify(forgeRepair)}`);
+    if((professionTamsin.stock.pick||0)<1||!professionTamsin.memory.some(m=>m.text.includes('Alden supplied Iron Pick')))throw new Error(`${vp.name}: restored forge production did not propagate to downstream NPC need ${JSON.stringify({professionAlden,professionTamsin})}`);
+
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.9.0',{timeout:5000});
+    const persistedHammer=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('alden','hammer'));
+    if(persistedHammer?.provenance?.maker!=='Alden'||persistedHammer.provenance.repairs!==1||persistedHammer.durability!==forgeRepair.used.durability||!persistedHammer.provenance.history.some(x=>x.includes('Used by Alden to forge an Iron Pick')))throw new Error(`${vp.name}: profession-tool service/use history did not persist ${JSON.stringify(persistedHammer)}`);
+
     if(errors.length)throw new Error(`${vp.name}: runtime errors: ${errors.join(' | ')}`);
     const canvas=await page.locator('#game').boundingBox();if(!canvas||canvas.width<250||canvas.height<140)throw new Error(`${vp.name}: canvas unusable`);
-    console.log(`PASS ${vp.name}: living AI + causal production + skill alternatives + equipment-dependent capability + player Smithing service economy + persistent item lineage`);
+    console.log(`PASS ${vp.name}: living AI + causal production + profession-tool dependencies + service economy + equipment capability + persistent item lineage`);
     await context.close();
   }
 } finally { await browser.close(); }
