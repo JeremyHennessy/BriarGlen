@@ -212,7 +212,7 @@
   function updateWeather(dt){world.weatherTimer-=dt;if(world.weatherTimer<=0){const old=world.weather;world.weather=Math.random()<.38?'rain':'clear';world.weatherTimer=rand(160,300);if(old!==world.weather)log(world.weather==='rain'?'Rain settles over Briar Glen. Herbs will come up richer.':'The rain clears. Roads dry and travel quickens.','world');}}
   function updateClock(dt){world.minute+=dt*5.2;if(world.minute>=1440){world.minute-=1440;world.day++;log(`Day ${world.day} begins. Prices and shortages have shifted.`,'world');for(const n of npcs)n.trust=clamp(n.trust-.03,0,10);}world.minute=Math.max(0,world.minute);}
 
-  function apprenticeState(){player.apprentice=normalizeApprentice(player.apprentice);return player.apprentice;}
+  function apprenticeState(){if(!player.apprentice||typeof player.apprentice!=='object'||!player.apprentice.values)player.apprentice=normalizeApprentice(player.apprentice);return player.apprentice;}
   function apprenticeRemember(text){const a=apprenticeState();a.memory.push({day:world.day,minute:world.minute,text});if(a.memory.length>10)a.memory.shift();}
   function apprenticeMetric(){const trust=npcs.reduce((s,n)=>s+n.trust,0),skill=Object.values(player.skills).reduce((s,x)=>s+x.level+x.xp/100,0),pack=Object.entries(player.inventory).reduce((s,[id,slot])=>s+(itemDefs[id]?.base||0)*slot.qty*.025,0);return player.coins*.04+player.hp*.025+trust*1.6+(player.servicesCompleted||0)*1.5+skill*.25+pack;}
   function apprenticeValue(kind){return Number(apprenticeState().values?.[kind]?.value||0);}
