@@ -314,7 +314,7 @@ try{
 
     const autonomousService=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.give('iron',1,1.4);d.setNpcArtifactDurability('tamsin','blade',0);const enabled=d.setApprentice(true);for(let i=0;i<180&&!d.npc('tamsin').memory.some(m=>m.text.includes('serviced my Warden Blade'));i++)d.advance(.25);return{enabled,agent:d.apprentice(),state:d.snapshot(),blade:d.npcArtifact('tamsin','blade')};});
     const autonomousTamsin=autonomousService.state.npcs.find(n=>n.id==='tamsin');
-    if(!autonomousService.enabled||!autonomousTamsin.memory.some(m=>m.text.includes('serviced my Warden Blade'))||(autonomousService.agent.values?.service?.tries||0)<1||autonomousService.blade?.durability<=0||autonomousService.state.player.skills.smithing.xp<8)throw new Error(`${vp.name}: Autonomous Apprentice did not independently service damaged NPC gear ${JSON.stringify(autonomousService)}`);
+    if(!autonomousService.enabled||!autonomousTamsin.memory.some(m=>m.text.includes('Warden Blade')&&(m.text.includes('serviced')||m.text.includes('repaired')))||(autonomousService.agent.values?.service?.tries||0)<1||autonomousService.blade?.durability<=0||autonomousService.blade?.provenance?.repairs<1||autonomousService.state.player.skills.smithing.xp<8)throw new Error(`${vp.name}: Autonomous Apprentice did not independently service damaged NPC gear ${JSON.stringify(autonomousService)}`);
 
     await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.17.0',{timeout:5000});
     const persistedApprentice=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.apprentice());
