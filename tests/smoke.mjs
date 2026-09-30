@@ -37,12 +37,12 @@ try{
 
       const npcTap=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(1250,545);return d.tapTarget('npc','alden');});
       if(!npcTap)throw new Error(`${vp.name}: could not target NPC for smart tap`);
-      for(let i=0;i<12;i++){const nav=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.navigation());if(!nav.active)break;await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(1));}
+      for(let i=0;i<60;i++){const nav=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.navigation());if(!nav.active)break;await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(.2));}
       const nearAlden=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,s=d.snapshot(),a=d.npc('alden');return{gap:Math.hypot(s.player.x-a.x,s.player.y-a.y),nav:d.navigation()};});
       const nearbyText=await page.locator('#nearby').innerText();
       if(nearAlden.nav.active||nearAlden.gap>72||!nearbyText.includes('Alden'))throw new Error(`${vp.name}: smart tap did not walk to and interact with NPC ${JSON.stringify({nearAlden,nearbyText})}`);
 
-      const gathered=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,r=d.resourceOfType('iron');if(!r)return{ok:false};d.setPosition(r.x+110,r.y);const before=d.snapshot().player.inventory.iron?.qty||0,ok=d.tapTarget('resource',r.id);for(let i=0;i<4&&d.navigation().active;i++)d.advance(1);const after=d.snapshot().player.inventory.iron?.qty||0;return{ok,before,after,nav:d.navigation()};});
+      const gathered=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,r=d.resourceOfType('iron');if(!r)return{ok:false};d.setPosition(r.x+110,r.y);const before=d.snapshot().player.inventory.iron?.qty||0,ok=d.tapTarget('resource',r.id);for(let i=0;i<20&&d.navigation().active;i++)d.advance(.2);const after=d.snapshot().player.inventory.iron?.qty||0;return{ok,before,after,nav:d.navigation()};});
       if(!gathered.ok||gathered.nav.active||gathered.after<=gathered.before)throw new Error(`${vp.name}: smart tap did not walk to and gather resource ${JSON.stringify(gathered)}`);
     }
 
