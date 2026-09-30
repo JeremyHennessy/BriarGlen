@@ -12,11 +12,39 @@ try{
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
     await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
-    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.0',{timeout:5000});
+    await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.1',{timeout:5000});
     let state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.npcs.length!==4)throw new Error(`${vp.name}: expected four autonomous NPCs`);
     if(!state.npcs.every(n=>n.goalText&&Array.isArray(n.memory)))throw new Error(`${vp.name}: NPC cognition surface missing`);
     if(state.resources<30)throw new Error(`${vp.name}: resource world under-seeded`);
+
+    if(vp.touch){
+      const canvas=page.locator('#game'),box=await canvas.boundingBox();
+      if(!box)throw new Error(`${vp.name}: canvas missing for touch navigation`);
+      const beforeTap=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player);
+      await canvas.tap({position:{x:box.width*.78,y:box.height*.5}});
+      const navAfterTap=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.navigation());
+      if(!navAfterTap.active)throw new Error(`${vp.name}: real canvas tap did not start navigation`);
+      await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(1.2));
+      const afterTap=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player);
+      if(afterTap.x<=beforeTap.x+80)throw new Error(`${vp.name}: tap-to-move did not materially move player ${JSON.stringify({beforeTap,afterTap,navAfterTap})}`);
+
+      await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.tapWorld(1500,600);});
+      await page.keyboard.down('ArrowLeft');
+      const cancelled=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.navigation());
+      await page.keyboard.up('ArrowLeft');
+      if(cancelled.active)throw new Error(`${vp.name}: manual movement did not cancel tap navigation`);
+
+      const npcTap=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(1250,545);return d.tapTarget('npc','alden');});
+      if(!npcTap)throw new Error(`${vp.name}: could not target NPC for smart tap`);
+      for(let i=0;i<12;i++){const nav=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.navigation());if(!nav.active)break;await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(1));}
+      const nearAlden=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,s=d.snapshot(),a=d.npc('alden');return{gap:Math.hypot(s.player.x-a.x,s.player.y-a.y),nav:d.navigation()};});
+      const nearbyText=await page.locator('#nearby').innerText();
+      if(nearAlden.nav.active||nearAlden.gap>72||!nearbyText.includes('Alden'))throw new Error(`${vp.name}: smart tap did not walk to and interact with NPC ${JSON.stringify({nearAlden,nearbyText})}`);
+
+      const gathered=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,r=d.resourceOfType('iron');if(!r)return{ok:false};d.setPosition(r.x+110,r.y);const before=d.snapshot().player.inventory.iron?.qty||0,ok=d.tapTarget('resource',r.id);for(let i=0;i<4&&d.navigation().active;i++)d.advance(1);const after=d.snapshot().player.inventory.iron?.qty||0;return{ok,before,after,nav:d.navigation()};});
+      if(!gathered.ok||gathered.nav.active||gathered.after<=gathered.before)throw new Error(`${vp.name}: smart tap did not walk to and gather resource ${JSON.stringify(gathered)}`);
+    }
 
     await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('iron',5,2.4);d.give('wood',2,2.0);});
     if(!await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.craft('pick')))throw new Error(`${vp.name}: meaningful tool craft failed`);
@@ -162,7 +190,7 @@ try{
     if(!replacementWolfDead||usedBlade?.provenance?.maker!=='You'||usedBlade.durability>=usedBlade.maxDurability||!usedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: owned Warden Blade did not determine/usefully wear through NPC capability ${JSON.stringify({usedBlade,equippedTamsin})}`);
     if(!equippedTamsin.memory.some(m=>m.text.includes('blade you forged'))||!equippedMira.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!(equippedMira.relations?.tamsin>0))throw new Error(`${vp.name}: NPC capability use left no social/maker consequence ${JSON.stringify({equippedTamsin,equippedMira})}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.1',{timeout:5000});
     const persistedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(persistedBlade?.provenance?.maker!=='You'||persistedBlade.durability!==usedBlade.durability||!persistedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: NPC capability item history/condition did not persist ${JSON.stringify(persistedBlade)}`);
 
@@ -180,7 +208,7 @@ try{
     const servicedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(!servicedWolfDead||servicedBlade?.provenance?.maker!=='Alden'||servicedBlade.provenance.repairs!==1||servicedBlade.durability>=serviceSetup.after.durability||!servicedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger')))throw new Error(`${vp.name}: repaired NPC equipment did not restore real Warden capability ${JSON.stringify(servicedBlade)}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.1',{timeout:5000});
     const persistedServiceBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     if(persistedServiceBlade?.provenance?.maker!=='Alden'||persistedServiceBlade.provenance.repairs!==1||persistedServiceBlade.durability!==servicedBlade.durability||!persistedServiceBlade.provenance.history.some(x=>x.includes('Serviced by You for Tamsin')))throw new Error(`${vp.name}: NPC Smithing service history did not persist ${JSON.stringify(persistedServiceBlade)}`);
 
@@ -203,7 +231,7 @@ try{
     if(!forgeRepair.used.provenance.history.some(x=>x.includes('Used by Alden to forge an Iron Pick'))||forgeRepair.used.durability>=forgeRepair.after.durability||forgeRepair.state.player.coins<=forgeRepair.coinsBefore||professionAlden.trust<=0)throw new Error(`${vp.name}: repaired Forge Hammer did not restore productive/economic capability ${JSON.stringify(forgeRepair)}`);
     if((professionTamsin.stock.pick||0)<1||!professionTamsin.memory.some(m=>m.text.includes('Alden supplied Iron Pick')))throw new Error(`${vp.name}: restored forge production did not propagate to downstream NPC need ${JSON.stringify({professionAlden,professionTamsin})}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.1',{timeout:5000});
     const persistedHammer=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('alden','hammer'));
     if(persistedHammer?.provenance?.maker!=='Alden'||persistedHammer.provenance.repairs!==1||persistedHammer.durability!==forgeRepair.used.durability||!persistedHammer.provenance.history.some(x=>x.includes('Used by Alden to forge an Iron Pick')))throw new Error(`${vp.name}: profession-tool service/use history did not persist ${JSON.stringify(persistedHammer)}`);
 
@@ -221,7 +249,7 @@ try{
     if(townCall.goal!=='seekService'||townCall.end>=townCall.start-30||townCall.end>75)throw new Error(`${vp.name}: referred unserviced NPC did not seek the player into service range ${JSON.stringify(townCall)}`);
     if(!townCall.third||townCall.final.player.servicesCompleted!==3||townAlden.seekingServiceFor||townAlden.trust<=0||!townAlden.memory.some(m=>m.text.includes('serviced my Forge Hammer'))||townCall.final.player.knownFor!=='keeping the Glen’s gear working')throw new Error(`${vp.name}: sought-out service did not resolve into specialist reputation/consequences ${JSON.stringify(townCall.final)}`);
 
-    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.0',{timeout:5000});
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.12.1',{timeout:5000});
     const persistedSpecialist=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     const persistedAlden=persistedSpecialist.npcs.find(n=>n.id==='alden'),persistedRowan=persistedSpecialist.npcs.find(n=>n.id==='rowan');
     if(persistedSpecialist.player.servicesCompleted!==3||persistedSpecialist.player.knownFor!=='keeping the Glen’s gear working'||!persistedAlden.memory.some(m=>m.text.includes('serviced my Forge Hammer'))||!persistedAlden.knowledge?.smith?.sources?.includes('tamsin')||!persistedRowan.knowledge?.smith?.sources?.includes('mira'))throw new Error(`${vp.name}: social specialist reputation did not persist ${JSON.stringify(persistedSpecialist.player)}`);
