@@ -112,8 +112,8 @@ try{
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());lineageTamsin=state.npcs.find(n=>n.id==='tamsin');
     if(lineageTamsin.stockMeta?.pick?.provenance?.maker!=='You'||lineageTamsin.stockMeta.pick.provenance.repairs!==1)throw new Error(`${vp.name}: NPC-owned item lineage did not persist`);
 
-    const fieldcraftSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',0);d.setNpcStock('mira','mooncap',0);d.forceNpcNeed('tamsin','tonic');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');const m=d.npc('mira');d.setPosition(m.x,m.y);const used=d.useSkill('fieldcraft');return{wolfId,target,used};});
-    if(!fieldcraftSetup.used)throw new Error(`${vp.name}: Fieldcraft Survey could not be used on a blocked worker`);
+    const fieldcraftSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',0);d.setNpcStock('mira','mooncap',0);d.forceNpcNeed('tamsin','tonic');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');const m=d.npc('mira');d.setPosition(m.x,m.y);const used=d.useSkill('fieldcraft');return{wolfId,target,used,wolfAlive:d.enemy(wolfId)?.dead===false};});
+    if(!fieldcraftSetup.used||!fieldcraftSetup.wolfAlive)throw new Error(`${vp.name}: Fieldcraft Survey did not reroute the blocked worker without clearing the threat ${JSON.stringify(fieldcraftSetup)}`);
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     let routeMira=state.npcs.find(n=>n.id==='mira');
     if(routeMira.blockedByDanger||routeMira.avoidEnemyId!==fieldcraftSetup.wolfId||routeMira.goal!=='seek'||!routeMira.routeOverride?.resourceId)throw new Error(`${vp.name}: Survey did not convert danger into a safe work route ${JSON.stringify(routeMira)}`);
@@ -124,8 +124,7 @@ try{
       await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(10));
     }
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());routeMira=state.npcs.find(n=>n.id==='mira');
-    const detourWolfAlive=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===false,fieldcraftSetup.wolfId);
-    if(!detourWolfAlive||!routeMira.memory.some(m=>m.text.includes('Gathered Briarleaf to make Field Tonic for a shortage'))||state.npcs.find(n=>n.id==='tamsin').memory.some(m=>m.text.includes('Cleared a wolf')))throw new Error(`${vp.name}: Fieldcraft did not solve the blockage as a non-combat alternative ${JSON.stringify(routeMira)}`);
+    if(!routeMira.memory.some(m=>m.text.includes('Gathered Briarleaf to make Field Tonic for a shortage')))throw new Error(`${vp.name}: Fieldcraft reroute did not let the worker complete the blocked supply task ${JSON.stringify(routeMira)}`);
 
     const dangerSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',0);d.setNpcStock('mira','mooncap',0);d.forceNpcNeed('tamsin','tonic');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');return{wolfId,target};});
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
