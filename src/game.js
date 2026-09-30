@@ -1,9 +1,9 @@
 (() => {
   'use strict';
 
-  const BUILD = Object.freeze({version:'0.16.0',id:'living-world-reboot',saveKey:'briar-glen-reboot-v1'});
+  const BUILD = Object.freeze({version:'0.17.0',id:'living-world-reboot',saveKey:'briar-glen-reboot-v1'});
   const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
-  const UI={clock:document.getElementById('clock'),coins:document.getElementById('coins'),hp:document.getElementById('hp'),energy:document.getElementById('energy'),standing:document.getElementById('standing'),knownFor:document.getElementById('known-for'),skills:document.getElementById('skills'),inventory:document.getElementById('inventory'),packWeight:document.getElementById('pack-weight'),nearby:document.getElementById('nearby'),nearbyType:document.getElementById('nearby-type'),log:document.getElementById('log'),toast:document.getElementById('toast'),worldLine:document.getElementById('world-line')};
+  const UI={clock:document.getElementById('clock'),coins:document.getElementById('coins'),hp:document.getElementById('hp'),energy:document.getElementById('energy'),standing:document.getElementById('standing'),knownFor:document.getElementById('known-for'),skills:document.getElementById('skills'),inventory:document.getElementById('inventory'),packWeight:document.getElementById('pack-weight'),nearby:document.getElementById('nearby'),nearbyType:document.getElementById('nearby-type'),log:document.getElementById('log'),toast:document.getElementById('toast'),worldLine:document.getElementById('world-line'),apprenticeToggle:document.getElementById('apprentice-toggle'),apprenticeGoal:document.getElementById('apprentice-goal'),apprenticeThought:document.getElementById('apprentice-thought'),apprenticeScore:document.getElementById('apprentice-score')};
   const TAU=Math.PI*2,clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
   const rand=(a,b)=>a+Math.random()*(b-a);
 
@@ -38,8 +38,12 @@
   const world={w:1800,h:1200,minute:8*60,day:1,weather:'clear',weatherTimer:220,events:[],resources:[],enemies:[],drops:[],townNeeds:{food:0,medicine:0,metal:0},serial:1};
   const camera={x:0,y:0};
   const navigation={active:false,x:0,y:0,target:null};
-  const player={x:900,y:600,r:12,speed:170,hp:100,maxHp:100,energy:100,maxEnergy:100,coins:24,attackCd:0,attackArc:0,guarded:false,surveyUntil:0,readNeedUntil:0,equippedTool:null,equippedWeapon:null,knownFor:'nothing yet',standing:'Unknown',servicesCompleted:0,inventory:{},skills:{}};
+  const player={x:900,y:600,r:12,speed:170,hp:100,maxHp:100,energy:100,maxEnergy:100,coins:24,attackCd:0,attackArc:0,guarded:false,surveyUntil:0,readNeedUntil:0,equippedTool:null,equippedWeapon:null,knownFor:'nothing yet',standing:'Unknown',servicesCompleted:0,inventory:{},skills:{},apprentice:null};
   for(const key of Object.keys(skillDefs))player.skills[key]={xp:0,level:1};
+  const apprenticeKinds=['recover','rest','help','service','connect','craft','gather','combat','explore'];
+  function freshApprentice(){const values={};for(const kind of apprenticeKinds)values[kind]={tries:0,value:0};return{enabled:false,think:0,goal:'Manual control',reason:'',plan:null,memory:[],values,decisions:0,successes:0,lastReward:0};}
+  function normalizeApprentice(raw){const base=freshApprentice(),src=raw&&typeof raw==='object'?raw:{};base.enabled=!!src.enabled;base.think=0;base.goal=typeof src.goal==='string'?src.goal:'Manual control';base.reason=typeof src.reason==='string'?src.reason:'';base.plan=null;base.memory=Array.isArray(src.memory)?src.memory.slice(-10):[];base.decisions=Math.max(0,Number(src.decisions||0));base.successes=Math.max(0,Number(src.successes||0));base.lastReward=Number(src.lastReward||0);for(const kind of apprenticeKinds){const v=src.values?.[kind];base.values[kind]={tries:Math.max(0,Number(v?.tries||0)),value:Number(v?.value||0)};}return base;}
+  player.apprentice=freshApprentice();
 
   const zones=[
     {id:'village',name:'Briar Glen',x:650,y:390,w:500,h:420,color:'#596c4e'},
@@ -126,7 +130,7 @@
   function spawnWolf(x,y){world.enemies.push({id:`w${world.serial++}`,type:'wolf',x,y,r:12,hp:36,maxHp:36,attackCd:0,wander:rand(0,10),dead:false});}
   function seedEnemies(){world.enemies.length=0;for(let i=0;i<6;i++)spawnWolf(rand(1240,1670),rand(300,650));for(let i=0;i<3;i++)spawnWolf(rand(350,800),rand(820,1040));}
 
-  function reset(){world.minute=8*60;world.day=1;world.weather='clear';world.weatherTimer=220;world.events=[];world.serial=1;player.x=900;player.y=600;player.hp=100;player.energy=100;player.coins=24;player.servicesCompleted=0;clearNavigation();player.inventory={};player.equippedTool=null;player.equippedWeapon=null;player.knownFor='nothing yet';player.standing='Unknown';for(const k of Object.keys(player.skills))player.skills[k]={xp:0,level:1};npcs=npcTemplates.map(newNPC);seedResources();seedEnemies();addItem('bread',2,1);log('A new day begins in Briar Glen. Everyone here has needs of their own.','world');save();}
+  function reset(){world.minute=8*60;world.day=1;world.weather='clear';world.weatherTimer=220;world.events=[];world.serial=1;player.x=900;player.y=600;player.hp=100;player.energy=100;player.coins=24;player.servicesCompleted=0;player.apprentice=freshApprentice();clearNavigation();player.inventory={};player.equippedTool=null;player.equippedWeapon=null;player.knownFor='nothing yet';player.standing='Unknown';for(const k of Object.keys(player.skills))player.skills[k]={xp:0,level:1};npcs=npcTemplates.map(newNPC);seedResources();seedEnemies();addItem('bread',2,1);log('A new day begins in Briar Glen. Everyone here has needs of their own.','world');save();}
 
   function memory(n,text){n.memory.push({day:world.day,text});if(n.memory.length>12)n.memory.shift();}
   function npcNeedScore(n,id){const raw=n.stock[id]||0,stock=isArtifact(id)&&raw>0&&!npcArtifactReady(n,id)?0:raw,bias=n.needBias[id]||0,target=isArtifact(id)?1:3;return bias*Math.max(0,target-stock)+(id==='bread'?n.hunger/35:0);}
