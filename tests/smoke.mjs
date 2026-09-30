@@ -81,10 +81,10 @@ try{
     if((tamsin.stock.tonic||0)<1||!(tamsin.relations?.mira>0))throw new Error(`${vp.name}: NPC-to-NPC supply decision failed`);
     if(!tamsin.memory.some(m=>m.text.includes('Mira supplied Field Tonic'))||!mira.memory.some(m=>m.text.includes('Tamsin came to me for Field Tonic')))throw new Error(`${vp.name}: NPC exchange memory failed`);
 
-    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setNpcStock('tamsin','tonic',0);d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',0);d.setNpcStock('mira','mooncap',0);d.forceNpcNeed('tamsin','tonic');d.rethink('mira');d.rethink('tamsin');d.advance(120);});
+    const plannedDeliveryBefore=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,before=d.npc('tamsin').memory.filter(m=>m.text.includes('Mira supplied Field Tonic')).length;d.setNpcStock('tamsin','tonic',0);d.setNpcStock('mira','tonic',0);d.setNpcStock('mira','briarleaf',0);d.setNpcStock('mira','mooncap',0);d.forceNpcNeed('tamsin','tonic');d.rethink('mira');d.rethink('tamsin');d.advance(120);return before;});
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
-    const plannedMira=state.npcs.find(n=>n.id==='mira'),plannedTamsin=state.npcs.find(n=>n.id==='tamsin');
-    if((plannedTamsin.stock.tonic||0)<1)throw new Error(`${vp.name}: downstream shortage did not resolve through producer planning ${JSON.stringify({mira:plannedMira, tamsin:plannedTamsin})}`);
+    const plannedMira=state.npcs.find(n=>n.id==='mira'),plannedTamsin=state.npcs.find(n=>n.id==='tamsin'),plannedDeliveries=plannedTamsin.memory.filter(m=>m.text.includes('Mira supplied Field Tonic')).length;
+    if(plannedDeliveries<=plannedDeliveryBefore)throw new Error(`${vp.name}: downstream shortage did not resolve through producer planning ${JSON.stringify({before:plannedDeliveryBefore,after:plannedDeliveries,mira:plannedMira,tamsin:plannedTamsin})}`);
     if(!plannedMira.memory.some(m=>m.text.includes('to make Field Tonic for a shortage'))||!plannedMira.memory.some(m=>m.text.includes('Prepared a Field Tonic')))throw new Error(`${vp.name}: producer did not remember causal production chain`);
 
     await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('blade',1,3);d.equip('blade');});
