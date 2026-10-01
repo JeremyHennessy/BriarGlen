@@ -317,7 +317,7 @@ try{
     const equipmentSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();const issued=d.npcArtifact('tamsin','blade');d.setNpcArtifactDurability('tamsin','blade',0);d.forceNpcNeed('mira','briarleaf');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');d.rethink('tamsin');d.advance(4);return{issued,wolfId,target};});
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     let equippedTamsin=state.npcs.find(n=>n.id==='tamsin'),equippedMira=state.npcs.find(n=>n.id==='mira');
-    const blockedWolfAlive=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===false,replacement.wolfId);
+    const blockedWolfAlive=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===false,equipmentSetup.wolfId);
     if(equipmentSetup.issued?.provenance?.maker!=='Alden'||!blockedWolfAlive||equippedTamsin.goal!=='gear'||equippedTamsin.request?.id!=='blade')throw new Error(`${vp.name}: broken Warden equipment did not block capability/create replacement need ${JSON.stringify({equipmentSetup,equippedTamsin})}`);
     if(!equippedMira.blockedByDanger)throw new Error(`${vp.name}: danger report vanished while Warden lacked usable gear`);
 
