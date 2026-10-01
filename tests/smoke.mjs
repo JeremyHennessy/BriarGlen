@@ -21,7 +21,7 @@ try{
     if(equipmentStart.equippedTool||equipmentStart.equippedWeapon)throw new Error(`${vp.name}: acquired gear unexpectedly auto-equipped ${JSON.stringify(equipmentStart)}`);
     const pickRow=page.locator('#inventory [data-equip="pick"]'),bladeRow=page.locator('#inventory [data-equip="blade"]');
     if(await pickRow.count()!==1||await bladeRow.count()!==1)throw new Error(`${vp.name}: artifact inventory rows are not controllable`);
-    const activateGear=async row=>{if(vp.touch)await row.tap();else{await row.focus();await row.press('Enter');}};
+    const activateGear=async row=>{if(vp.touch)await row.tap();else{await row.focus();await page.waitForTimeout(220);await row.press('Enter');}};
     await activateGear(pickRow);
     let equipment=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player);
     if(equipment.equippedTool!=='pick'||!(await pickRow.innerText()).includes('equipped'))throw new Error(`${vp.name}: inventory control did not equip Iron Pick ${JSON.stringify(equipment)}`);
