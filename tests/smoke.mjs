@@ -82,7 +82,7 @@ try{
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.player.skills.rapport.xp<=0)throw new Error(`${vp.name}: active skill did not improve through use`);
 
-    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setNpcStock('mira','tonic',2);d.forceNpcNeed('tamsin','tonic');d.rethink('tamsin');});
+    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',2);d.forceNpcNeed('tamsin','tonic');d.rethink('tamsin');});
     for(let i=0;i<20;i++){
       const supplied=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,s=d.snapshot(),t=s.npcs.find(n=>n.id==='tamsin');return(t.stock.tonic||0)>=1&&(t.relations?.mira||0)>0;});
       if(supplied)break;
