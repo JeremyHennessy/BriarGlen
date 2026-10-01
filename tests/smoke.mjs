@@ -317,7 +317,7 @@ try{
     const equipmentSetup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();const issued=d.npcArtifact('tamsin','blade');d.setNpcArtifactDurability('tamsin','blade',0);d.forceNpcNeed('mira','briarleaf');d.rethink('mira');const target={...d.npc('mira').target};const wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');d.rethink('tamsin');d.advance(4);return{issued,wolfId,target};});
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     let equippedTamsin=state.npcs.find(n=>n.id==='tamsin'),equippedMira=state.npcs.find(n=>n.id==='mira');
-    const blockedWolfAlive=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===false,equipmentSetup.wolfId);
+    const blockedWolfAlive=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===false,replacement.wolfId);
     if(equipmentSetup.issued?.provenance?.maker!=='Alden'||!blockedWolfAlive||equippedTamsin.goal!=='gear'||equippedTamsin.request?.id!=='blade')throw new Error(`${vp.name}: broken Warden equipment did not block capability/create replacement need ${JSON.stringify({equipmentSetup,equippedTamsin})}`);
     if(!equippedMira.blockedByDanger)throw new Error(`${vp.name}: danger report vanished while Warden lacked usable gear`);
 
@@ -327,20 +327,20 @@ try{
     const persistedResidentBlade=await page.evaluate(()=>({blade:window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'),alden:window.__BRIAR_GLEN_DEBUG__.npc('alden'),tamsin:window.__BRIAR_GLEN_DEBUG__.npc('tamsin')}));
     if(persistedResidentBlade.blade?.provenance?.source!=='Emergency Warden issue'||persistedResidentBlade.blade.quality>=1.7||!persistedResidentBlade.blade.provenance.history.some(x=>x.includes('Transferred from Alden to Tamsin'))||!persistedResidentBlade.alden.memory.some(m=>m.text.includes('plain emergency Warden Blade'))||!persistedResidentBlade.tamsin.memory.some(m=>m.text.includes('Alden forged a basic Warden Blade')))throw new Error(`${vp.name}: resident Warden replacement lineage/consequence did not persist ${JSON.stringify(persistedResidentBlade)}`);
 
-    const replacement=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setSkillLevel('smithing',2);d.give('iron',4,2.8);d.give('wood',1,2.5);d.give('hide',1,2.4);const crafted=d.craft('blade');const before=d.artifact('blade');const t=d.npc('tamsin');d.setPosition(t.x,t.y);const helped=d.help('tamsin');d.rethink('tamsin');return{crafted,helped,before,owned:d.npcArtifact('tamsin','blade')};});
+    const replacement=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcArtifactDurability('tamsin','blade',0);d.forceNpcNeed('mira','briarleaf');d.rethink('mira');const target={...d.npc('mira').target},wolfId=d.spawnWolfAt(target.x,target.y);d.rethink('mira');d.rethink('tamsin');d.advance(4);d.setSkillLevel('smithing',2);d.give('iron',4,2.8);d.give('wood',1,2.5);d.give('hide',1,2.4);const crafted=d.craft('blade');const before=d.artifact('blade');const t=d.npc('tamsin');d.setPosition(t.x,t.y);const helped=d.help('tamsin');d.rethink('tamsin');return{wolfId,crafted,helped,before,owned:d.npcArtifact('tamsin','blade')};});
     if(!replacement.crafted||!replacement.helped||replacement.before?.provenance?.maker!=='You'||replacement.owned?.provenance?.maker!=='You')throw new Error(`${vp.name}: player-forged replacement blade did not transfer as the same living item ${JSON.stringify(replacement)}`);
 
     for(let i=0;i<10;i++){
-      const dead=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===true,equipmentSetup.wolfId);
+      const dead=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===true,replacement.wolfId);
       if(dead)break;
       await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(4));
     }
-    const replacementWolfDead=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===true,equipmentSetup.wolfId);
+    const replacementWolfDead=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===true,replacement.wolfId);
     const usedBlade=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'));
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());equippedTamsin=state.npcs.find(n=>n.id==='tamsin');equippedMira=state.npcs.find(n=>n.id==='mira');
     if(!replacementWolfDead||usedBlade?.provenance?.maker!=='You'||usedBlade.durability>=usedBlade.maxDurability||!usedBlade.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger'))||!usedBlade.provenance.impactCredited||state.player.makerImpact!==1||state.player.knownFor!=='making useful things')throw new Error(`${vp.name}: owned Warden Blade did not determine/usefully wear through NPC capability and earn maker identity ${JSON.stringify({usedBlade,equippedTamsin,player:state.player})}`);
     const bladeUse=usedBlade.provenance.history.find(x=>x.includes('Used by Tamsin to clear danger for ')),helpedName=bladeUse?.match(/danger for (.+) on Day/)?.[1],helpedReporter=state.npcs.find(n=>n.name===helpedName);
-    if(!equippedTamsin.memory.some(m=>m.text.includes('blade you forged'))||!helpedReporter||!helpedReporter.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!(helpedReporter.relations?.tamsin>0)||helpedReporter.blockedByDanger?.enemyId===equipmentSetup.wolfId)throw new Error(`${vp.name}: restored Warden capability did not create social/maker consequence for the NPC actually helped ${JSON.stringify({bladeUse,helpedName,equippedTamsin,helpedReporter})}`);
+    if(!equippedTamsin.memory.some(m=>m.text.includes('blade you forged'))||!helpedReporter||!helpedReporter.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!(helpedReporter.relations?.tamsin>0)||helpedReporter.blockedByDanger?.enemyId===replacement.wolfId)throw new Error(`${vp.name}: restored Warden capability did not create social/maker consequence for the NPC actually helped ${JSON.stringify({bladeUse,helpedName,equippedTamsin,helpedReporter})}`);
 
     await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.53.0',{timeout:5000});
     const persistedBlade=await page.evaluate(()=>({blade:window.__BRIAR_GLEN_DEBUG__.npcArtifact('tamsin','blade'),player:window.__BRIAR_GLEN_DEBUG__.snapshot().player}));
