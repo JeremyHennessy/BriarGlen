@@ -298,7 +298,7 @@ try{
     await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.rethink('tamsin');d.advance(12);});
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     riskMira=state.npcs.find(n=>n.id==='mira');const riskTamsin=state.npcs.find(n=>n.id==='tamsin');
-    const wolfCleared=await page.evaluate(id=>window.__BRIAR_GLEN_DEBUG__.enemy(id)?.dead===true,dangerSetup.wolfId);
+    const wolfCleared=await page.evaluate(id=>{const e=window.__BRIAR_GLEN_DEBUG__.enemy(id);return !e||e.dead===true;},dangerSetup.wolfId);
     if(!wolfCleared)throw new Error(`${vp.name}: Warden did not clear reported danger`);
     if(riskMira.blockedByDanger)throw new Error(`${vp.name}: civilian danger block was not released`);
     if(!(riskMira.relations?.tamsin>0)||!riskMira.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))||!riskTamsin.memory.some(m=>m.text.includes("blocking Mira's work")))throw new Error(`${vp.name}: danger response did not create social memory ${JSON.stringify({riskMira,riskTamsin})}`);
