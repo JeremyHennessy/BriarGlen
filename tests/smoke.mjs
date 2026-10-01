@@ -82,7 +82,7 @@ try{
     state=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot());
     if(state.player.skills.rapport.xp<=0)throw new Error(`${vp.name}: active skill did not improve through use`);
 
-    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setNpcStock('mira','tonic',2);d.forceNpcNeed('tamsin','tonic');d.rethink('tamsin');});
+    await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,t=d.npc('tamsin'),m=d.npc('mira');d.clearEnemies();d.setNpcStock('tamsin','tonic',0);d.setNpcStock('mira','tonic',2);for(const n of [t,m]){n.exchangeCooldown=0;n.socialCommitment=null;n.brokeredNeed=null;n.pendingReferral=null;}t.blockedByDanger=null;t.avoidEnemyId=null;t.routeOverride=null;t.seekingServiceFor=null;t.serviceCall=null;t.seekingProviderFor=null;t.providerCall=null;t.injury=0;t.hunger=0;t.x=m.x+20;t.y=m.y;t.target={x:m.x,y:m.y};d.forceNpcNeed('tamsin','tonic');d.rethink('tamsin');});
     for(let i=0;i<20;i++){
       const supplied=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,s=d.snapshot(),t=s.npcs.find(n=>n.id==='tamsin');return(t.stock.tonic||0)>=1&&(t.relations?.mira||0)>0;});
       if(supplied)break;
