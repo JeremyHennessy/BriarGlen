@@ -1,0 +1,93 @@
+name: Branch-only quarry proof authoring
+on:
+  push:
+    branches: [custodian/build-0.88-deep-quarry-seam]
+    paths: [.github/workflows/quarry-proof-authoring.yml]
+permissions:
+  contents: write
+jobs:
+  author-proof:
+    if: github.ref == 'refs/heads/custodian/build-0.88-deep-quarry-seam'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Verify exact preserved candidate
+        run: |
+          test "$(git rev-parse HEAD^)" = cb346b56cc926f0a79002657a5ce753fd4d288df
+          test "$(git hash-object src/game.js)" = 39b60c66f3c2e19ff2ef0c4f7427d0a60cdab665
+          test "$(git hash-object tests/smoke.mjs)" = 327a39be564a05ac2abaf2c618aca9c47cf830c5
+          test "$(git ls-remote origin refs/heads/custodian/build-0.88-deep-quarry-seam | cut -f1)" = "$GITHUB_SHA"
+      - name: Add bounded gameplay proof to existing suite
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/smoke.mjs')
+          s=p.read_text()
+          anchor='    const exhaustionTravel=await page.evaluate'
+          assert s.count(anchor)==1 and 'const quarryGates=' not in s
+          count=s.count("'0.87.0'")
+          assert count>0
+          s=s.replace("'0.87.0'", "'0.88.0'")
+          block=r'''    // Deep Quarry Seam: real boss unlock, bounded costs/rewards, and durable daily depletion.
+              const quarryGates=await page.evaluate(()=>{
+                const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.setApprentice(false);d.clearEnemies();
+                const seam=()=>d.landmarks().find(l=>l.id==='deep-quarry-seam');
+                const state=()=>({player:d.snapshot().player,seam:seam()});
+                const attempt=()=>{d.advance(0);const before=state();document.getElementById('interact-btn').click();return{before,after:state(),toast:document.getElementById('toast').textContent};};
+                const seeded=seam(),targeted=d.tapTarget('landmark',seam().id);d.setPosition(seeded.x,seeded.y);const locked=attempt();
+                d.setPosition(30,30);const boss=d.spawnEmberbackAt(30,30);d.setEnemyHp(boss,1);d.advance(.5);d.setEnergy(100);d.attack();const deed=d.snapshot().player.deeds.emberback;d.clearEnemies();
+                d.setPosition(seeded.x,seeded.y);const missing=attempt();d.give('pick',1,1.7);const stowed=attempt();d.equip('pick');d.setDurability('pick',0);const broken=attempt();d.setDurability('pick',8);d.setEnergy(13);const tired=attempt();
+                d.setEnergy(14);const mined=attempt(),saved=JSON.parse(localStorage.getItem(d.build().saveKey));
+                d.setDurability('pick',40);d.setEnergy(100);const repeated=attempt();d.save();
+                return{seeded,targeted,saveKey:d.build().saveKey,zone:d.zoneAtPoint(seeded.x,seeded.y),deed,locked,missing,stowed,broken,tired,mined,saved,repeated,day:d.snapshot().day,nearby:document.getElementById('nearby').textContent};
+              });
+              const quarrySummary=s=>({energy:s.player.energy,inventory:s.player.inventory,discoveries:s.player.discoveries,fieldcraft:s.player.skills.fieldcraft,seam:s.seam});
+              if(!quarryGates.targeted||quarryGates.seeded?.name!=='Deep Quarry Seam'||!quarryGates.seeded.playerOnly||quarryGates.zone?.id!=='quarry'||quarryGates.seeded.lastMinedDay!==0||quarryGates.seeded.discovered||quarryGates.deed!==1)throw new Error(`${vp.name}: quarry seeding or actual Emberback unlock failed ${JSON.stringify(quarryGates)}`);
+              for(const [name,text] of Object.entries({locked:'Emberback',missing:'Equip a working Iron Pick',stowed:'Equip a working Iron Pick',broken:'broken',tired:'need 14 energy'})){
+                const a=quarryGates[name];if(!a.toast.includes(text)||JSON.stringify(quarrySummary(a.before))!==JSON.stringify(quarrySummary(a.after)))throw new Error(`${vp.name}: quarry ${name} gate mutated gameplay state or lacked guidance ${JSON.stringify(a)}`);
+              }
+              const firstQuarry=quarryGates.mined;
+              if(firstQuarry.after.player.energy!==0||firstQuarry.after.player.inventory.pick.durability!==0||firstQuarry.after.player.inventory.iron?.qty!==2||Math.abs(firstQuarry.after.player.inventory.iron.qualitySum-5.2)>1e-9||firstQuarry.after.player.discoveries!==firstQuarry.before.player.discoveries+1||firstQuarry.after.player.skills.fieldcraft.xp!==firstQuarry.before.player.skills.fieldcraft.xp+12||!firstQuarry.after.seam.discovered||firstQuarry.after.seam.lastMinedDay!==quarryGates.day)throw new Error(`${vp.name}: first quarry mining did not apply exact costs, fine ore, or discovery XP ${JSON.stringify(firstQuarry)}`);
+              const savedSeam=quarryGates.saved.world.landmarks.find(l=>l.id==='deep-quarry-seam');
+              if(quarryGates.saved.player.inventory.iron?.qty!==2||quarryGates.saved.player.inventory.pick.durability!==0||quarryGates.saved.player.energy!==0||!savedSeam?.discovered||savedSeam.lastMinedDay!==quarryGates.day||quarryGates.saved.build!=='0.88.0'||quarryGates.saveKey!=='briar-glen-reboot-v1')throw new Error(`${vp.name}: quarry reward/cost/depletion did not save synchronously ${JSON.stringify(quarryGates.saved)}`);
+              if(!quarryGates.nearby.includes('Deep Quarry Seam')||!quarryGates.repeated.toast.includes('already worked today')||JSON.stringify(quarrySummary(quarryGates.repeated.before))!==JSON.stringify(quarrySummary(quarryGates.repeated.after)))throw new Error(`${vp.name}: same-day quarry repeat spent resources or duplicated rewards ${JSON.stringify(quarryGates.repeated)}`);
+              await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.88.0',{timeout:5000});
+              const quarryReload=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setApprentice(false);d.clearEnemies();const l=d.landmarks().find(x=>x.id==='deep-quarry-seam');d.setPosition(l.x,l.y);d.setEnergy(100);d.advance(0);return{player:d.snapshot().player,seam:l};});
+              if(quarryReload.player.inventory.iron?.qty!==2||quarryReload.player.inventory.pick.durability!==40||quarryReload.player.discoveries!==firstQuarry.after.player.discoveries||quarryReload.seam.lastMinedDay!==quarryGates.day||!quarryReload.seam.discovered)throw new Error(`${vp.name}: quarry state did not survive reload ${JSON.stringify(quarryReload)}`);
+              if(vp.touch)await page.locator('#interact-btn').tap();else await page.keyboard.press('e');
+              const quarryRepeatReload=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;return{player:d.snapshot().player,seam:d.landmarks().find(l=>l.id==='deep-quarry-seam'),toast:document.getElementById('toast').textContent};});
+              if(quarryRepeatReload.player.inventory.iron?.qty!==2||quarryRepeatReload.player.inventory.pick.durability!==40||quarryRepeatReload.player.skills.fieldcraft.xp!==quarryReload.player.skills.fieldcraft.xp||!quarryRepeatReload.toast.includes('already worked today'))throw new Error(`${vp.name}: real keyboard/touch control duplicated the saved daily reward ${JSON.stringify(quarryRepeatReload)}`);
+              const quarryNextDay=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setDay(d.snapshot().day+1);d.setEnergy(14);d.setDurability('pick',5);d.advance(0);const before=d.snapshot().player;document.getElementById('interact-btn').click();return{before,after:d.snapshot().player,seam:d.landmarks().find(l=>l.id==='deep-quarry-seam'),day:d.snapshot().day,saved:JSON.parse(localStorage.getItem(d.build().saveKey))};});
+              if(quarryNextDay.after.inventory.iron?.qty!==4||Math.abs(quarryNextDay.after.inventory.iron.qualitySum-10.4)>1e-9||quarryNextDay.after.energy!==0||quarryNextDay.after.inventory.pick.durability!==0||quarryNextDay.after.discoveries!==quarryNextDay.before.discoveries||quarryNextDay.after.skills.fieldcraft.xp!==quarryNextDay.before.skills.fieldcraft.xp+6||quarryNextDay.seam.lastMinedDay!==quarryNextDay.day||quarryNextDay.saved.player.inventory.iron?.qty!==4)throw new Error(`${vp.name}: next-day quarry renewal, bounded wear, or repeat XP failed ${JSON.stringify(quarryNextDay)}`);
+              const quarryLegacy=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setPosition(900,600);d.save();const key=d.build().saveKey,s=JSON.parse(localStorage.getItem(key));s.world.landmarks=s.world.landmarks.filter(l=>l.id!=='deep-quarry-seam');localStorage.setItem(key,JSON.stringify(s));return{landmarks:s.world.landmarks,inventory:s.player.inventory,discoveries:s.player.discoveries,deeds:s.player.deeds};});
+              await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.88.0',{timeout:5000});
+              const quarryMigration=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setApprentice(false);return{landmarks:d.landmarks(),player:d.snapshot().player};});
+              const migratedSeams=quarryMigration.landmarks.filter(l=>l.id==='deep-quarry-seam');
+              if(migratedSeams.length!==1||migratedSeams[0].discovered||migratedSeams[0].lastMinedDay!==0||JSON.stringify(quarryMigration.landmarks.filter(l=>l.id!=='deep-quarry-seam'))!==JSON.stringify(quarryLegacy.landmarks)||JSON.stringify(quarryMigration.player.inventory)!==JSON.stringify(quarryLegacy.inventory)||quarryMigration.player.discoveries!==quarryLegacy.discoveries||JSON.stringify(quarryMigration.player.deeds)!==JSON.stringify(quarryLegacy.deeds))throw new Error(`${vp.name}: old-save quarry migration replaced established progress ${JSON.stringify({quarryLegacy,quarryMigration})}`);
+              // Remove only this fixture's drops via its saved test world; do not change runtime reset behaviour.
+              await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.save();const key=d.build().saveKey,s=JSON.parse(localStorage.getItem(key));s.world.drops=[];localStorage.setItem(key,JSON.stringify(s));});
+              await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.88.0',{timeout:5000});
+              const quarryFresh=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;return{seams:d.landmarks().filter(l=>l.id==='deep-quarry-seam'),player:d.snapshot().player};});
+              if(quarryFresh.seams.length!==1||quarryFresh.seams[0].discovered||quarryFresh.seams[0].lastMinedDay!==0||quarryFresh.player.deeds.emberback||quarryFresh.player.inventory.iron)throw new Error(`${vp.name}: fresh-game quarry state retained prior-run rewards ${JSON.stringify(quarryFresh)}`);
+          
+          '''
+          # Strip the YAML/Python literal's extra continuation indent only.
+          lines=block.splitlines(True)
+          block=lines[0]+''.join(line[10:] if line.startswith('          ') else line for line in lines[1:])
+          p.write_text(s.replace(anchor,block+anchor,1))
+          print(f'Updated {count} build assertions; inserted isolated quarry proof.')
+          PY
+          node --check src/game.js
+          node --check tests/smoke.mjs
+          git diff --check
+      - name: Commit only reviewed test patch and remove temporary authoring job
+        run: |
+          test "$(git ls-remote origin refs/heads/custodian/build-0.88-deep-quarry-seam | cut -f1)" = "$GITHUB_SHA"
+          git rm .github/workflows/quarry-proof-authoring.yml
+          git add tests/smoke.mjs
+          git diff --cached --stat
+          git -c user.name='Briar Glen Custodian' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Test: prove Deep Quarry gates, daily rewards and persistence'
+          git push origin HEAD:refs/heads/custodian/build-0.88-deep-quarry-seam
