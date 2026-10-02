@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const BUILD = Object.freeze({version:'0.83.0',id:'living-world-reboot',saveKey:'briar-glen-reboot-v1'});
+  const BUILD = Object.freeze({version:'0.84.0',id:'living-world-reboot',saveKey:'briar-glen-reboot-v1'});
   const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
   const UI={clock:document.getElementById('clock'),coins:document.getElementById('coins'),hp:document.getElementById('hp'),energy:document.getElementById('energy'),standing:document.getElementById('standing'),knownFor:document.getElementById('known-for'),skills:document.getElementById('skills'),inventory:document.getElementById('inventory'),packWeight:document.getElementById('pack-weight'),nearby:document.getElementById('nearby'),nearbyType:document.getElementById('nearby-type'),log:document.getElementById('log'),toast:document.getElementById('toast'),worldLine:document.getElementById('world-line'),apprenticeToggle:document.getElementById('apprentice-toggle'),apprenticeGoal:document.getElementById('apprentice-goal'),apprenticeThought:document.getElementById('apprentice-thought'),apprenticeScore:document.getElementById('apprentice-score')};
   const TAU=Math.PI*2,clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -14,6 +14,7 @@
     wood:{name:'Ashwood',weight:.8,base:7,kind:'wood',color:'#aa8457'},
     hide:{name:'Wolf Hide',weight:.7,base:15,kind:'hide',color:'#b99878'},
     bread:{name:'Brown Bread',weight:.3,base:6,kind:'food',color:'#d7ad69'},
+    bedroll:{name:'Trail Bedroll',weight:1.4,base:24,kind:'camp',color:'#b9a27a'},
     tonic:{name:'Field Tonic',weight:.2,base:22,kind:'medicine',color:'#7fcaad'},
     pick:{name:'Iron Pick',weight:2,base:50,kind:'tool',color:'#b9c1c4'},
     hammer:{name:'Forge Hammer',weight:2.2,base:64,kind:'tool',color:'#aeb7bc'},
@@ -27,6 +28,7 @@
     pick:{skill:'smithing',level:1,input:{iron:3,wood:1},output:'pick'},
     blade:{skill:'smithing',level:2,input:{iron:4,wood:1,hide:1},output:'blade'},
     bow:{skill:'fieldcraft',level:1,input:{wood:2,hide:1},output:'bow'},
+    bedroll:{skill:'fieldcraft',level:1,input:{wood:1,hide:2},output:'bedroll'},
   });
 
   const skillDefs=Object.freeze({
@@ -271,9 +273,29 @@
   function resourceGatherQuality(node){const zone=zoneAt(node.x,node.y),weatherBonus=world.weather==='rain'&&itemDefs[node.type].kind==='herb'?.18:0,quarryBonus=player.deeds?.emberback&&node.type==='iron'&&zone?.id==='quarry'?.25:0,ridgeBonus=zone?.id==='ridge'&&(node.type==='iron'||node.type==='wood')?.3:0;return clamp(node.quality+weatherBonus+quarryBonus+ridgeBonus,.7,3);}
   function resourceQualityCause(node){const causes=[],zone=zoneAt(node.x,node.y);if(world.weather==='rain'&&itemDefs[node.type].kind==='herb')causes.push('rain-enriched');if(player.deeds?.emberback&&node.type==='iron'&&zone?.id==='quarry')causes.push('reopened seam');if(zone?.id==='ridge'&&(node.type==='iron'||node.type==='wood'))causes.push('high-ridge yield');return causes.join(' · ');}
   function gather(node){if(!node.available)return false;const pick=player.inventory.pick,pickReady=player.equippedTool==='pick'&&pick?.durability>0,pickQuality=pickReady?avgQuality('pick'):1;let q=resourceGatherQuality(node)+(player.skills.fieldcraft.level-1)*.12;let qty=1;if(node.type==='iron'){if(pickReady){qty+=player.skills.fieldcraft.level>=3?1:0;q+=(pickQuality-1)*.18;pick.durability=Math.max(0,pick.durability-Math.max(2,6-Math.floor(pickQuality)));}else q-=.35;}if(node.type==='wood'&&pickReady)q-=.2;addItem(node.type,qty,clamp(q,.7,3));node.available=false;node.respawn=rand(60,120);player.energy=Math.max(0,player.energy-(node.type==='iron'?(pickReady?8:12):4));skillXp('fieldcraft',node.type==='iron'?5:3);if(player.equippedTool==='pick'&&pick&&!pick.durability)toast('Iron Pick broke — Mend it before the next hard job');save();return true;}
-  function craft(id){const r=recipes[id];if(!r)return false;if(player.skills[r.skill].level<r.level){toast(`${skillDefs[r.skill].name} ${r.level} required`);return false;}if(isArtifact(id)&&itemCount(id)>0){toast(`You already carry a ${itemDefs[id].name}; singular gear keeps its own history.`);return false;}if(!hasItems(r.input)){toast(`Missing materials for ${itemDefs[id].name}`);return false;}let total=0,count=0;for(const [mat,q] of Object.entries(r.input)){total+=avgQuality(mat)*q;count+=q;}const materialQuality=total/count;consume(r.input);const quality=clamp(materialQuality+(player.skills[r.skill].level-1)*.15,.8,3),forged=r.skill==='smithing',craftVerb=forged?'Forged':'Crafted';const artifact=isArtifact(id)?{provenance:{maker:'You',madeDay:world.day,source:forged?'Player-forged':'Player-crafted',materialQuality,skillLevel:player.skills[r.skill].level,repairs:0,history:[`${craftVerb} by You on Day ${world.day} from ${qualityLabel(materialQuality)} materials.`]}}:null;if(!addItem(id,1,quality,artifact))return false;skillXp(r.skill,10);if(itemDefs[id]?.kind==='tool')player.equippedTool=id;if(itemDefs[id]?.kind==='weapon')player.equippedWeapon=id;deriveIdentity();save();toast(`Crafted ${qualityLabel(quality)} ${itemDefs[id].name}`);return true;}
+  function craft(id){const r=recipes[id];if(!r)return false;if(player.skills[r.skill].level<r.level){toast(`${skillDefs[r.skill].name} ${r.level} required`);return false;}if((isArtifact(id)||id==='bedroll')&&itemCount(id)>0){toast(id==='bedroll'?'You already carry a Trail Bedroll.':`You already carry a ${itemDefs[id].name}; singular gear keeps its own history.`);return false;}if(!hasItems(r.input)){toast(`Missing materials for ${itemDefs[id].name}`);return false;}let total=0,count=0;for(const [mat,q] of Object.entries(r.input)){total+=avgQuality(mat)*q;count+=q;}const materialQuality=total/count;consume(r.input);const quality=clamp(materialQuality+(player.skills[r.skill].level-1)*.15,.8,3),forged=r.skill==='smithing',craftVerb=forged?'Forged':'Crafted';const artifact=isArtifact(id)?{provenance:{maker:'You',madeDay:world.day,source:forged?'Player-forged':'Player-crafted',materialQuality,skillLevel:player.skills[r.skill].level,repairs:0,history:[`${craftVerb} by You on Day ${world.day} from ${qualityLabel(materialQuality)} materials.`]}}:null;if(!addItem(id,1,quality,artifact))return false;skillXp(r.skill,10);if(itemDefs[id]?.kind==='tool')player.equippedTool=id;if(itemDefs[id]?.kind==='weapon')player.equippedWeapon=id;deriveIdentity();save();toast(`Crafted ${qualityLabel(quality)} ${itemDefs[id].name}`);return true;}
   function drinkTonic(){if(itemCount('tonic')<1){toast('No Field Tonic');return false;}if(player.hp>=player.maxHp){toast('Health is already full — save the Field Tonic');return false;}const quality=avgQuality('tonic'),base=35+player.skills.herbcraft.level*3,qualityDelta=Math.round(clamp(quality-1,-.5,2)*6),heal=Math.max(1,base+qualityDelta),before=player.hp;removeItem('tonic',1);player.hp=clamp(player.hp+heal,0,player.maxHp);const restored=player.hp-before;save();toast(`${qualityLabel(quality)} Field Tonic restored ${restored} health${restored<heal?' · fully recovered':''}`);return true;}
   function eatBread(){if(itemCount('bread')<1){toast('No Brown Bread for the trail');return false;}if(player.energy>=player.maxEnergy-10){toast('Energy is already high — save the bread for the trail');return false;}const quality=avgQuality('bread'),restore=Math.max(12,Math.round(30+clamp(quality-1,-.5,2)*8)),before=player.energy;removeItem('bread',1);player.energy=clamp(player.energy+restore,0,player.maxEnergy);const restored=player.energy-before;save();log(`You ate ${qualityLabel(quality)} Brown Bread at Stonepine Overlook and recovered ${Math.round(restored)} energy.`,'world');toast(`${qualityLabel(quality)} Brown Bread restored ${Math.round(restored)} energy`);return true;}
+
+  function campDanger(range=180){return world.enemies.find(e=>!e.dead&&dist(player,e)<=range)||null;}
+  function makeCamp(){
+    const zone=zoneAt(player.x,player.y);
+    if(!zone||zone.id==='village'){toast('Make camp in the wilderness, not Briar Glen');return false;}
+    if(itemCount('bedroll')<1){toast('Craft a Trail Bedroll before making camp');return false;}
+    const danger=campDanger();
+    if(danger){toast(`${danger.name||'Danger'} is too close to make camp`);return false;}
+    if(itemCount('bread')<1){toast('Camp needs 1 Brown Bread provision');return false;}
+    const breadQuality=avgQuality('bread'),energyBefore=player.energy,hpBefore=player.hp;
+    clearNavigation();removeItem('bread',1);
+    player.energy=clamp(player.energy+Math.round(45+clamp(breadQuality-1,-.5,2)*8),0,player.maxEnergy);
+    player.hp=clamp(player.hp+Math.round(10+clamp(breadQuality-1,-.5,2)*3),0,player.maxHp);
+    world.minute+=180;
+    while(world.minute>=1440){world.minute-=1440;world.day++;log(`Day ${world.day} begins. Prices and shortages have shifted.`,'world');for(const n of npcs)n.trust=clamp(n.trust-.03,0,10);}
+    skillXp('fieldcraft',8);
+    const energyGain=Math.round(player.energy-energyBefore),hpGain=Math.round(player.hp-hpBefore);
+    log(`You made camp in ${zone.name}, ate Brown Bread, and rested for three hours.`,'world');
+    save();renderUI();toast(`Camp rested · +${energyGain} energy · +${hpGain} health`);return true;
+  }
 
   function nearestNPC(range=70){let best=null,bd=range;for(const n of npcs){const d=dist(player,n);if(d<bd){best=n;bd=d;}}return best;}
   function nearestResource(range=44){let best=null,bd=range;for(const r of world.resources){if(!r.available)continue;const d=dist(player,r);if(d<bd){best=r;bd=d;}}return best;}
@@ -390,6 +412,7 @@
     give:(id,qty=1,quality=1)=>{addItem(id,qty,quality);renderUI();save();return itemCount(id);},
     setPosition:(x,y)=>{clearNavigation();player.x=x;player.y=y;return{x:player.x,y:player.y};},
     setEnergy:(value)=>{player.energy=clamp(Number(value)||0,0,player.maxEnergy);return player.energy;},
+    setHp:(value)=>{player.hp=clamp(Number(value)||0,0,player.maxHp);return player.hp;},
     navigation:()=>({active:navigation.active,x:navigation.x,y:navigation.y,target:copy(navigation.target)}),
     tapWorld:(x,y)=>setNavigation(x,y,null),
     tapTarget:(kind,id)=>navigateToTarget(kind,id),
@@ -422,13 +445,14 @@
     advance:(seconds=1)=>{const steps=Math.max(1,Math.ceil(seconds/.1)),dt=seconds/steps;for(let i=0;i<steps;i++)update(dt);renderUI();save();return window.__BRIAR_GLEN_DEBUG__.snapshot();},
     help:(npcId)=>{const n=npcs.find(x=>x.id===npcId);return n?helpNPC(n):false;},
     craft,
+    camp:makeCamp,
     useSkill,
     attack,
     save,
   };
 
   document.addEventListener('click',e=>{const target=e.target.closest?.('[data-craft]');if(target){manualTakeover('Manual crafting took control.');craft(target.dataset.craft);}});
-  const craftBox=document.createElement('section');craftBox.className='card';craftBox.innerHTML='<div class="card-title"><span>Make</span><small>items exist to solve problems</small></div><div class="nearby"><button data-craft="tonic">Brew Tonic</button><button data-craft="pick">Forge Pick</button><button data-craft="blade">Forge Blade</button><button data-craft="bow">Craft Briar Bow</button><button id="drink-tonic">Drink Tonic (Q)</button></div>';document.querySelector('.sidebar').insertBefore(craftBox,document.querySelector('.log-card'));document.getElementById('drink-tonic').addEventListener('click',()=>{manualTakeover('Manual tonic use took control.');drinkTonic();});
+  const craftBox=document.createElement('section');craftBox.className='card';craftBox.innerHTML='<div class="card-title"><span>Make</span><small>items exist to solve problems</small></div><div class="nearby"><button data-craft="tonic">Brew Tonic</button><button data-craft="pick">Forge Pick</button><button data-craft="blade">Forge Blade</button><button data-craft="bow">Craft Briar Bow</button><button data-craft="bedroll">Craft Trail Bedroll</button><button id="make-camp">Make Camp</button><button id="drink-tonic">Drink Tonic (Q)</button></div>';document.querySelector('.sidebar').insertBefore(craftBox,document.querySelector('.log-card'));document.getElementById('make-camp').addEventListener('click',()=>{manualTakeover('Manual camping took control.');makeCamp();});document.getElementById('drink-tonic').addEventListener('click',()=>{manualTakeover('Manual tonic use took control.');drinkTonic();});
 
   if(!load())reset();deriveIdentity();renderLog();renderUI();requestAnimationFrame(frame);
 })();
