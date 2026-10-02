@@ -1,0 +1,47 @@
+name: Branch-only Survey proof authoring
+on:
+  push:
+    branches: [custodian/0.89-quarry-survey-proof-isolation]
+    paths: [.github/workflows/quarry-survey-proof-authoring.yml]
+permissions:
+  contents: write
+jobs:
+  author:
+    if: github.ref == 'refs/heads/custodian/0.89-quarry-survey-proof-isolation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Verify exact parent, source and test blobs
+        run: |
+          test "$(git rev-parse HEAD^)" = 447f4d9955c11836f0de699ac9700fd0f90cee06
+          test "$(git hash-object src/game.js)" = f8a9f599a1d87ab005708f972849eef726821a18
+          test "$(git hash-object tests/smoke.mjs)" = 072315f53ddb26ddf2d599b083194ba60d055fea
+          test "$(git ls-remote origin refs/heads/custodian/0.89-quarry-survey-proof-isolation | cut -f1)" = "$GITHUB_SHA"
+      - name: Isolate resource Survey from intentional landmark context
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/smoke.mjs');s=p.read_text()
+          old="const surveyNode=d.resourceOfType('iron');d.useSkill('fieldcraft');"
+          new="const surveyNode=d.resourcesAll().find(r=>r.available&&r.type==='iron'&&d.zoneAtPoint(r.x,r.y)?.id==='quarry'&&d.landmarks().every(l=>Math.hypot(r.x-l.x,r.y-l.y)>70));if(!surveyNode)throw new Error('Quarry Survey fixture needs available iron outside landmark interaction range');d.useSkill('fieldcraft');"
+          assert s.count(old)==1
+          s=s.replace(old,new,1)
+          anchor='    const quarryYield=await page.evaluate'
+          assert s.count(anchor)==1
+          s=s.replace(anchor,'    // Survey an ordinary quarry node outside landmark context; Deep Quarry Seam correctly owns Nearby within 55 units.\n'+anchor,1)
+          p.write_text(s)
+          PY
+          node --check tests/smoke.mjs
+          git diff --check
+          test "$(git hash-object src/game.js)" = f8a9f599a1d87ab005708f972849eef726821a18
+      - name: Commit test-only change and remove this temporary job
+        run: |
+          test "$(git ls-remote origin refs/heads/custodian/0.89-quarry-survey-proof-isolation | cut -f1)" = "$GITHUB_SHA"
+          git rm .github/workflows/quarry-survey-proof-authoring.yml
+          git add tests/smoke.mjs
+          git diff --cached --stat
+          git -c user.name='Briar Glen Custodian' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Test: keep quarry Survey fixture clear of landmark context'
+          git push origin HEAD:refs/heads/custodian/0.89-quarry-survey-proof-isolation
