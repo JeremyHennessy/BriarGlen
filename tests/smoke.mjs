@@ -98,7 +98,7 @@ try{
       d.reset();d.clearEnemies();d.setPosition(900,600);d.setEnergy(100);d.tapWorld(1500,600);
       const manualBefore={nav:d.navigation(),player:d.snapshot().player};ambush();
       const manualAfter={nav:d.navigation(),player:d.snapshot().player};
-      d.reset();d.clearEnemies();d.forceNpcNeed('alden','bread');d.setApprentice(true);d.advance(.2);
+      d.reset();d.clearEnemies();d.forceNpcNeed('alden','bread');d.setPosition(300,900);d.setApprentice(true);d.advance(.2);
       const apprenticeBefore={agent:d.apprentice(),nav:d.navigation(),player:d.snapshot().player};ambush();
       const apprenticeAfter={agent:d.apprentice(),nav:d.navigation(),player:d.snapshot().player};d.setApprentice(false);
       return{manualBefore,manualAfter,apprenticeBefore,apprenticeAfter};
