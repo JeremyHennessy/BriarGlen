@@ -119,6 +119,7 @@ try{
     await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build?.().version==='0.78.0',{timeout:5000});
     const reloadedDefeat=await page.evaluate(()=>({player:window.__BRIAR_GLEN_DEBUG__.snapshot().player,agent:window.__BRIAR_GLEN_DEBUG__.apprentice()}));
     if(reloadedDefeat.player.coins!==durableDefeat.storedPlayer.coins||reloadedDefeat.player.hp!==100||!reloadedDefeat.agent.objectiveHistory.some(o=>o.status==='paused')||!reloadedDefeat.agent.memory.some(m=>m.text.includes('defeat forced a return to Briar Glen')))throw new Error(`${vp.name}: immediate defeat save did not survive reload ${JSON.stringify(reloadedDefeat)}`);
+    await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.setApprentice(false));
 
     await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('iron',5,2.4);d.give('wood',2,2.0);});
     if(!await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.craft('pick')))throw new Error(`${vp.name}: meaningful tool craft failed`);
