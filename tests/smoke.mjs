@@ -105,10 +105,10 @@ try{
       for(const id of ['alden','mira','rowan','tamsin']){const n=d.npc(id);n.injury=0;n.hunger=0;n.request=null;n.blockedByDanger=null;n.avoidEnemyId=null;n.routeOverride=null;n.productionPlan=null;n.seekingServiceFor=null;n.serviceCall=null;n.seekingProviderFor=null;n.providerCall=null;n.pendingReferral=null;n.socialCommitment=null;n.brokeredNeed=null;for(const item of ['briarleaf','mooncap','iron','wood','hide','bread','tonic'])d.setNpcStock(id,item,20);}
       d.setNpcStock('alden','hammer',1);d.setNpcStock('alden','pick',1);d.setNpcStock('mira','shears',1);d.setNpcStock('tamsin','blade',1);
       d.setPosition(guard.x-90,guard.y);d.setEnergy(100);d.setApprentice(true);d.advance(.1);const apprenticePlan=d.apprentice().plan?{...d.apprentice().plan}:null,guardAliveAfterApprentice=!!d.enemy(guard.id)&&!d.enemy(guard.id).dead;d.setApprentice(false);
-      return{guards,guardGoal,guardReportAfter,guardAliveAfter,normalGoal,normalTarget,normalId,apprenticePlan,guardAliveAfterApprentice};
+      return{guards,guardGoal,guardReportAfter,guardAliveAfter,normalGoal,normalTarget,normalId,normalPos:{x:normal.x,y:normal.y},apprenticePlan,guardAliveAfterApprentice};
     });
     if(waycacheOwnership.guards.length!==2||waycacheOwnership.guardGoal==='patrol'||waycacheOwnership.guardReportAfter||!waycacheOwnership.guardAliveAfter)throw new Error(`${vp.name}: player-owned Waycache guard leaked into Tamsin routine patrol ${JSON.stringify(waycacheOwnership)}`);
-    if(waycacheOwnership.normalGoal!=='patrol'||Math.hypot(waycacheOwnership.normalTarget.x-waycacheOwnership.guards[0].x,waycacheOwnership.normalTarget.y-waycacheOwnership.guards[0].y)<40)throw new Error(`${vp.name}: player-owned guard exclusion damaged ordinary wolf patrol behavior ${JSON.stringify(waycacheOwnership)}`);
+    if(waycacheOwnership.normalGoal!=='patrol'||Math.hypot(waycacheOwnership.normalTarget.x-waycacheOwnership.normalPos.x,waycacheOwnership.normalTarget.y-waycacheOwnership.normalPos.y)>.001)throw new Error(`${vp.name}: player-owned guard exclusion damaged ordinary wolf patrol behavior ${JSON.stringify(waycacheOwnership)}`);
     if(waycacheOwnership.apprenticePlan?.kind==='combat'||waycacheOwnership.apprenticePlan?.enemyId===waycacheOwnership.guards[0].id||!waycacheOwnership.guardAliveAfterApprentice)throw new Error(`${vp.name}: Autonomous Apprentice consumed the player-owned Waycache encounter ${JSON.stringify(waycacheOwnership)}`);
 
     const waycacheCleared=await page.evaluate(()=>{
