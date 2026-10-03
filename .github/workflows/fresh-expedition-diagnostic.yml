@@ -16,96 +16,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify exact shipped runtime
+      - name: Verify unchanged game and original diagnostic
         run: |
-          test "$(git rev-parse HEAD^)" = efb547dc5390a243c465c939f3b3fd27b0844381
+          test "$(git rev-parse HEAD^)" = 24b864dc109bf0618b8a591f015ac8c5f727e918
           test "$(git hash-object src/game.js)" = 6f21f9f2c18500a50a8ed970b32618c218c2afba
           test "$(git hash-object tests/smoke.mjs)" = 94f9712afb59d7837fd77e149abe8b65b2614d4f
-      - name: Run ordinary-action outing on three fresh worlds
+      - name: Reuse original route with evidence-based preparation correction
         run: |
+          git show 24b864dc109bf0618b8a591f015ac8c5f727e918:.github/workflows/fresh-expedition-diagnostic.yml > /tmp/original-outing.yml
+          python3 - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+          text=Path('/tmp/original-outing.yml').read_text()
+          s=dedent(text.split("cat > fresh-outing.mjs <<'JS'\n",1)[1].split('\n          JS\n',1)[0])+'\n'
+          def replace(old,new):
+              global s
+              assert s.count(old)==1,(old,s.count(old))
+              s=s.replace(old,new)
+          # Initial run 37162074537: two worlds equipped a bow before crafting any arrows;
+          # another left town at 10 HP. Correct only the controller, using real supplies.
+          replace("const before=d.snapshot().player,profile=d.combatProfile()", "if(d.snapshot().player.hp<=70&&count('tonic')>0)button('#drink-tonic');const before=d.snapshot().player,profile=d.combatProfile()")
+          replace("threats.some(e=>e.type==='briarwolf'&&e.windup>0)", "threats.some(e=>(e.type==='briarwolf'&&e.windup>0)||(e.type==='wolf'&&distance(e,before)<45&&before.equippedWeapon!=='bow'))")
+          replace("stage='gather and hunt';gather('wood',2);hides(1);button('[data-craft=\"bow\"]');", "stage='prepare field medicine';gather('briarleaf',4);gather('mooncap',2);button('[data-craft=\"tonic\"]');button('[data-craft=\"tonic\"]');require(count('tonic')===2,'Medicine not prepared');walk(900,600);rest();log('medicine-prepared');stage='gather and hunt';gather('wood',3);hides(1);button('[data-craft=\"arrows\"]');button('[data-craft=\"bow\"]');")
+          Path('fresh-outing.mjs').write_text(s)
+          PY
+          node --check fresh-outing.mjs
           npm install --no-save playwright@1.55.0
           npx playwright install chromium
           python3 -m http.server 4173 >/tmp/outing-server.log 2>&1 &
           sleep 2
           mkdir -p outings
-          cat > fresh-outing.mjs <<'JS'
-          import {chromium} from 'playwright';
-          import {writeFileSync} from 'node:fs';
-          import assert from 'node:assert/strict';
-          const browser=await chromium.launch({headless:true});
-          let failures=0;
-          try{
-            for(const vp of [{name:'desktop',width:1280,height:800,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true}]){
-              const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,isMobile:vp.touch});
-              const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-              await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
-              const result=await page.evaluate(()=>{
-                const api=window.__BRIAR_GLEN_DEBUG__;
-                // Deliberate allow-list: no reset, item grants, teleport, skill/HP/energy setters, enemy spawning or NPC mutation.
-                // Reads reveal world positions for route planning; advancement uses the unchanged normal simulation.
-                const d=Object.fromEntries(['snapshot','resourcesAll','landmarks','enemies','drops','navigation','tapWorld','tapTarget','advance','attack','combatProfile'].map(k=>[k,api[k].bind(api)]));
-                const count=id=>d.snapshot().player.inventory[id]?.qty||0;
-                let ticks=0,minHp=100,stage='fresh';const milestones=[];
-                const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-                const log=label=>{const s=d.snapshot();milestones.push({label,ticks,day:s.day,minute:s.minute,hp:s.player.hp,energy:s.player.energy,coins:s.player.coins,inventory:s.player.inventory});};
-                const require=(ok,msg)=>{if(!ok)throw new Error(msg);};
-                const button=selector=>{const b=document.querySelector(selector);require(!!b,'Missing action '+selector);b.click();};
-                const tick=()=>{
-                  require(++ticks<18000,'Route simulation budget reached');
-                  const before=d.snapshot().player,profile=d.combatProfile(),threats=d.enemies().filter(e=>!e.dead&&distance(e,before)<=profile.range);
-                  if(threats.length&&before.attackCd<=0){if(before.equippedWeapon==='bow')require(profile.arrows>0,'Prepared ammunition exhausted');d.attack();}
-                  if(threats.some(e=>e.type==='briarwolf'&&e.windup>0)&&!before.guarded&&before.energy>=14)button('[data-skill="guard"]');
-                  d.advance(.1);const after=d.snapshot().player;minHp=Math.min(minHp,after.hp);
-                  require(after.coins>=before.coins,'Player was defeated during '+stage);
-                };
-                const finishNavigation=()=>{let n=0;while(d.navigation().active){require(n++<1200,'Navigation budget reached');tick();}};
-                const walk=(x,y)=>{d.tapWorld(x,y);finishNavigation();};
-                const interact=(kind,id)=>{require(d.tapTarget(kind,id),'Cannot target '+kind+':'+id);finishNavigation();};
-                const rest=()=>{const p=d.snapshot().player;walk(p.x,p.y);let n=0;while(d.snapshot().player.energy<96){require(n++<1500,'Rest budget reached');tick();}};
-                const gather=(id,qty)=>{
-                  let tries=0;while(count(id)<qty){require(tries++<qty*3+6,'Gather budget '+id);const p=d.snapshot().player,enemies=d.enemies().filter(e=>!e.dead);
-                    const score=r=>distance(r,p)+enemies.filter(e=>distance(r,e)<200).length*350;
-                    const r=d.resourcesAll().filter(r=>r.type===id&&r.available).sort((a,b)=>score(a)-score(b))[0];require(!!r,'No available '+id);interact('resource',r.id);
-                  }
-                };
-                const hides=qty=>{
-                  let tries=0;while(count('hide')<qty){require(tries++<20,'Hide route budget');const p=d.snapshot().player,drop=d.drops().filter(x=>x.item==='hide').sort((a,b)=>distance(a,p)-distance(b,p))[0];
-                    if(drop){interact('drop',drop.id);continue;}
-                    const wolf=d.enemies().filter(e=>!e.dead&&e.type==='wolf'&&!e.encounter).sort((a,b)=>distance(a,p)-distance(b,p))[0];require(!!wolf,'No ordinary wolf available');
-                    for(let n=0;n<600;n++){const live=d.enemies().find(e=>e.id===wolf.id&&!e.dead);if(!live)break;if(n%5===0)d.tapWorld(live.x,live.y);tick();}
-                  }
-                };
-                const landmark=id=>d.landmarks().find(l=>l.id===id);
-                try{
-                  const start=d.snapshot().player;require(start.x===900&&start.y===600&&start.coins===24&&count('bread')===2&&Object.keys(start.inventory).length===1,'Not a genuinely fresh starting save');log('fresh');
-                  stage='ledger';interact('landmark','stonepine-trail-ledger');require(d.snapshot().player.expeditions.stonepine.started,'Expedition not started');log('ledger-started');
-                  stage='gather and hunt';gather('wood',2);hides(1);button('[data-craft="bow"]');require(count('bow')===1,'Real bow recipe failed');
-                  gather('wood',6);for(let n=0;n<5;n++)button('[data-craft="arrows"]');require(count('arrows')>=30&&count('wood')>=1,'Preparation did not produce ammunition and spare wood');
-                  walk(900,600);rest();log('prepared-bow-arrows');
-                  stage='ridge route';for(const [x,y] of [[1100,820],[1400,800],[1790,750],[1950,520]])walk(x,y);
-                  interact('landmark','stonepine-overlook');require(landmark('stonepine-overlook').discovered,'Overlook not charted');log('overlook');rest();
-                  stage='secure cache';walk(1900,855);interact('landmark','stonepine-waycache');
-                  for(let n=0;n<30&&!landmark('stonepine-waycache').claimed;n++){for(let i=0;i<20;i++)tick();interact('landmark','stonepine-waycache');}
-                  require(landmark('stonepine-waycache').claimed,'Guarded cache not secured');log('cache-secured');
-                  stage='collect and provision';hides(2);interact('landmark','stonepine-waycache');
-                  require(count('bread')>=1&&count('arrows')>=6,'Insufficient earned provisions');button('[data-cache-store="bread"]');for(let n=0;n<6;n++)button('[data-cache-store="arrows"]');
-                  const stash=landmark('stonepine-waycache').stash;require(stash.bread?.qty===1&&stash.arrows?.qty===6,'Real cache controls failed to provision');log('cache-provisioned');rest();
-                  stage='return';for(const [x,y] of [[1900,855],[1790,750],[1400,800]])walk(x,y);
-                  const rewardBefore=d.snapshot().player.coins;interact('landmark','stonepine-trail-ledger');const complete=d.snapshot().player;
-                  require(complete.expeditions.stonepine.completed&&complete.coins>=rewardBefore+18,'Physical expedition return failed');log('expedition-complete');
-                  stage='earned pack';require(count('hide')>=2&&count('wood')>=1,'Missing gathered pack materials');button('[data-craft="trailpack"]');require(count('trailpack')===1,'Earned Trail Pack craft failed');log('pack-crafted');
-                  return{ok:true,stage,ticks,minHp,milestones,player:d.snapshot().player};
-                }catch(e){return{ok:false,error:e.message,stage,ticks,minHp,milestones,player:d.snapshot().player,nearby:document.querySelector('#nearby')?.innerText,toast:document.getElementById('toast').textContent,enemies:d.enemies()};}
-              });
-              if(result.ok){await page.reload({waitUntil:'domcontentloaded'});const persisted=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player);result.reload={completed:persisted.expeditions.stonepine.completed,pack:persisted.inventory.trailpack?.qty,coins:persisted.coins};assert.equal(result.reload.completed,true);assert.equal(result.reload.pack,1);assert.equal(result.reload.coins,result.player.coins);}
-              result.errors=errors;if(errors.length)result.ok=false;
-              writeFileSync(`outings/${vp.name}.json`,JSON.stringify(result,null,2));await page.screenshot({path:`outings/${vp.name}.png`,fullPage:true});
-              console.log('FRESH_OUTING',JSON.stringify({viewport:vp.name,ok:result.ok,stage:result.stage,error:result.error,ticks:result.ticks,minHp:result.minHp,milestones:result.milestones.map(x=>({label:x.label,hp:x.hp,energy:x.energy,coins:x.coins})),reload:result.reload,errors}));
-              if(!result.ok)failures++;await context.close();
-            }
-          }finally{await browser.close();}
-          if(failures)throw new Error(`${failures} fresh-world route diagnostics did not complete; inspect controller and gameplay separately`);
-          JS
           node fresh-outing.mjs
       - name: Preserve diagnostic outputs
         if: always()
