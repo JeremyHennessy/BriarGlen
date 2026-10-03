@@ -12,16 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 3
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify unchanged game and original diagnostic
+      - name: Verify unchanged game and diagnostic parents
         run: |
-          test "$(git rev-parse HEAD^)" = 24b864dc109bf0618b8a591f015ac8c5f727e918
+          test "$(git rev-parse HEAD^)" = f4d14993d4b71bbd388f13a853726787e9e0baba
           test "$(git hash-object src/game.js)" = 6f21f9f2c18500a50a8ed970b32618c218c2afba
           test "$(git hash-object tests/smoke.mjs)" = 94f9712afb59d7837fd77e149abe8b65b2614d4f
-      - name: Reuse original route with evidence-based preparation correction
+      - name: Prepare ordinary-action controller at native frame bounds
         run: |
           git show 24b864dc109bf0618b8a591f015ac8c5f727e918:.github/workflows/fresh-expedition-diagnostic.yml > /tmp/original-outing.yml
           python3 - <<'PY'
@@ -33,11 +33,18 @@ jobs:
               global s
               assert s.count(old)==1,(old,s.count(old))
               s=s.replace(old,new)
-          # Initial run 37162074537: two worlds equipped a bow before crafting any arrows;
-          # another left town at 10 HP. Correct only the controller, using real supplies.
           replace("const before=d.snapshot().player,profile=d.combatProfile()", "if(d.snapshot().player.hp<=70&&count('tonic')>0)button('#drink-tonic');const before=d.snapshot().player,profile=d.combatProfile()")
           replace("threats.some(e=>e.type==='briarwolf'&&e.windup>0)", "threats.some(e=>(e.type==='briarwolf'&&e.windup>0)||(e.type==='wolf'&&distance(e,before)<45&&before.equippedWeapon!=='bow'))")
           replace("stage='gather and hunt';gather('wood',2);hides(1);button('[data-craft=\"bow\"]');", "stage='prepare field medicine';gather('briarleaf',4);gather('mooncap',2);button('[data-craft=\"tonic\"]');button('[data-craft=\"tonic\"]');require(count('tonic')===2,'Medicine not prepared');walk(900,600);rest();log('medicine-prepared');stage='gather and hunt';gather('wood',3);hides(1);button('[data-craft=\"arrows\"]');button('[data-craft=\"bow\"]');")
+          # The actual animation frame caps dt at .05. Debug .1 steps can oscillate
+          # across a 7-unit point-navigation stop radius, inventing endurance loss.
+          replace('d.advance(.1);const after=', 'd.advance(.05);const after=')
+          replace('++ticks<18000','++ticks<36000')
+          replace('n++<1200','n++<2400')
+          replace('n++<1500','n++<3000')
+          replace('n<600','n<1200')
+          replace('n%5===0','n%10===0')
+          replace('i<20;i++)tick()','i<40;i++)tick()')
           Path('fresh-outing.mjs').write_text(s)
           PY
           node --check fresh-outing.mjs
@@ -46,6 +53,16 @@ jobs:
           python3 -m http.server 4173 >/tmp/outing-server.log 2>&1 &
           sleep 2
           mkdir -p outings
+          cat > navigation-step-diagnostic.mjs <<'JS'
+          import {chromium} from 'playwright';
+          import assert from 'node:assert/strict';
+          import {writeFileSync} from 'node:fs';
+          const browser=await chromium.launch({headless:true});const results=[];
+          try{for(const dt of [.1,.05]){const c=await browser.newContext(),p=await c.newPage();await p.goto('http://127.0.0.1:4173/');results.push(await p.evaluate(dt=>{const d=window.__BRIAR_GLEN_DEBUG__,start=d.snapshot().player;d.tapWorld(start.x+8.5,start.y);const positions=[];for(let i=0;i<20;i++){d.advance(dt);positions.push(d.snapshot().player.x);}return{dt,positions,active:d.navigation().active,energy:d.snapshot().player.energy};},dt));await c.close();}}finally{await browser.close();}
+          writeFileSync('outings/navigation-step.json',JSON.stringify(results,null,2));console.log('NAVIGATION_STEP_DIAGNOSTIC',JSON.stringify(results));
+          assert.equal(results[0].active,true);assert.equal(results[1].active,false);
+          JS
+          node navigation-step-diagnostic.mjs
           node fresh-outing.mjs
       - name: Preserve diagnostic outputs
         if: always()
