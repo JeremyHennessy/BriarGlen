@@ -157,10 +157,12 @@ try{
     const waycacheGuarded=await page.evaluate(()=>{
       const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.setApprentice(false);
       const cache=d.landmarks().find(l=>l.id==='stonepine-waycache'),guards=d.enemies().filter(e=>e.encounter==='stonepine-waycache'&&!e.dead),zone=cache?d.zoneAtPoint(cache.x,cache.y):null;
+      d.setPosition(cache.x,cache.y);const unclaimedBefore={player:d.snapshot().player,cache:d.landmarks().find(l=>l.id===cache.id)},unclaimedStore=d.waycacheStore('bread'),unclaimedToast=document.querySelector('#toast')?.textContent||'',unclaimedAfter={player:d.snapshot().player,cache:d.landmarks().find(l=>l.id===cache.id)};
       d.setPosition(cache.x-35,cache.y);const before=d.snapshot().player;const targeted=d.tapTarget('landmark',cache.id);d.advance(.12);
-      return{cache,guards,zone,targeted,before,after:d.snapshot().player,afterCache:d.landmarks().find(l=>l.id===cache.id),toast:document.querySelector('#toast')?.textContent||''};
+      return{cache,guards,zone,unclaimedBefore,unclaimedStore,unclaimedToast,unclaimedAfter,targeted,before,after:d.snapshot().player,afterCache:d.landmarks().find(l=>l.id===cache.id),toast:document.querySelector('#toast')?.textContent||''};
     });
     if(waycacheGuarded.cache?.name!=='Stonepine Waycache'||waycacheGuarded.zone?.id!=='ridge'||waycacheGuarded.guards.length!==2||!waycacheGuarded.cache.playerOnly)throw new Error(`${vp.name}: Stonepine Waycache was not seeded as a guarded player expedition objective ${JSON.stringify(waycacheGuarded)}`);
+    if(waycacheGuarded.unclaimedStore||JSON.stringify(waycacheGuarded.unclaimedBefore)!==JSON.stringify(waycacheGuarded.unclaimedAfter)||!waycacheGuarded.unclaimedToast.includes('Secure the Stonepine Waycache'))throw new Error(`${vp.name}: unclaimed Stonepine Waycache allowed field-stash transfer ${JSON.stringify(waycacheGuarded)}`);
     if(!waycacheGuarded.targeted||waycacheGuarded.afterCache?.claimed||waycacheGuarded.after.discoveries!==waycacheGuarded.before.discoveries||waycacheGuarded.after.coins!==waycacheGuarded.before.coins||(waycacheGuarded.after.inventory.arrows?.qty||0)!==(waycacheGuarded.before.inventory.arrows?.qty||0)||waycacheGuarded.after.inventory.bread?.qty!==waycacheGuarded.before.inventory.bread?.qty||waycacheGuarded.after.skills.fieldcraft.xp!==waycacheGuarded.before.skills.fieldcraft.xp||!waycacheGuarded.toast.includes('too close'))throw new Error(`${vp.name}: guarded Stonepine Waycache did not block reward until danger was cleared ${JSON.stringify(waycacheGuarded)}`);
 
     const waycacheCleared=await page.evaluate(()=>{
