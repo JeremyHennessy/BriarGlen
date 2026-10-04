@@ -1,0 +1,115 @@
+name: Skill fresh-save isolation proof (branch only)
+on:
+  push:
+    branches: [custodian/skill-ui-fresh-save-isolation]
+    paths: [.github/workflows/skill-save-isolation-proof.yml]
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Preserve unchanged release source
+        run: |
+          set -eu
+          test "$GITHUB_REF" = refs/heads/custodian/skill-ui-fresh-save-isolation
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = 4274a00dae2b0ed5f3654f787e349e7b8a982f2f
+          git diff --exit-code 4274a00dae2b0ed5f3654f787e349e7b8a982f2f -- src tests index.html styles.css .github/workflows/reboot-game-proof.yml
+          mkdir -p evidence/source
+          cp tests/skill-ui.mjs evidence/original-skill-ui.mjs
+      - name: Install canonical browser and serve
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+          python3 -m http.server 4173 >/tmp/skill-isolation.log 2>&1 &
+          sleep 2
+      - name: Controlled original-red and guarded-green native autosave reproduction
+        run: |
+          cat > .skill-save-repro.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch({headless:true}),records=[];
+          try{for(const vp of [{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true}])for(const protect of [false,true]){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage(),errors=[];
+            page.on('pageerror',e=>errors.push(e.message));
+            await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.setEnergy(100);d.save();});
+            if(vp.touch)await page.locator('#quick-brace').tap();else await page.locator('#quick-brace').click();
+            assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.guarded),true);
+            await page.evaluate(protect=>{const key='briar-glen-reboot-v1',write=Storage.prototype.setItem;window.__fixtureWrites=[];Storage.prototype.setItem=function(k,v){if(k===key){window.__fixtureWrites.push({at:performance.now(),guarded:JSON.parse(v).player.guarded,stack:String(new Error().stack)});if(protect)return;}return write.call(this,k,v);};localStorage.removeItem(key);localStorage.setItem('isolation-probe','unrelated write allowed');},protect);
+            // Deliberately span the existing native five-second autosave without advancing/debug-saving the world.
+            await page.waitForFunction(()=>window.__fixtureWrites.some(w=>w.stack.includes('frame')),{},{timeout:15000});
+            const beforeReload=await page.evaluate(()=>({writes:window.__fixtureWrites,stored:localStorage.getItem('briar-glen-reboot-v1'),other:localStorage.getItem('isolation-probe'),live:window.__BRIAR_GLEN_DEBUG__.snapshot().player.guarded}));
+            assert.equal(beforeReload.other,'unrelated write allowed');assert.equal(beforeReload.live,true);
+            if(protect)assert.equal(beforeReload.stored,null);else assert.equal(JSON.parse(beforeReload.stored).player.guarded,true);
+            await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+            const afterReload=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.save();return{guarded:d.snapshot().player.guarded,oldHookGone:window.__fixtureWrites===undefined,saved:JSON.parse(localStorage.getItem('briar-glen-reboot-v1')).player.guarded};});
+            assert.equal(afterReload.guarded,!protect);assert.equal(afterReload.oldHookGone,true);assert.equal(afterReload.saved,!protect,'Normal saving must resume in the fresh document');
+            records.push({viewport:vp.name,protect,beforeReload:{...beforeReload,stored:beforeReload.stored?{guarded:JSON.parse(beforeReload.stored).player.guarded}:null},afterReload});
+            assert.deepEqual(errors,[]);await context.close();
+          }console.log('PASS original empty save is recreated by native frame/autosave; guarded fixture stays empty; fresh document discards hook and resumes normal saving in all three viewports');}
+          finally{await writeFile('evidence/red-green.json',JSON.stringify(records,null,2));await browser.close();}
+          JS
+          set -o pipefail
+          node .skill-save-repro.mjs 2>&1 | tee evidence/red-green.log
+      - name: Apply only the proven fresh-document fixture isolation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/skill-ui.mjs');old=p.read_text()
+          a="  await page.evaluate(()=>localStorage.removeItem('briar-glen-reboot-v1'));"
+          b="  // Hold only the cleared game save until reload; native autosave must not recreate the previous fixture.\n  await page.evaluate(()=>{const key='briar-glen-reboot-v1',write=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k===key)return;return write.call(this,k,v);};localStorage.removeItem(key);});"
+          assert old.count(a)==1;p.write_text(old.replace(a,b));assert p.read_text().replace(b,a)==old
+          PY
+          node --check tests/skill-ui.mjs
+          git diff --check
+          git diff --exit-code 4274a00dae2b0ed5f3654f787e349e7b8a982f2f -- src index.html styles.css tests/smoke.mjs tests/play-ui.mjs tests/interaction-ui.mjs tests/live-ui-stability.mjs .github/workflows/reboot-game-proof.yml
+          cp -r src tests index.html styles.css evidence/source/
+          git diff -- tests/skill-ui.mjs > evidence/repair.diff
+      - name: Full canonical gameplay and UI proof
+        env:
+          UI_EVIDENCE_DIR: evidence/canonical
+        run: |
+          set -o pipefail
+          node tests/smoke.mjs http://127.0.0.1:4173/ 2>&1 | tee evidence/full-proof.log
+      - name: Repeat exact repaired skill suite at five sizes
+        run: |
+          cat > .skill-isolation-repeat.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {chromium} from 'playwright';
+          import {proveSkillReadiness} from './tests/skill-ui.mjs';
+          const browser=await chromium.launch({headless:true});
+          try{for(const vp of [{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}]){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+            for(let i=0;i<2;i++){await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setEnergy(100);});await page.locator('#quick-brace').click();await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.guarded),true);await proveSkillReadiness(page,{...vp,name:`${vp.name}-${i}`});}
+            assert.deepEqual(errors,[]);await context.close();
+          }}finally{await browser.close();}
+          JS
+          set -o pipefail
+          UI_EVIDENCE_DIR=evidence/repeated node .skill-isolation-repeat.mjs 2>&1 | tee evidence/repeated.log
+      - name: Commit only tested fixture repair on unchanged owned branch
+        run: |
+          set -eu
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = 4274a00dae2b0ed5f3654f787e349e7b8a982f2f
+          test "$(git ls-remote origin refs/heads/custodian/skill-ui-fresh-save-isolation | cut -f1)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/skill-ui.mjs
+          git commit -m 'Test: isolate fresh skill document from previous native autosave'
+          git push origin HEAD:refs/heads/custodian/skill-ui-fresh-save-isolation
+          git rev-parse HEAD > evidence/candidate-head.txt
+          git ls-tree -r HEAD > evidence/tree.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: skill-save-isolation
+          path: evidence
+          retention-days: 14
