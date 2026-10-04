@@ -1,0 +1,90 @@
+name: Phone engines - exact label portability (never merge)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/phone-engines-portability.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ENGINE: ${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prepare isolated test copy with exact semantic label assertion
+        run: |
+          set -eu
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css .github/workflows/reboot-game-proof.yml
+          mkdir -p evidence/source
+          cp -r src tests index.html styles.css evidence/source/
+          git ls-tree -r HEAD > evidence/source-tree.txt
+          git rev-parse HEAD > evidence/branch-head.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,shutil,textwrap,difflib
+          shutil.copytree('tests','.phone-engine-tests')
+          p=Path('.phone-engine-tests/live-ui-stability.mjs');old=p.read_text()
+          a="assert.match(await guard.locator('..').innerText(),new RegExp(` ${skillUpdate}$`));"
+          b="assert.equal(await guard.locator('..').locator('.lvl').innerText(),`Guard ${skillUpdate}`);"
+          assert old.count(a)==1
+          new=old.replace(a,b);assert new.replace(b,a)==old;p.write_text(new)
+          Path('evidence/only-fixture.diff').write_text(''.join(difflib.unified_diff(old.splitlines(True),new.splitlines(True),fromfile='original/live-ui-stability.mjs',tofile='temporary-copy/live-ui-stability.mjs')))
+          p=Path('.phone-engine-tests/smoke.mjs');old=p.read_text();a="import { chromium } from 'playwright';";assert old.count(a)==1
+          engine=os.environ['ENGINE'];assert engine in ('chromium','webkit')
+          b='import { '+engine+" as chromium } from 'playwright';";new=old.replace(a,b);assert new.replace(b,a)==old;p.write_text(new)
+          Path('evidence/engine-substitution.txt').write_text(a+'\n'+b+'\n')
+          wf=Path('.github/workflows/phone-engines-review.yml').read_text()
+          start="          cat > .phone-engine-review.mjs <<'JS'\n";assert wf.count(start)==1
+          body=wf.split(start)[1].split('\n          JS\n')[0]
+          script=textwrap.dedent(body)+'\n'
+          a="import {provePlayUi} from './tests/play-ui.mjs';";b="import {provePlayUi} from './.phone-engine-tests/play-ui.mjs';";assert script.count(a)==1
+          Path('.phone-engine-review.mjs').write_text(script.replace(a,b))
+          for src in Path('tests').glob('*.mjs'):
+              dst=Path('.phone-engine-tests',src.name)
+              if src.name not in ('smoke.mjs','live-ui-stability.mjs'):assert src.read_bytes()==dst.read_bytes(),src
+          print('PASS exact one fixture selector/assertion change only in a temporary copy; every original tracked test/frontend unchanged')
+          PY
+          node --check .phone-engine-review.mjs
+          node --check .phone-engine-tests/live-ui-stability.mjs
+      - name: Install pinned browser and serve verified frontend
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps "$ENGINE"
+          python3 -m http.server 4173 >/tmp/phone-engine-server.log 2>&1 &
+          sleep 2
+      - name: Complete canonical body on selected engine with exact label assertion
+        env:
+          UI_EVIDENCE_DIR: evidence/canonical
+        run: |
+          set -o pipefail
+          node .phone-engine-tests/smoke.mjs http://127.0.0.1:4173/ 2>&1 | tee evidence/canonical.log
+      - name: Same five-size mobile-mode and native panel-session proof
+        if: ${{ !cancelled() }}
+        env:
+          UI_EVIDENCE_DIR: evidence/screens
+        run: |
+          set -o pipefail
+          node .phone-engine-review.mjs 2>&1 | tee evidence/mobile.log
+      - name: Confirm all original production and permanent test files untouched
+        if: always()
+        run: |
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css .github/workflows/reboot-game-proof.yml
+          git diff --stat d253e62349e1a99b4bdb2291449b7c60626b7eca > evidence/branch-only-diff.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phone-portable-${{ matrix.engine }}
+          path: evidence
+          retention-days: 14
