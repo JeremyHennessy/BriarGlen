@@ -34,6 +34,23 @@ export async function provePlayUi(page, vp) {
   await page.keyboard.press('j');assert.equal(await page.locator('#panel-journal').isVisible(),true);
   await page.keyboard.press('Escape');assert.equal(await page.locator('#panel-nearby').isVisible(),true);
 
+  // Crafting readiness must mirror craft() gate order before the player commits materials.
+  await activate('[data-panel="craft"]');
+  assert.equal(await page.locator('#recipe-trailpack').getAttribute('data-state'),'locked');
+  assert.match(await page.locator('#recipe-trailpack').innerText(),/Complete Stonepine expedition/);
+  assert.equal(await page.locator('#recipe-arrows').getAttribute('data-state'),'missing');
+  assert.match(await page.locator('#recipe-arrows').innerText(),/Missing materials/);
+  assert.match(await page.locator('#recipe-arrows').innerText(),/Makes 6× Trail Arrows/);
+  await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('iron',4);d.give('wood',3);d.give('hide',2);d.give('bow',1,2.8);d.advance(0);});
+  await page.waitForTimeout(220);
+  assert.equal(await page.locator('#recipe-blade').getAttribute('data-state'),'locked');
+  assert.match(await page.locator('#recipe-blade').innerText(),/Smithing 2 required/);
+  assert.equal(await page.locator('#recipe-bow').getAttribute('data-state'),'owned');
+  assert.match(await page.locator('#recipe-bow').innerText(),/Already owned/);
+  assert.match(await page.locator('#recipe-bow').innerText(),/Mend in You/);
+  await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.advance(0);});
+  await page.waitForTimeout(220);
+
   // Native Space activation of a recipe must not also spend attack energy.
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setEnergy(100);d.give('wood',1);d.advance(0);});
   await activate('[data-panel="craft"]');
