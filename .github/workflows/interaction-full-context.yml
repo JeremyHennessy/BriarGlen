@@ -1,0 +1,72 @@
+name: WebKit full scroll context (evidence only)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/interaction-full-context.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [base, candidate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERSION: ${{ matrix.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: final-comfort-acceptance
+          run-id: 37226895313
+          github-token: ${{ github.token }}
+          path: .candidate-evidence
+      - name: Isolate complete tests with only passive failure recording
+        run: |
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          mkdir -p evidence/base evidence/candidate evidence/screens
+          cp -r src tests index.html styles.css evidence/base/
+          cp -r .candidate-evidence/source/. evidence/candidate/
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap,os,shutil
+          wf=Path('.github/workflows/interaction-scroll-context.yml').read_text()
+          start="          python3 - <<'PY'\n";assert wf.count(start)==1
+          code=textwrap.dedent(wf.split(start)[1].split('\n          PY\n')[0]);exec(compile(code,'original-passive-probe','exec'))
+          version=os.environ['VERSION'];assert version in ('base','candidate')
+          shutil.copytree(f'evidence/{version}/tests','.full-observe-tests')
+          Path('.full-observe-tests/interaction-ui.mjs').write_text(Path('.interaction-observe.mjs').read_text())
+          p=Path('.full-observe-tests/smoke.mjs');old=p.read_text();a="import { chromium } from 'playwright';";assert old.count(a)==1
+          new=old.replace(a,"import { webkit as chromium } from 'playwright';")
+          prefix="import {writeFileSync} from 'node:fs';\nglobalThis.__scrollProbe=[];process.on('exit',()=>writeFileSync('evidence/scroll-records.json',JSON.stringify(globalThis.__scrollProbe,null,2)));\n"
+          p.write_text(prefix+new)
+          Path('evidence/source-version.txt').write_text(version)
+          PY
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps webkit
+          python3 -m http.server 4173 --directory "evidence/$VERSION" >/tmp/full-scroll.log 2>&1 &
+          sleep 2
+      - name: Full original test body with original strict assertion
+        env:
+          UI_EVIDENCE_DIR: evidence/screens
+        run: |
+          set -o pipefail
+          node .full-observe-tests/smoke.mjs http://127.0.0.1:4173/ 2>&1 | tee evidence/full.log
+      - name: Confirm tracked source unchanged
+        if: always()
+        run: git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: interaction-full-${{ matrix.version }}
+          path: evidence
+          retention-days: 14
