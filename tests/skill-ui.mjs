@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
 export async function proveSkillReadiness(page,vp){
+  // The existing reset intentionally leaves transient combat flags; start this suite in a fresh document.
+  await page.evaluate(()=>localStorage.removeItem('briar-glen-reboot-v1'));
+  await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+  assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.guarded),false);
   const activate=async s=>vp.touch?page.locator(s).tap():page.locator(s).click();
   const refresh=()=>page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(0));
   const state=()=>page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return {inventory:p.inventory,coins:p.coins,skills:p.skills,expeditions:p.expeditions,equippedWeapon:p.equippedWeapon,equippedTool:p.equippedTool,equippedArmor:p.equippedArmor};});

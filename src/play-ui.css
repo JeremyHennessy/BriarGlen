@@ -31,3 +31,6 @@ html,body{height:100%;overflow:hidden}body{padding:max(8px,env(safe-area-inset-t
 
 /* Contextual Use guidance stays inside the existing scroll panel and action deck. */
 .interaction-context{padding:0 0 10px;margin-bottom:10px;border-bottom:1px solid var(--line);min-width:0}.interaction-eyebrow{display:block;font-size:10px;letter-spacing:.06em;color:var(--muted);margin-bottom:5px}.interaction-context>strong{display:block;font-size:14px;line-height:1.4;overflow-wrap:anywhere}.interaction-context[data-state=ready]>strong{color:var(--accent)}.interaction-context[data-state=warning]>strong{color:var(--warn)}.interaction-context p{font-size:12px;line-height:1.6;color:var(--muted);margin:6px 0;overflow-wrap:anywhere}.interaction-controls summary{font-size:11px;min-height:44px;padding:10px 0}.interaction-controls p{font-size:11px;line-height:1.6;color:var(--muted);margin:6px 0;overflow-wrap:anywhere}.interaction-context[hidden]{display:none!important}
+
+/* Skill hints update independently of stable controls. */
+.skill .skill-readiness{display:block;margin-top:6px;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.skill-readiness[data-state=ready]{color:var(--good)}.skill-readiness[data-state=blocked],.skill-readiness[data-state=caution]{color:var(--warn)}
