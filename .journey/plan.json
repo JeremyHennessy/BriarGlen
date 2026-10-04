@@ -1,17 +1,23 @@
 {
- "resume":37225183366,
+ "resume":37225552492,
  "viewport":{"width":1440,"height":900},
  "touch":false,
  "collectNearby":true,
  "actions":[
-  {"click":"#interact-btn","shot":"wood-for-armor"},
-  {"click":"[data-panel=craft]","clickIfVisible":"[data-craft=jerkin]","shot":"craft-trail-jerkin"},
-  {"click":"[data-panel=pack]","clickIfVisible":"[data-equip=jerkin][aria-label='Equip Trail Jerkin']","shot":"armor-equipped"},
-  {"click":"[data-panel=nearby]","point":[597,348],"wait":2400,"shot":"extra-ashwood"},
-  {"click":"[data-panel=craft]","clickIfVisible":"[data-craft=arrows]","shot":"reserve-arrows"},
-  {"click":"[data-panel=nearby]","track":{"limit":15000},"shot":"follow-east-to-stonepine"},
-  {"click":"#interact-btn","shot":"nearby-objective-action"},
-  {"click":"[data-panel=journal]","shot":"route-progress"},
-  {"click":"[data-panel=nearby]","shot":"ridge-view"}
+  {"click":"#interact-btn","wait":250,"shot":"eat-one-travel-ration"},
+  {"track":{"limit":15000},"wait":2200,"shot":"waycache-approach"},
+  {"click":"#interact-btn","wait":250,"shot":"secure-cache"},
+  {"clickIfVisible":"[data-cache-store=bread]","shot":"store-bread"},
+  {"clickIfVisible":"[data-cache-store=arrows]"},
+  {"clickIfVisible":"[data-cache-store=arrows]"},
+  {"clickIfVisible":"[data-cache-store=arrows]"},
+  {"clickIfVisible":"[data-cache-store=arrows]"},
+  {"clickIfVisible":"[data-cache-store=arrows]"},
+  {"clickIfVisible":"[data-cache-store=arrows]","shot":"six-arrows-stored"},
+  {"click":"[data-panel=journal]","shot":"provisions-check"},
+  {"click":"[data-panel=nearby]","track":{"limit":16000},"shot":"return-toward-ledger"},
+  {"click":"#interact-btn","wait":250,"shot":"return-action"},
+  {"click":"[data-panel=journal]","shot":"return-progress"},
+  {"click":"[data-panel=nearby]","shot":"return-world"}
  ]
 }
