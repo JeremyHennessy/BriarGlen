@@ -4,7 +4,7 @@ on:
     branches: [custodian/ui-contextual-use]
     paths: [.github/workflows/interaction-ui-review.yml]
 permissions:
-  contents: read
+  contents: write
 jobs:
   review:
     runs-on: ubuntu-latest
@@ -16,10 +16,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Assert untouched release source
+      - name: Apply bounded presentation patch to exact base
         run: |
+          set -eu
+          test "$GITHUB_REF" = refs/heads/custodian/ui-contextual-use
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = d84d354aaf5918805160377e76efdebee686a984
           git merge-base --is-ancestor d84d354aaf5918805160377e76efdebee686a984 HEAD
-          test -z "$(git diff d84d354aaf5918805160377e76efdebee686a984 -- src index.html styles.css tests .github/workflows/reboot-game-proof.yml)"
+          mkdir -p evidence/source evidence/before
+          git archive d84d354aaf5918805160377e76efdebee686a984 index.html styles.css src tests .github/workflows/reboot-game-proof.yml | tar -x -C evidence/before
+          python3 .interaction-ui-author.py | tee evidence/preservation.log
+          node --check src/game.js && node --check src/play-ui.js && node --check tests/play-ui.mjs && node --check tests/interaction-ui.mjs && node --check tests/smoke.mjs
+          git diff --check
+          cp -r src tests index.html styles.css evidence/source/
+          mkdir -p evidence/source/.github/workflows
+          cp .github/workflows/reboot-game-proof.yml evidence/source/.github/workflows/
+          git diff d84d354aaf5918805160377e76efdebee686a984 -- src tests > evidence/candidate.diff
+          git rev-parse HEAD > evidence/author-head.txt
       - name: Install canonical browser
         run: |
           npm install --no-save playwright@1.55.0
@@ -28,45 +40,57 @@ jobs:
         run: |
           python3 -m http.server 4173 >/tmp/server.log 2>&1 &
           sleep 2
-      - name: Baseline interaction reproduction
+      - name: Full canonical gameplay and UI proof
+        env:
+          UI_EVIDENCE_DIR: evidence/canonical
         run: |
-          mkdir -p evidence/source
-          git archive HEAD index.html styles.css src tests .github/workflows/reboot-game-proof.yml | tar -x -C evidence/source
-          git rev-parse HEAD > evidence/head.txt
-          cat > .interaction-probe.mjs <<'JS'
+          set -o pipefail
+          node tests/smoke.mjs http://127.0.0.1:4173/ | tee evidence/full-proof.log
+      - name: Five-size visual, interaction, long-content and inset proof
+        run: |
+          cat > .interaction-visual.mjs <<'JS'
           import assert from 'node:assert/strict';
-          import {writeFile} from 'node:fs/promises';
+          import {mkdir,writeFile} from 'node:fs/promises';
           import {chromium} from 'playwright';
+          import {provePlayUi} from './tests/play-ui.mjs';
           const browser=await chromium.launch();const records=[];
-          try{for(const vp of [{name:'desktop',width:1440,height:900},{name:'landscape',width:844,height:390},{name:'portrait',width:390,height:844}]){
-            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.name!=='desktop'});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-            await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');await page.screenshot({path:`evidence/${vp.name}-default-before.png`});
-            const initial={label:await page.locator('#interact-btn').innerText(),nearby:await page.locator('#nearby').innerText()};
-            const activate=async()=>{if(vp.name==='desktop')await page.locator('#interact-btn').click();else await page.locator('#interact-btn').tap();};
-            const setup=async()=>page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){const live=d.npc(n.id);live.x=30;live.y=30;}d.advance(0);});
-            await setup();
-            const resource=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,r=d.resourceOfType('briarleaf');d.setPosition(r.x+46,r.y);d.advance(0);return r;});
-            assert.match(await page.locator('#nearby').innerText(),/Use E to gather/);const old=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.inventory);
-            await activate();assert.match(await page.locator('#toast').innerText(),/Nothing useful within reach/);assert.deepEqual(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.inventory),old);
-            await page.screenshot({path:`evidence/${vp.name}-resource-out-of-reach-before.png`});
-            await setup();
-            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,l=d.landmarks().find(x=>x.id==='stonepine-trail-ledger');d.setPosition(l.x+53,l.y);d.advance(0);});
-            assert.match(await page.locator('#nearby').innerText(),/Use E to begin/);await activate();assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started),false);assert.match(await page.locator('#toast').innerText(),/Nothing useful within reach/);
-            await page.screenshot({path:`evidence/${vp.name}-ledger-out-of-reach-before.png`});
-            await setup();
-            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,l=d.landmarks().find(x=>x.id==='stonepine-trail-ledger'),n=d.npc('rowan');n.x=l.x;n.y=l.y;d.setPosition(l.x,l.y);d.advance(0);});
-            await activate();assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started),false);assert.match(await page.locator('#nearby').innerText(),/Use E to begin/);
-            await page.screenshot({path:`evidence/${vp.name}-resident-ledger-overlap-before.png`});
-            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.tapTarget('landmark','stonepine-trail-ledger');d.advance(.05);});
-            assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started),true,'Existing targeted approach can use the ledger without changing Use priority');
-            assert.deepEqual(errors,[]);records.push({viewport:vp,initial,resource,resourcePreviewOutsideUseRange:true,ledgerPreviewOutsideUseRange:true,residentTakesUsePriority:true,targetedLedgerApproachWorks:true});await context.close();
-          }console.log('PASS reproduced resource/ledger preview vs Use-range mismatch and resident priority; existing targeted approach works on unchanged runtime');}finally{await writeFile('evidence/observations.json',JSON.stringify(records,null,2));await browser.close();}
+          try{for(const vp of [{name:'desktop-large',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}]){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');await page.waitForTimeout(220);await mkdir('evidence/screens',{recursive:true});await page.screenshot({path:`evidence/screens/${vp.name}-default.png`});
+            await provePlayUi(page,vp);
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setPosition(30,30);const n=d.npc('mira');n.x=30;n.y=30;n.name='Mira the Very Experienced Village Herbalist With a Long Display Name';for(const id of ['wood','iron','hide','bread','briarleaf','mooncap','tonic','arrows','bow','blade','pick','jerkin','bedroll','trailpack'])d.give(id,1,2.8);d.advance(0);});
+            for(const id of ['nearby','pack','craft','character','journal']){
+              if(vp.touch)await page.locator(`[data-panel="${id}"]`).tap();else await page.locator(`[data-panel="${id}"]`).click();
+              const geometry=await page.locator(`#panel-${id}`).evaluate(el=>({w:el.clientWidth,sw:el.scrollWidth}));assert.ok(geometry.sw<=geometry.w+1,`${vp.name} ${id}: long content overflow`);assert.equal(await page.locator('.play-panel:visible').count(),1);
+            }
+            if(vp.touch)await page.locator('[data-panel="nearby"]').tap();else await page.locator('[data-panel="nearby"]').click();
+            await page.locator('#panel-nearby').evaluate(el=>el.scrollTop=0);await page.screenshot({path:`evidence/screens/${vp.name}-long-context.png`});
+            if(vp.name==='portrait'||vp.name==='landscape'){
+              await page.addStyleTag({content:'body{padding:20px 12px 16px !important}'});await page.waitForTimeout(220);
+              const g=await page.evaluate(()=>({w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,controls:['#hp','#energy','#attack-btn','#interact-btn','#quick-brace','#quick-tonic'].map(s=>document.querySelector(s).getBoundingClientRect().toJSON())}));
+              assert.ok(g.sw<=g.w+1&&g.sh<=g.h+1);for(const b of g.controls)assert.ok(b.left>=12&&b.right<=g.w-11&&b.top>=20&&b.bottom<=g.h-15,'Inset stress inaccessible control');records.push({vp,inset:g});await page.screenshot({path:`evidence/screens/${vp.name}-inset.png`});
+            }
+            assert.deepEqual(errors,[]);records.push({vp,complete:true});await context.close();
+          }console.log('PASS five-size extended playability, default and long-content screenshots, all panels, keyboard/touch/orientation and inset stress');}finally{await writeFile('evidence/visual-proof.json',JSON.stringify(records,null,2));await browser.close();}
           JS
           set -o pipefail
-          node .interaction-probe.mjs | tee evidence/probe.log
+          UI_EVIDENCE_DIR=evidence/screens node .interaction-visual.mjs | tee evidence/visual-proof.log
+      - name: Commit tested candidate to exact owned branch
+        run: |
+          set -eu
+          test "$GITHUB_REF" = refs/heads/custodian/ui-contextual-use
+          test "$(git ls-remote origin refs/heads/custodian/ui-contextual-use | cut -f1)" = "$GITHUB_SHA"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = d84d354aaf5918805160377e76efdebee686a984
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/game.js src/play-ui.js src/play-ui.css tests/play-ui.mjs
+          git commit -m 'UI: explain reachable Use actions and movement without changing gameplay'
+          git push origin HEAD:refs/heads/custodian/ui-contextual-use
+          git rev-parse HEAD > evidence/candidate-head.txt
+          git ls-tree -r HEAD > evidence/tree.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: contextual-use-baseline
+          name: contextual-use-candidate
           path: evidence
           retention-days: 14
