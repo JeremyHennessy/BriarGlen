@@ -436,6 +436,7 @@
     if(active&&panel&&!panel.hidden){
       const replacement=previous?.context===context&&attribute?[...container.querySelectorAll(`[${attribute}]`)].find(el=>el.getAttribute(attribute)===value&&!el.disabled):null;
       (replacement||panel).focus({preventScroll:true});panel.scrollTop=scrollTop;
+      if(replacement){const box=replacement.getBoundingClientRect(),bounds=panel.getBoundingClientRect();if(box.top<bounds.top)panel.scrollTop-=bounds.top-box.top;else if(box.bottom>bounds.bottom)panel.scrollTop+=box.bottom-bounds.bottom;}
     }
     return true;
   }

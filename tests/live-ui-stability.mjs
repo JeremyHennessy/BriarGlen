@@ -10,9 +10,9 @@ export async function proveLiveUiStability(page, vp) {
   const focusIs=async selector=>assert.equal(await page.locator(selector).evaluate(el=>el===document.activeElement),true,`${vp.name}: focus lost from ${selector}`);
   const shot=async name=>{if(process.env.UI_EVIDENCE_DIR){await mkdir(process.env.UI_EVIDENCE_DIR,{recursive:true});await page.screenshot({path:`${process.env.UI_EVIDENCE_DIR}/${vp.name}-stable-${name}.png`});}};
   await setup();await activate('[data-panel="character"]');
-  const guard=page.locator('[data-skill="guard"]');await guard.focus();
+  const guard=page.locator('[data-skill="guard"]');await page.keyboard.press('Tab');await guard.focus();
   const oldButton=await guard.elementHandle(),before=await state();
-  await page.waitForTimeout(650);await focusIs('[data-skill="guard"]');
+  await page.waitForTimeout(650);await focusIs('[data-skill="guard"]');assert.equal(await guard.evaluate(el=>el.matches(':focus-visible')),true,'Keyboard focus must remain visibly indicated');
   assert.equal(await oldButton.evaluate(el=>el.isConnected),true,'Unchanged skill controls must not be recreated');
   assert.deepEqual(await state(),before,'A normal UI refresh must not change progress/equipment/supplies');
   await shot('skills-focus');await page.keyboard.press('Enter');await refresh();
@@ -39,6 +39,9 @@ export async function proveLiveUiStability(page, vp) {
   await activate('[data-panel="nearby"]');await page.locator('[data-near="buy"]').focus();await page.waitForTimeout(650);await focusIs('[data-near="buy"]');
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.x=900;n.y=600;n.trust=7.25;d.advance(0);});
   assert.match(await page.locator('#nearby').innerText(),/trust 7.3/);await focusIs('[data-near="buy"]');await shot('resident');
+  // A same-target live update must not scroll the focused action out of sight on a phone.
+  const growing=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.x=900;n.y=600;n.name='Mira the Experienced Herbalist of Briar Glen and the Greenwood';n.goalText='Preparing a careful delivery of medicine and supplies for a resident on the far side of the village.';d.advance(0);const b=document.querySelector('[data-near="buy"]').getBoundingClientRect().toJSON(),p=document.querySelector('#panel-nearby').getBoundingClientRect().toJSON();return{b,p};});
+  await focusIs('[data-near="buy"]');assert.ok(growing.b.top>=growing.p.top-1&&growing.b.bottom<=growing.p.bottom+1,`${vp.name}: live content hid the focused action`);await shot('resident-growing');
   const beforeSwitch=await state();
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.npc('mira').x=30;d.npc('mira').y=30;d.npc('rowan').x=900;d.npc('rowan').y=600;d.advance(0);});
   await focusIs('#panel-nearby');assert.match(await page.locator('#nearby').innerText(),/Rowan/);
