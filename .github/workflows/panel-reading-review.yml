@@ -2,7 +2,7 @@ name: Panel reading acceptance (temporary)
 on:
   push:
     branches: [custodian/ui-panel-reading]
-    paths: [.github/workflows/panel-reading-review.yml]
+    paths: [.github/workflows/panel-reading-review.yml, .panel-reading-test.mjs]
 permissions:
   contents: write
 jobs:
