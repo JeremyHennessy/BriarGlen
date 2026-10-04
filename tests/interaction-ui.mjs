@@ -3,6 +3,9 @@ import { mkdir } from 'node:fs/promises';
 
 // Readiness fixtures exercise the original DOM controls; no gameplay outcome is relaxed.
 export async function proveInteractionUi(page, vp) {
+  // A fresh document isolates this suite from ordinary drops deliberately retained by reset().
+  await page.evaluate(()=>localStorage.removeItem('briar-glen-reboot-v1'));
+  await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
   const activate=async selector=>{const el=page.locator(selector);if(vp.touch)await el.tap();else await el.click();};
   const refresh=()=>page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(0));
   // Reset preserves ordinary world drops. Choose an actually empty view, not a presumed empty spawn.
@@ -48,6 +51,8 @@ export async function proveInteractionUi(page, vp) {
   const worldCanvas=page.locator('#game'),canvasBox=await worldCanvas.boundingBox();assert.ok(canvasBox);
   const point={x:canvasBox.width/2-90,y:canvasBox.height/2};
   if(vp.touch)await worldCanvas.tap({position:point});else await worldCanvas.click({position:point});
+  await page.waitForFunction(()=>document.querySelector('#objective-direction')?.textContent.includes('Walking'),null,{timeout:1000});
+  assert.match(await page.locator('#objective-direction').innerText(),/Walking .* · Stonepine Trail Ledger/);
   await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started,null,{timeout:5000});
   assert.equal(await page.locator('#panel-nearby').isVisible(),true);await shot('canvas-approach');
 
@@ -63,8 +68,10 @@ export async function proveInteractionUi(page, vp) {
   // The existing Nearby renderer replaces its buttons each tick; native scrolling and bounds are sampled in one browser turn.
   for(const selector of ['[data-near="sell"]','[data-near="buy"]','.interaction-controls summary']){const {b,p}=await page.locator(selector).evaluate(el=>{el.scrollIntoView({block:'nearest'});return{b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON()};});assert.ok(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1,'Resident/help controls remain reachable');}
   await activate('.interaction-controls summary');assert.equal(await page.locator('.interaction-controls').getAttribute('open'),'');
+  const expeditionDirection=await page.locator('#objective-direction').innerText();
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.tapWorld(1800,1100);d.advance(0);});
-  assert.match(await page.locator('#interaction-travel').innerText(),/Use stops walking/);await activate('#interact-btn');assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.navigation().active),false);
+  assert.match(await page.locator('#interaction-travel').innerText(),/Use stops walking/);assert.match(await page.locator('#objective-direction').innerText(),/Walking .* · selected spot/);
+  await activate('#interact-btn');await refresh();assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.navigation().active),false);assert.equal(await page.locator('#objective-direction').innerText(),expeditionDirection);
   await shot('resident');
 
   // Honest special-landmark actions: display does not grant progress or waive requirements.
