@@ -82,6 +82,12 @@ jobs:
           cp -r src tests index.html styles.css evidence/source/
           git diff "$BASE" -- src tests > evidence/candidate.diff
           git diff --no-index /dev/null tests/panel-reading.mjs >> evidence/candidate.diff || test "$?" = 1
+      - name: Ten native after cases with all panel reading and orientation proof
+        env:
+          UI_EVIDENCE_DIR: evidence/screens
+        run: |
+          set -o pipefail
+          node .reading-probe.mjs after 2>&1 | tee evidence/after-probe.log
       - name: Full canonical Chromium game and UI proof
         env:
           UI_EVIDENCE_DIR: evidence/chromium-canonical
@@ -99,12 +105,6 @@ jobs:
           PY
           set -o pipefail
           node tests/.reading-webkit.mjs http://127.0.0.1:4173/ 2>&1 | tee evidence/webkit-canonical.log
-      - name: Ten native after cases with all panel reading and orientation proof
-        env:
-          UI_EVIDENCE_DIR: evidence/screens
-        run: |
-          set -o pipefail
-          node .reading-probe.mjs after 2>&1 | tee evidence/after-probe.log
       - name: Commit verified bounded candidate to unchanged owned branch
         run: |
           set -eu
