@@ -85,7 +85,7 @@
   $('#inventory').before(loadout);
   $('#panel-character').append(cards.skills);
   const guide = document.createElement('section'); guide.className = 'card expedition-guide';
-  guide.innerHTML = '<div class="card-title"><span>Stonepine expedition</span><small>Optional adventure</small></div><div id="guide-body"></div><h3>Before you leave</h3><p id="guide-preparation"></p><p class="guide-note">Gather Ashwood in Greenwood, herbs in South Meadow and Moss Fen, and hides from wolves. Make a bow and arrows, brew medicine, and rest before heading for the ridge. The world keeps moving while panels are open.</p>';
+  guide.innerHTML = '<div class="card-title"><span>Stonepine expedition</span><small>Optional adventure</small></div><div class="guide-tools" role="group" aria-label="Expedition preparation panels"><button type="button" data-guide-panel="pack">Check gear</button><button type="button" data-guide-panel="craft">Make supplies</button><button type="button" data-guide-panel="character">Skills &amp; recovery</button></div><h3>Field preparation</h3><p id="guide-preparation"></p><h3>Waycache provisions</h3><div class="guide-provisions"><p id="guide-bread-plan"></p><p id="guide-arrows-plan"></p><p id="guide-deposit-help"></p></div><h3>Route checklist</h3><div id="guide-body"></div><details class="guide-sources"><summary>Where to get supplies</summary><p class="guide-note">Gather Ashwood in Greenwood, herbs in South Meadow and Moss Fen, and hides from wolves. Make a bow and arrows, brew medicine, and rest before heading for the ridge. Keep Brown Bread for the cache; check Nearby trades when you need more. Bring extra arrows for bow combat. The world keeps moving while panels are open.</p></details>';
   $('#panel-journal').append(guide, cards.log);
   const apprentice = $('.apprentice-panel'), details = document.createElement('details'); details.id = 'apprentice-details';
   details.innerHTML = '<summary>Autonomous play &amp; details</summary>';
@@ -120,6 +120,11 @@
     const id = {KeyI:'pack', KeyC:'craft', KeyJ:'journal', KeyK:'character', Escape:'nearby'}[event.code];
     if (id) { event.preventDefault(); setPanel(id); canvas.focus({preventScroll:true}); }
     if (event.code === 'KeyE') setPanel('nearby');
+  });
+  // Navigation only: these shortcuts never craft, equip, travel or spend a resource.
+  guide.addEventListener('click', event => {
+    const button = event.target.closest('[data-guide-panel]');
+    if (button && guide.contains(button)) setPanel(button.dataset.guidePanel, true);
   });
   $('#objective-open').addEventListener('click', () => setPanel('journal', true));
   $('#interact-btn').addEventListener('click', () => setPanel('nearby'));

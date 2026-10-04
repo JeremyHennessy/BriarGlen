@@ -566,6 +566,17 @@
     const heading=(near?`${name(near)} · ${Math.max(0,Math.ceil(near.hp))}/${near.maxHp} health${warning}`:'Recent damage')+(hit?` · Hit −${combatHudLoss}`:'');
     for(const [id,value] of [['combat-threat',heading],['combat-action',action]]){const node=document.getElementById(id);if(node.textContent!==value)node.textContent=value;}
   }
+  // Read existing progress only: carried supplies are not Waycache deposits.
+  function renderExpeditionSupplyPlan(p){
+    const set=(id,value,state)=>{const el=document.getElementById(id);if(!el)return;if(el.textContent!==value)el.textContent=value;if(state)el.dataset.state=state;};
+    for(const [id,required,label] of [['bread',1,'Brown Bread'],['arrows',6,'Trail Arrows']]){
+      const stored=p[id],carried=itemCount(id),remaining=Math.max(0,required-stored),missing=Math.max(0,remaining-carried);
+      const state=p.completed?'complete':remaining===0?'stored':missing===0?'carry':'missing';
+      const next=p.completed?'Route recorded':remaining===0?'Deposit met':missing>0?`Need ${missing} more to carry; ${remaining} still to store`:`Carry enough; store ${remaining} in Nearby`;
+      set(`guide-${id}-plan`,`${label} · Carried ${carried} · Stored ${stored}/${required} · ${next}`,state);
+    }
+    set('guide-deposit-help',p.completed?'Expedition recorded. Your stored provisions may be taken without undoing the reward.':p.ready?'Return to the Trail Ledger. Leave the provisions in the Waycache until the expedition is recorded.':!p.cache?'Secure the Waycache first, then store provisions in Nearby. Carried items alone do not count.':'At the Waycache, use Store 1 in Nearby for each item. Leave the deposits there until you return to the Trail Ledger.');
+  }
   function renderPlayHud(){
   renderCombatCue();
   renderSkillReadiness();
@@ -575,6 +586,7 @@
   if(!document.getElementById('objective-text'))return;
   const p=stonepineExpeditionProgress(),targetId=!p.started||p.ready?'stonepine-trail-ledger':!p.overlook?'stonepine-overlook':'stonepine-waycache',target=world.landmarks.find(l=>l.id===targetId);
   renderInteractionCue(p);
+  renderExpeditionSupplyPlan(p);
   const next=p.completed?(itemCount('trailpack')?'Route proven · explore the wilds':'Craft your earned Trail Pack'):!p.started?'Visit the Stonepine Trail Ledger':stonepineExpeditionNext(p);
   const compass=(dx,dy)=>['East','South-east','South','South-west','West','North-west','North','North-east'][(Math.round(Math.atan2(dy,dx)/(Math.PI/4))+8)%8];
   let direction='';
