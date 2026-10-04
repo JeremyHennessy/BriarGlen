@@ -1,0 +1,76 @@
+name: Journal supply lifecycle (prototype only)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/journal-lifecycle-review.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Isolate prototype, preserve actual before source
+        run: |
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          mkdir -p evidence/before evidence/after evidence/screens
+          cp -r src tests index.html styles.css evidence/before/
+          cp -r src tests index.html styles.css evidence/after/
+          (cd evidence/after && python3 ../../.journal-plan-author.py) > evidence/prototype.diff
+          cp .journal-guide-test.mjs evidence/after/tests/expedition-guide.mjs
+          git ls-tree -r HEAD > evidence/tree.txt
+          node --check evidence/after/src/game.js && node --check evidence/after/src/play-ui.js && node --check .journal-guide-test.mjs
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+          python3 -m http.server 4173 --directory evidence/after >/tmp/journal-lifecycle.log 2>&1 &
+          sleep 2
+      - name: Native controls, lifecycle, all panels, rotations and insets
+        run: |
+          cat > .journal-lifecycle.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium,webkit} from 'playwright';
+          import {proveExpeditionGuide} from './.journal-guide-test.mjs';
+          const records=[];
+          for(const [engine,type] of Object.entries({chromium,webkit})){
+            const browser=await type.launch({headless:true});
+            try{for(const vp of [{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}]){
+              const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage(),errors=[],r={engine,vp};
+              page.on('pageerror',e=>errors.push(String(e)));
+              const geometry=()=>page.evaluate(()=>({w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,panelW:document.querySelector('#panel-journal').clientWidth,panelSW:document.querySelector('#panel-journal').scrollWidth,panels:[...document.querySelectorAll('.play-panel')].filter(p=>!p.hidden).length,controls:['attack-btn','interact-btn','quick-brace','quick-tonic'].map(id=>({id,...document.getElementById(id).getBoundingClientRect().toJSON()}))}));
+              const check=g=>{assert.ok(g.sw<=g.w+1&&g.sh<=g.h+1&&g.panelSW<=g.panelW+1);assert.equal(g.panels,1);for(const b of g.controls)assert.ok(b.width>=44&&b.height>=44&&b.top>=0&&b.bottom<=g.h+1&&b.left>=0&&b.right<=g.w+1);};
+              try{
+                await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#guide-preparation')?.textContent.includes('health'));
+                await page.screenshot({path:`evidence/screens/${engine}-${vp.name}-default.png`});
+                await proveExpeditionGuide(page,{...vp,name:`${engine}-${vp.name}`});
+                r.lifecycle=true;check(await geometry());
+                for(const id of ['pack','craft','character','nearby','journal']){const tab=page.locator(`[data-panel="${id}"]`);if(vp.touch)await tab.tap();else await tab.click();assert.equal(await page.locator(`#panel-${id}`).isVisible(),true);assert.equal(await page.locator('.play-panel:visible').count(),1);}
+                if(vp.touch){await page.setViewportSize({width:vp.height,height:vp.width});await page.waitForTimeout(250);check(await geometry());await page.setViewportSize({width:vp.width,height:vp.height});await page.waitForTimeout(250);check(await geometry());}
+                await page.locator('[data-guide-panel="pack"]').scrollIntoViewIfNeeded();await page.screenshot({path:`evidence/screens/${engine}-${vp.name}-themed-buttons.png`});
+                if(vp.touch){await page.addStyleTag({content:'body{padding:20px 12px 16px!important}#app{height:calc(100dvh - 36px)!important}'});await page.waitForTimeout(250);check(await geometry());await page.screenshot({path:`evidence/screens/${engine}-${vp.name}-insets.png`});}
+                assert.deepEqual(errors,[]);r.pass=true;r.geometry=await geometry();
+              }catch(e){r.pass=false;r.error=String(e.stack||e);r.errors=errors;try{await page.screenshot({path:`evidence/screens/${engine}-${vp.name}-FAIL.png`});r.text=await page.locator('#panel-journal').innerText();}catch{}console.error(r.error);}
+              records.push(r);await writeFile('evidence/lifecycle.json',JSON.stringify(records,null,2));await context.close();
+            }}finally{await browser.close();}
+          }
+          assert.ok(records.every(r=>r.pass),'Every prototype viewport and lifecycle must pass');
+          console.log('PASS ten engine/size prototype flows; not final canonical or deployment acceptance.');
+          JS
+          set -o pipefail
+          UI_EVIDENCE_DIR=evidence/screens node .journal-lifecycle.mjs 2>&1 | tee evidence/lifecycle.log
+      - name: Assert tracked runtime and original tests unchanged
+        if: always()
+        run: git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journal-lifecycle-prototype
+          path: evidence
+          retention-days: 14
