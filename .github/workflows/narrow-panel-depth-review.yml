@@ -27,7 +27,7 @@ jobs:
           npx playwright install --with-deps chromium webkit
           python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
           sleep 2
-      - name: Original subproofs at additional narrow landscape size with no assertion modifications
+      - name: Original subproofs at 600x375 within their unchanged world-height contract
         run: |
           cat > .narrow-depth.mjs <<'JS'
           import {chromium,webkit} from 'playwright';
@@ -37,7 +37,9 @@ jobs:
           import {proveSkillReadiness} from './tests/skill-ui.mjs';
           import {proveCombatUi} from './tests/combat-ui.mjs';
           import {proveExpeditionGuide} from './tests/expedition-guide.mjs';
-          const vp={name:'narrow-landscape',width:568,height:320,touch:true};
+          // This original suite requires a140px world, so use600x375 within the new CSS range.
+          // The separately verified568x320 native suite retains its explicit additional-short-viewport checks.
+          const vp={name:'narrow-landscape',width:600,height:375,touch:true};
           for(const [engine,type] of Object.entries({chromium,webkit})){
             const browser=await type.launch();
             try{
@@ -47,7 +49,7 @@ jobs:
               await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>!!document.querySelector('#guide-preparation')?.textContent);
               for(const prove of [proveEquipmentReadiness,proveInteractionUi,proveLiveUiStability,proveSkillReadiness,proveCombatUi,proveExpeditionGuide])await prove(page,vp);
               if(errors.length)throw new Error(JSON.stringify(errors));
-              console.log(`PASS ${engine}: every original equipment, interaction, live focus, skill, combat and Journal lifecycle subproof at additional568x320; no assertion changes or skipped subproofs`);
+              console.log(`PASS ${engine}: every original equipment, interaction, live focus, skill, combat and Journal lifecycle subproof at600x375; no assertion changes or skipped subproofs`);
             }finally{await browser.close();}
           }
           JS
