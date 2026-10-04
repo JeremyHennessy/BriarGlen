@@ -1,0 +1,72 @@
+name: Contextual Use review (branch only)
+on:
+  push:
+    branches: [custodian/ui-contextual-use]
+    paths: [.github/workflows/interaction-ui-review.yml]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Assert untouched release source
+        run: |
+          git merge-base --is-ancestor d84d354aaf5918805160377e76efdebee686a984 HEAD
+          test -z "$(git diff d84d354aaf5918805160377e76efdebee686a984 -- src index.html styles.css tests .github/workflows/reboot-game-proof.yml)"
+      - name: Install canonical browser
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Serve game
+        run: |
+          python3 -m http.server 4173 >/tmp/server.log 2>&1 &
+          sleep 2
+      - name: Baseline interaction reproduction
+        run: |
+          mkdir -p evidence/source
+          git archive HEAD index.html styles.css src tests .github/workflows/reboot-game-proof.yml | tar -x -C evidence/source
+          git rev-parse HEAD > evidence/head.txt
+          cat > .interaction-probe.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch();const records=[];
+          try{for(const vp of [{name:'desktop',width:1440,height:900},{name:'landscape',width:844,height:390},{name:'portrait',width:390,height:844}]){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.name!=='desktop'});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');await page.screenshot({path:`evidence/${vp.name}-default-before.png`});
+            const initial={label:await page.locator('#interact-btn').innerText(),nearby:await page.locator('#nearby').innerText()};
+            const activate=async()=>{if(vp.name==='desktop')await page.locator('#interact-btn').click();else await page.locator('#interact-btn').tap();};
+            const setup=async()=>page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){const live=d.npc(n.id);live.x=30;live.y=30;}d.advance(0);});
+            await setup();
+            const resource=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,r=d.resourceOfType('briarleaf');d.setPosition(r.x+46,r.y);d.advance(0);return r;});
+            assert.match(await page.locator('#nearby').innerText(),/Use E to gather/);const old=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.inventory);
+            await activate();assert.match(await page.locator('#toast').innerText(),/Nothing useful within reach/);assert.deepEqual(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.inventory),old);
+            await page.screenshot({path:`evidence/${vp.name}-resource-out-of-reach-before.png`});
+            await setup();
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,l=d.landmarks().find(x=>x.id==='stonepine-trail-ledger');d.setPosition(l.x+53,l.y);d.advance(0);});
+            assert.match(await page.locator('#nearby').innerText(),/Use E to begin/);await activate();assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started),false);assert.match(await page.locator('#toast').innerText(),/Nothing useful within reach/);
+            await page.screenshot({path:`evidence/${vp.name}-ledger-out-of-reach-before.png`});
+            await setup();
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,l=d.landmarks().find(x=>x.id==='stonepine-trail-ledger'),n=d.npc('rowan');n.x=l.x;n.y=l.y;d.setPosition(l.x,l.y);d.advance(0);});
+            await activate();assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started),false);assert.match(await page.locator('#nearby').innerText(),/Use E to begin/);
+            await page.screenshot({path:`evidence/${vp.name}-resident-ledger-overlap-before.png`});
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.tapTarget('landmark','stonepine-trail-ledger');d.advance(.05);});
+            assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started),true,'Existing targeted approach can use the ledger without changing Use priority');
+            assert.deepEqual(errors,[]);records.push({viewport:vp,initial,resource,resourcePreviewOutsideUseRange:true,ledgerPreviewOutsideUseRange:true,residentTakesUsePriority:true,targetedLedgerApproachWorks:true});await context.close();
+          }console.log('PASS reproduced resource/ledger preview vs Use-range mismatch and resident priority; existing targeted approach works on unchanged runtime');}finally{await writeFile('evidence/observations.json',JSON.stringify(records,null,2));await browser.close();}
+          JS
+          set -o pipefail
+          node .interaction-probe.mjs | tee evidence/probe.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contextual-use-baseline
+          path: evidence
+          retention-days: 14
