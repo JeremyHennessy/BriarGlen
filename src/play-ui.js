@@ -66,6 +66,15 @@
     sidebar.append(panel);
   }
   for (const id of ['nearby', 'pack', 'craft', 'character']) $(`#panel-${id}`).append(cards[id]);
+  // Explain the existing Use action without replacing or adding an action handler.
+  $('#interact-btn').insertAdjacentHTML('beforeend', '<small id="interact-readiness" class="action-readiness">None</small>');
+  $('#interact-btn').setAttribute('aria-describedby', 'interact-explanation');
+  actions.insertAdjacentHTML('beforeend', '<span id="interact-explanation" class="sr-only"></span>');
+  const interaction = document.createElement('section'); interaction.id = 'interaction-context'; interaction.className = 'interaction-context';
+  interaction.setAttribute('aria-label', 'Current Use action');
+  interaction.innerHTML = '<small class="interaction-eyebrow">USE / E · RIGHT NOW</small><strong id="interaction-target">Nothing in reach</strong><p id="interaction-help"></p>';
+  cards.nearby.prepend(interaction);
+  cards.nearby.insertAdjacentHTML('beforeend', '<details class="interaction-controls"><summary>Movement &amp; interaction help</summary><p id="interaction-travel"></p><p>Use prioritizes residents, then landmarks, resources and loose items. Nearby can preview things just outside reach. The world keeps moving while panels are open.</p></details>');
   const loadout = document.createElement('div'); loadout.id = 'loadout-summary'; loadout.className = 'loadout-summary';
   loadout.setAttribute('role', 'group'); loadout.setAttribute('aria-label', 'Equipped gear and supplies');
   for (const [kind, label] of [['weapon','Weapon'], ['armor','Armor'], ['tool','Tool']]) {

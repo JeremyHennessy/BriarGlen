@@ -459,14 +459,61 @@
     document.getElementById('carry-state').dataset.heavy=String(heavy);
     text('loadout-supplies',`${itemCount('arrows')} arrows · ${itemCount('bread')} bread · ${itemCount('tonic')} tonics`);
   }
+  // Presentation only. Use keeps its existing NPC > landmark > resource > drop priority.
+  function renderInteractionCue(progress){
+    const cue=document.getElementById('interaction-context');if(!cue)return;
+    const text=(id,value)=>{const el=document.getElementById(id);if(el&&el.textContent!==value)el.textContent=value;};
+    const npc=nearestNPC(),landmark=nearestLandmark(),resource=nearestResource(),drop=nearestDrop();
+    const target=npc||landmark||resource||drop,kind=npc?'npc':landmark?'landmark':resource?'resource':drop?'drop':'none';
+    const name=(entity,type)=>type==='resource'?itemDefs[entity.type].name:type==='drop'?itemDefs[entity.item].name:entity.name;
+    let label='None',state='neutral',title='Nothing in reach',help='Tap a person, plant, loose item or landmark in the world to walk over and interact. Use only works within reach.';
+    if(target){
+      state='ready';title=name(target,kind);
+      if(npc){
+        label='Details';const preview=nearestLandmark(55);
+        help=preview?`${npc.name} takes Use priority here; Use shows local details, not the landmark action. Tap ${preview.name} in the world to approach and use it directly.`:`Use to inspect ${npc.name}. Help and trade actions are in Nearby; Connect (4) reads priorities.`;
+      }else if(landmark){
+        label='Inspect';help='Use to inspect this landmark.';
+        if(landmark.id==='stonepine-trail-ledger'){
+          label=progress.completed?'Done':!progress.started?'Begin':progress.ready?'Finish':'Review';
+          help=progress.completed?'Stonepine expedition complete. Your Trail Pack recipe is in Make.':!progress.started?'Use to begin the optional Stonepine expedition. No supplies are spent.':progress.ready?'Use to record your return and claim the one-time expedition reward.':`Use to review the expedition. Next: ${stonepineExpeditionNext(progress)}.`;
+        }else if(landmark.id==='deep-quarry-seam'){
+          const pick=player.inventory.pick;label='Mine';
+          const block=!player.deeds?.emberback?'Defeat Emberback to reopen this seam.':player.equippedTool!=='pick'||!pick?'Equip an Iron Pick in Pack.':pick.durability<=0?'Mend your broken Iron Pick first.':player.energy<14?'Rest until you have 14 energy.':landmark.lastMinedDay===world.day?'Already worked today; return tomorrow.':'';
+          help=block||'Use to mine 2 fine Iron Ore. Costs 14 energy and 8 pick durability.';if(block){state='warning';label='Blocked';}
+        }else if(landmark.id==='moonwell-hollow'){
+          const harvest=moonwellIsNight()&&landmark.lastHarvestNight!==moonwellNightKey();
+          label=harvest?'Harvest':!landmark.discovered?'Chart':'Inspect';help=harvest?'Use to gather 2 fine Mooncaps. One harvest per night.':!landmark.discovered?'Use to chart the Moonwell. Return after dusk for Mooncaps.':moonwellIsNight()?'Already gathered this night; return after the next dusk.':'Quiet until dusk. Use to inspect; no harvest now.';
+        }else if(landmark.id==='stonepine-waycache'){
+          const danger=world.enemies.find(e=>!e.dead&&(dist(landmark,e)<=180||dist(player,e)<=180));
+          label=landmark.claimed?'Stash':danger?'Blocked':'Secure';state=!landmark.claimed&&danger?'warning':'ready';help=landmark.claimed?'Use shows the cache. Store and Take buttons below move one supply at a time.':danger?`${danger.name||'A wolf'} is too close. Clear nearby danger before securing the cache.`:'Use to secure the cache and collect its one-time trail supplies.';
+        }else if(landmark.id==='stonepine-overlook'&&landmark.discovered){
+          const block=itemCount('bread')<1?'Bring Brown Bread to recover energy here.':player.energy>=player.maxEnergy-10?'Energy is already high; save your bread for later.':'';
+          label=block?'Rest':'Eat';state=block?'warning':'ready';help=block||'Use to eat 1 Brown Bread and recover travel energy.';
+        }else if(!landmark.discovered){label='Chart';help='Use to chart this landmark and earn Fieldcraft experience.';}
+      }else if(resource){
+        label='Gather';const pickReady=player.equippedTool==='pick'&&player.inventory.pick?.durability>0;
+        help=resource.type==='iron'?`Use to gather Iron Ore. ${pickReady?'Your equipped pick improves the work; costs up to 8 energy and wears the pick.':'No working pick equipped; lower quality ore, costs up to 12 energy.'}`:'Use to gather this resource. Costs up to 4 energy.';
+      }else{label='Pick up';help=`Use to collect 1 ${itemDefs[drop.item].name}.`;}
+    }else{
+      const preview=nearestLandmark(55)||nearestNPC(85)||nearestResource(48)||nearestDrop(42);
+      if(preview){label='Closer';state='warning';title='Move closer';help='The nearby preview is outside Use range. Walk closer, or tap the target in the world to approach and interact.';}
+    }
+    text('interact-readiness',label);text('interaction-target',title);text('interaction-help',help);
+    cue.dataset.state=state;cue.dataset.kind=kind;cue.dataset.target=target?.id||'';
+    const button=document.getElementById('interact-btn');button.dataset.readiness=state;button.title=`Use: ${title}. ${help}`;button.setAttribute('aria-label',`Use: ${label} — ${title}`);text('interact-explanation',help);
+    const destination=navigation.active&&navigation.target?navigationEntity(navigation.target):null;
+    text('interaction-travel',navigation.active?destination?`Walking to ${name(destination,navigation.target.kind)}. Arrival interacts automatically. Use stops walking and acts on what is in reach now.`:'Walking to the selected spot. Use stops walking; movement keys also take control.':'Tap a target to approach it automatically, or move with WASD, arrow keys or the direction buttons.');
+  }
   function renderPlayHud(){
   renderReadiness();
   const text=(id,value)=>{const el=document.getElementById(id);if(el&&el.textContent!==value)el.textContent=value;};
   text('hp-text',`${Math.ceil(player.hp)} / ${player.maxHp}`);text('energy-text',`${Math.floor(player.energy)} / ${player.maxEnergy}`);
   if(!document.getElementById('objective-text'))return;
   const p=stonepineExpeditionProgress(),targetId=!p.started||p.ready?'stonepine-trail-ledger':!p.overlook?'stonepine-overlook':'stonepine-waycache',target=world.landmarks.find(l=>l.id===targetId);
+  renderInteractionCue(p);
   const next=p.completed?(itemCount('trailpack')?'Route proven · explore the wilds':'Craft your earned Trail Pack'):!p.started?'Visit the Stonepine Trail Ledger':stonepineExpeditionNext(p);
-  let direction='';if(!p.completed&&target){const dx=target.x-player.x,dy=target.y-player.y;direction=dist(player,target)<=55?'Within reach · press Use':`${['East','South-east','South','South-west','West','North-west','North','North-east'][(Math.round(Math.atan2(dy,dx)/(Math.PI/4))+8)%8]} · ${targetId==='stonepine-trail-ledger'?'Briar Glen':'Stonepine Ridge'}`;}
+  let direction='';if(!p.completed&&target){const dx=target.x-player.x,dy=target.y-player.y;direction=dist(player,target)<=55?(nearestNPC()?'Nearby resident has Use priority · tap the landmark':nearestLandmark()?.id===target.id?'Within reach · press Use':'Close by · move closer or tap the landmark'):`${['East','South-east','South','South-west','West','North-west','North','North-east'][(Math.round(Math.atan2(dy,dx)/(Math.PI/4))+8)%8]} · ${targetId==='stonepine-trail-ledger'?'Briar Glen':'Stonepine Ridge'}`;}
   text('objective-text',next);text('objective-direction',p.completed?(itemCount('trailpack')?'Your supplies remain in the Waycache':'Make · 2 Wolf Hides + 1 Ashwood'):direction);
   const guide=document.getElementById('guide-body');if(guide){const html=`<p>${!p.started?'Begin at the Trail Ledger in Briar Glen.':p.completed?'Expedition complete. Your Trail Pack recipe is unlocked.':'Chart the ridge, secure its cache, leave supplies, and return.'}</p>`+[[p.overlook,'Chart Stonepine Overlook'],[p.cache,'Secure the Waycache'],[p.bread>=1&&p.arrows>=6,`Leave supplies: ${Math.min(p.bread,1)}/1 bread · ${Math.min(p.arrows,6)}/6 arrows`],[p.completed,'Return to the Trail Ledger']].map(([done,label])=>`<div class="guide-step" data-complete="${done}">${done?'✓':'○'} ${label}</div>`).join('')+'<p>Reward: 18c, Fieldcraft experience, and the Trail Pack recipe. Stored provisions remain yours.</p>';if(guide.innerHTML!==html)guide.innerHTML=html;}
   const weapon=player.equippedWeapon,working=weapon&&player.inventory[weapon]?.durability>0;
