@@ -35,6 +35,6 @@ addition="  $('.canvas-wrap').insertAdjacentHTML('beforeend', '<div id=\"combat-
 p.write_text(old.replace(anchor,anchor+addition))
 p=Path('src/play-ui.css');old=get(str(p));assert p.read_text()==old
 p.write_text(old+'\n/* Close threats remain legible without replacing world messages or controls. */\n.combat-cue{position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);box-sizing:border-box;padding:5px 8px;border:1px solid var(--warn);border-radius:7px;background:rgba(14,17,13,.93);color:var(--text);font-size:12px;line-height:1.4;pointer-events:none;z-index:2;overflow-wrap:anywhere}.combat-cue[hidden]{display:none}.combat-cue strong,.combat-cue span{display:block}.combat-cue span{color:var(--warn)}\n')
-p=Path('tests/play-ui.mjs');old=get(str(p));assert p.read_text()==old;anchor='  await proveSkillReadiness(page, vp);';assert old.count(anchor)==1
+p=Path('tests/play-ui.mjs');old=get(str(p));assert p.read_text()==old;anchor='  await proveSkillReadiness(page,vp);';assert old.count(anchor)==1
 p.write_text("import { proveCombatUi } from './combat-ui.mjs';\n"+old.replace(anchor,anchor+'\n  await proveCombatUi(page, vp);'))
 print('PASS exact preservation outside read-only combat cue and close-wolf marker; action/update/seed/save/renderer order unchanged')
