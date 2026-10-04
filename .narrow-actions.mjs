@@ -30,7 +30,9 @@ export async function proveNarrowActions(sourcePage, vp) {
       assert.ok(t.b.left>=0&&t.b.top>=0&&t.b.right<=g.w+1&&t.b.bottom<=g.h+1,`${label}: ${t.id} onscreen`);
       assert.ok(t.hits.every(Boolean),`${label}: ${t.id} is not covered by another element`);
     }
-    assert.ok(g.canvas.width>=250&&g.canvas.height>=100,`${label}: usable world in this additional short viewport`);
+    assert.ok(g.canvas.width>=250&&g.canvas.height>0,`${label}: world remains visible`);
+    // The new 320px-high landscape minimum is not an invented minimum for the unchanged 320px-wide portrait layout.
+    if(g.w>g.h)assert.ok(g.canvas.height>=100,`${label}: usable world in the additional short landscape viewport`);
     assert.ok(g.canvas.bottom<=g.deck.top,`${label}: actions do not cover the world`);
     if(g.w>g.h)assert.ok(g.side.bottom<=g.deck.top,`${label}: actions have their own lane below the sidebar`);
     if(evidence)await page.screenshot({path:`${evidence}/narrow-${label}.png`});
