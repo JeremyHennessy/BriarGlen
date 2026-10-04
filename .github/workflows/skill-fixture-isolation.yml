@@ -1,0 +1,98 @@
+name: Skill fixture isolation (branch only)
+on:
+  push:
+    branches: [custodian/skill-fixture-autosave-isolation]
+    paths: [.github/workflows/skill-fixture-isolation.yml]
+permissions:
+  contents: write
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Preserve exact baseline and install canonical browser
+        run: |
+          set -eu
+          git diff --exit-code 4274a00dae2b0ed5f3654f787e349e7b8a982f2f -- src tests index.html styles.css
+          mkdir -p evidence/source
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+          python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
+          sleep 2
+      - name: Reproduce unguarded clear versus document-scoped write isolation
+        run: |
+          cat > .skill-isolation.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch({headless:true}),records=[];
+          try {
+            for(const vp of [{name:'desktop',width:1280,height:800},{name:'landscape',width:844,height:390},{name:'portrait',width:390,height:844}]){
+              const context=await browser.newContext({viewport:{width:vp.width,height:vp.height}});
+              for(const isolated of [false,true]){
+                const page=await context.newPage();await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+                await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.setEnergy(100);});
+                await page.locator('#quick-brace').click();
+                assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.guarded),true);
+                await page.evaluate(isolated=>{const key='briar-glen-reboot-v1';if(isolated){const write=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k===key)return;return write.call(this,k,v);};}localStorage.removeItem(key);},isolated);
+                // Keep native frame/5s autosave running across the exact clear-to-reload window.
+                await page.waitForTimeout(5250);
+                const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('briar-glen-reboot-v1')));
+                if(isolated)assert.equal(stored,null);else assert.equal(stored.player.guarded,true);
+                await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+                const guarded=await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.guarded);
+                assert.equal(guarded,!isolated);
+                await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());
+                assert.ok(await page.evaluate(()=>localStorage.getItem('briar-glen-reboot-v1')),'Normal save resumes in new document');
+                records.push({viewport:vp,isolated,autosaveRestoredOldFixture:!!stored,guardedAfterReload:guarded,savingAfterReload:true});await page.close();
+              }
+              await context.close();
+            }
+            console.log('PASS three-size controlled native autosave red/green; original guard and saving unchanged');
+          }finally{await writeFile('evidence/autosave-control.json',JSON.stringify(records,null,2));await browser.close();}
+          JS
+          node .skill-isolation.mjs
+      - name: Apply test-only isolation after reproduction
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/skill-ui.mjs');s=p.read_text();old="  await page.evaluate(()=>localStorage.removeItem('briar-glen-reboot-v1'));"
+          assert s.count(old)==1
+          new="  // Prevent the old document's native autosave from restoring its combat flags before reload.\n  await page.evaluate(()=>{const key='briar-glen-reboot-v1',write=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k===key)return;return write.call(this,k,v);};localStorage.removeItem(key);});"
+          p.write_text(s.replace(old,new))
+          PY
+          git diff --exit-code 4274a00dae2b0ed5f3654f787e349e7b8a982f2f -- src index.html styles.css tests/smoke.mjs tests/play-ui.mjs tests/interaction-ui.mjs tests/live-ui-stability.mjs
+          git diff --check
+          node --check tests/skill-ui.mjs
+          cp -r src tests index.html styles.css evidence/source/
+          git diff -- tests/skill-ui.mjs > evidence/test-only.diff
+      - name: Full unchanged canonical gameplay and UI proof
+        env:
+          UI_EVIDENCE_DIR: evidence/canonical
+        run: |
+          set -o pipefail
+          node tests/smoke.mjs http://127.0.0.1:4173/ | tee evidence/full-proof.log
+      - name: Commit only proven test to exact branch
+        run: |
+          set -eu
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = 4274a00dae2b0ed5f3654f787e349e7b8a982f2f
+          test "$(git ls-remote origin refs/heads/custodian/skill-fixture-autosave-isolation | cut -f1)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/skill-ui.mjs
+          git commit -m 'Test: isolate skill fresh-save setup from old-document autosave'
+          git push origin HEAD:refs/heads/custodian/skill-fixture-autosave-isolation
+          git rev-parse HEAD > evidence/candidate-head.txt
+          git ls-tree -r HEAD > evidence/tree.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: skill-fixture-isolation
+          path: evidence
+          retention-days: 14
