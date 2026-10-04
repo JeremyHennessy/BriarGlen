@@ -42,6 +42,15 @@ export async function proveInteractionUi(page, vp) {
   await hint('Begin','landmark');assert.match(await page.locator('#objective-direction').innerText(),/Within reach/);
   await activate('#interact-btn');await refresh();await hint('Review','landmark');assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started),true);await shot('ledger-started');
 
+  // Real mouse/touch input must execute the suggested approach, not merely a debug target call.
+  await setup();await page.evaluate(l=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('rowan');n.x=l.x+60;n.y=l.y;d.setPosition(l.x+90,l.y);d.advance(0);},ledger);
+  await hint('Details','npc');await page.waitForTimeout(80);
+  const worldCanvas=page.locator('#game'),canvasBox=await worldCanvas.boundingBox();assert.ok(canvasBox);
+  const point={x:canvasBox.width/2-90,y:canvasBox.height/2};
+  if(vp.touch)await worldCanvas.tap({position:point});else await worldCanvas.click({position:point});
+  await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started,null,{timeout:5000});
+  assert.equal(await page.locator('#panel-nearby').isVisible(),true);await shot('canvas-approach');
+
   // Resident priority is disclosed, not silently rewritten into a new target resolver.
   await setup();await page.evaluate(l=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('rowan');n.x=l.x;n.y=l.y;d.setPosition(l.x,l.y);d.advance(0);},ledger);
   await hint('Details','npc');assert.equal(await page.locator('#interaction-target').innerText(),'Rowan');assert.match(await page.locator('#interaction-help').innerText(),/takes Use priority/);
@@ -51,7 +60,8 @@ export async function proveInteractionUi(page, vp) {
 
   await setup();await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.x=900;n.y=600;d.setPosition(900,600);d.advance(0);});
   await hint('Details','npc');assert.match(await page.locator('#interaction-help').innerText(),/Help and trade/);await activate('#interact-btn');assert.match(await page.locator('#nearby').innerText(),/Mira/);
-  for(const selector of ['[data-near="sell"]','[data-near="buy"]','.interaction-controls summary']){await page.locator(selector).scrollIntoViewIfNeeded();const b=await page.locator(selector).boundingBox(),p=await page.locator('#panel-nearby').boundingBox();assert.ok(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1,'Resident/help controls remain reachable');}
+  // The existing Nearby renderer replaces its buttons each tick; native scrolling and bounds are sampled in one browser turn.
+  for(const selector of ['[data-near="sell"]','[data-near="buy"]','.interaction-controls summary']){const {b,p}=await page.locator(selector).evaluate(el=>{el.scrollIntoView({block:'nearest'});return{b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON()};});assert.ok(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1,'Resident/help controls remain reachable');}
   await activate('.interaction-controls summary');assert.equal(await page.locator('.interaction-controls').getAttribute('open'),'');
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.tapWorld(1800,1100);d.advance(0);});
   assert.match(await page.locator('#interaction-travel').innerText(),/Use stops walking/);await activate('#interact-btn');assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.navigation().active),false);
