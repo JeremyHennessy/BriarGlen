@@ -1,0 +1,58 @@
+name: Warden replacement fixture diagnosis (temporary)
+on:
+  push:
+    branches: [custodian/ui-exploration-leads]
+    paths: [.github/workflows/warden-fixture-review.yml]
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Original production runtime and original replacement fixture
+        run: |
+          set -eu
+          mkdir -p evidence baseline
+          git archive e18b09e4c24ca0e05f51066e1f3f2c42cc20d460 src tests index.html styles.css | tar -x -C baseline
+          cp baseline/tests/smoke.mjs evidence/original-smoke.mjs
+          test "$(git hash-object baseline/src/game.js)" = bbe35f9f86c33b4408f73a20ae4ea803e2c7105e
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 --directory baseline >/tmp/briar.log 2>&1 &
+          sleep 2
+      - name: Compare original fixture and isolated-threat hypothesis without runtime edits
+        run: |
+          cat > .warden-diagnostic.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFile,writeFile} from 'node:fs/promises';
+          import {chromium} from 'playwright';
+          const source=await readFile('baseline/tests/smoke.mjs','utf8'),prefix='    const replacement=await page.evaluate(',line=source.split('\n').find(l=>l.startsWith(prefix));assert.ok(line);
+          const fn=line.slice(prefix.length,-2),records=[];
+          const browser=await chromium.launch(),page=await browser.newPage();
+          const check=r=>{const b=r.blade,p=r.state.player,t=r.state.npcs.find(n=>n.id==='tamsin'),use=b?.provenance.history.find(x=>x.includes('Used by Tamsin to clear danger for ')),who=use?.match(/danger for (.+) on Day/)?.[1],reporter=r.state.npcs.find(n=>n.name===who);return{setup:r.setup.crafted&&r.setup.helped&&r.setup.resumedGoal==='patrol'&&r.setup.before?.provenance?.maker==='You'&&r.setup.owned?.provenance?.maker==='You',dead:r.dead,item:b?.provenance?.maker==='You'&&b.durability<b.maxDurability&&b.provenance.history.some(x=>x.includes('Used by Tamsin to clear danger'))&&b.provenance.impactCredited&&p.makerImpact===1&&p.knownFor==='making useful things',social:t.memory.some(m=>m.text.includes('blade you forged'))&&!!reporter&&reporter.memory.some(m=>m.text.includes('Tamsin cleared the wolf'))&&reporter.relations?.tamsin>0&&reporter.blockedByDanger?.enemyId!==r.setup.wolfId};};
+          try{
+            await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__);
+            for(const mode of ['original','isolated'])for(let seed=1;seed<=128;seed++){
+              const r=await page.evaluate(({fn,mode,seed})=>{const original=Math.random;let v=seed;Math.random=()=>((v=(Math.imul(v,1664525)+1013904223)>>>0)/4294967296);try{const d=window.__BRIAR_GLEN_DEBUG__,setup=(0,eval)(`(${fn})`)(),steps=[];for(let i=0;i<10;i++){const e=d.enemy(setup.wolfId);if(!e||e.dead)break;if(mode==='isolated')for(const other of d.enemies())if(other.id!==setup.wolfId)d.enemy(other.id).dead=true;d.advance(4);const t=d.npc('tamsin');steps.push({i,goal:t.goal,goalText:t.goalText,injury:t.injury,pos:{x:t.x,y:t.y},target:t.target,enemies:d.enemies(),memory:t.memory});}const e=d.enemy(setup.wolfId);return{setup,steps,dead:!e||e.dead===true,blade:d.npcArtifact('tamsin','blade'),state:d.snapshot()};}finally{Math.random=original;}},{fn,mode,seed});
+              r.mode=mode;r.seed=seed;r.checks=check(r);r.pass=Object.values(r.checks).every(Boolean);records.push(r);
+              if(!r.pass)console.log('FAILURE '+JSON.stringify({mode,seed,checks:r.checks,steps:r.steps,blade:r.blade}));
+            }
+            console.log('SUMMARY '+JSON.stringify(Object.fromEntries(['original','isolated'].map(mode=>[mode,records.filter(r=>r.mode===mode&&!r.pass).map(r=>({seed:r.seed,checks:r.checks}))]))));
+          }finally{await writeFile('evidence/warden-records.json',JSON.stringify(records,null,2));await browser.close();}
+          JS
+          cp .warden-diagnostic.mjs evidence/probe.mjs
+          set -o pipefail
+          node .warden-diagnostic.mjs 2>&1 | tee evidence/diagnostic.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: warden-fixture-diagnostic
+          path: evidence
+          retention-days: 14
