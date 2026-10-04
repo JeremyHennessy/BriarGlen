@@ -587,6 +587,7 @@
   const p=stonepineExpeditionProgress(),targetId=!p.started||p.ready?'stonepine-trail-ledger':!p.overlook?'stonepine-overlook':'stonepine-waycache',target=world.landmarks.find(l=>l.id===targetId);
   renderInteractionCue(p);
   renderExpeditionSupplyPlan(p);
+  const leads=document.getElementById('exploration-leads');if(leads)leads.hidden=!p.completed;
   const next=p.completed?(itemCount('trailpack')?'Route proven · explore the wilds':'Craft your earned Trail Pack'):!p.started?'Visit the Stonepine Trail Ledger':stonepineExpeditionNext(p);
   const compass=(dx,dy)=>['East','South-east','South','South-west','West','North-west','North','North-east'][(Math.round(Math.atan2(dy,dx)/(Math.PI/4))+8)%8];
   let direction='';

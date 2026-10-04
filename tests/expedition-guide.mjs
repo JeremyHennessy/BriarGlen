@@ -19,6 +19,7 @@ export async function proveExpeditionGuide(page,vp){
   assert.equal(await page.locator('#guide-arrows-plan').getAttribute('data-state'),'missing');
   assert.match(await page.locator('#guide-deposit-help').innerText(),/Carried items alone do not count/);
   assert.equal(await page.locator('.guide-sources').getAttribute('open'),null);
+  assert.equal(await page.locator('#exploration-leads').isVisible(),false,'Exploration leads stay hidden before route completion');
   await shot('fresh');
   for(const id of ['pack','craft','character']){
     await activate(`[data-guide-panel="${id}"]`);
@@ -48,6 +49,7 @@ export async function proveExpeditionGuide(page,vp){
   await activate('[data-panel="nearby"]');await activate('[data-cache-store="arrows"]');await refresh();await activate('#objective-open');
   assert.equal(await page.locator('#guide-arrows-plan').getAttribute('data-state'),'stored');
   assert.match(await page.locator('#guide-deposit-help').innerText(),/Leave the provisions in the Waycache/);
+  assert.equal(await page.locator('#exploration-leads').isVisible(),false,'Deposits alone must not reveal completion-only leads');
   await shot('ready-return');
   await activate('[data-panel="nearby"]');await activate('[data-cache-take="arrows"]');await refresh();await activate('#objective-open');
   assert.equal(await page.locator('#guide-arrows-plan').getAttribute('data-state'),'carry','Taking a needed deposit restores the honest remaining requirement');
@@ -59,16 +61,32 @@ export async function proveExpeditionGuide(page,vp){
   await visit('stonepine-waycache');for(let i=0;i<6;i++)await activate('[data-cache-take="arrows"]');await refresh();await activate('#objective-open');
   assert.match(await page.locator('#guide-arrows-plan').innerText(),/Stored 0\/6 · Route recorded/);
   assert.equal(await page.locator('#guide-arrows-plan').getAttribute('data-state'),'complete');
+  const leads=page.locator('#exploration-leads'),leadSummary=leads.locator('summary');
+  assert.equal(await leads.isVisible(),true);assert.equal(await leads.getAttribute('open'),null,'New leads are collapsed by default');
+  const beforeLeads=await state();await activate('#exploration-leads summary');
+  assert.notEqual(await leads.getAttribute('open'),null);
+  assert.match(await leads.innerText(),/Emberback.*working Iron Pick.*14 energy/s);
+  assert.match(await leads.innerText(),/Moonwell Hollow.*after dusk.*once each night/s);
+  assert.match(await leads.innerText(),/Mireglass Lens.*7 to 11 seconds/s);
+  assert.deepEqual(await state(),beforeLeads,'Reading leads never grants discoveries, items or progress');
+  await leadSummary.focus();await page.keyboard.press('Enter');assert.equal(await leads.getAttribute('open'),null);
+  // Finish the native close render before the next held key; immediate mixed-touch input can lose Chromium activation.
+  assert.deepEqual(await leadSummary.evaluate(el=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve({focused:document.activeElement===el,open:el.parentElement.open}))))),{focused:true,open:false});
+  await page.keyboard.down('Space');await page.waitForTimeout(650);await page.keyboard.up('Space');
+  assert.notEqual(await leads.getAttribute('open'),null);assert.deepEqual(await state(),beforeLeads);
+  assert.equal(await leadSummary.evaluate(el=>document.activeElement===el),true);await shot('exploration-leads');
   await shot('recorded');
   // Actual save/reload retains earned route/gear state; derived guidance is not persisted independently.
   const saved=await state();await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
   assert.deepEqual(await state(),saved);await activate('#objective-open');
   await page.waitForFunction(()=>document.querySelector('#guide-arrows-plan')?.dataset.state==='complete');
+  assert.equal(await page.locator('#exploration-leads').isVisible(),true);assert.equal(await page.locator('#exploration-leads').getAttribute('open'),null,'Reload derives availability without persisting disclosure state');
   assert.equal(await page.locator('#guide-arrows-plan').getAttribute('data-state'),'complete');
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.clearEnemies();d.setPosition(900,600);d.give('arrows',1000000);d.advance(0);});
   await activate('.guide-sources summary');assert.match(await page.locator('.guide-sources').innerText(),/Brown Bread/);
   const geometry=await page.locator('#panel-journal').evaluate(el=>({w:el.clientWidth,sw:el.scrollWidth,pageW:document.documentElement.scrollWidth,vw:innerWidth}));
   assert.ok(geometry.sw<=geometry.w+1&&geometry.pageW<=geometry.vw+1,'Large supply counts must wrap within Journal');
   for(const id of ['pack','craft','character']){const b=await page.locator(`[data-guide-panel="${id}"]`).boundingBox();assert.ok(b.width>=44&&b.height>=44,'Guide touch targets at least44px');}
+  await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.advance(0);});assert.equal(await page.locator('#exploration-leads').isVisible(),false,'Fresh reset hides previously revealed leads');
   console.log(`PASS ${vp.name}: guide navigation, held input, carried vs stored, partial deposits, withdraw/return/reward, large counts, save and stable controls`);
 }

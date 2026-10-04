@@ -1,4 +1,0 @@
-  function renderExplorationLeads(p){
-    const section=document.getElementById('exploration-leads');
-    if(section)section.hidden=!p.completed;
-  }
