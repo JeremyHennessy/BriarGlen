@@ -1,0 +1,102 @@
+name: Branch-only equipment readiness preflight
+on:
+  push:
+    branches: [custodian/build-0.95-equipment-readiness]
+    paths: [.github/workflows/readiness-authoring.yml, tools/readiness-author.py, tools/readiness-proof.mjs]
+permissions:
+  contents: write
+jobs:
+  author:
+    if: github.ref == 'refs/heads/custodian/build-0.95-equipment-readiness'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify exact release inputs
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = acf4e523ef6ea9d1b9907dbce2d11f5bbd4933a5
+          test "$(git hash-object src/game.js)" = 61d38c8a67bbbfe9c2cb64e396058bdf70021173
+          test "$(git hash-object src/play-ui.js)" = e3a1a6e4e1103e92c7e7169b14b3161cc2666302
+          test "$(git hash-object src/play-ui.css)" = 7383c1e474828f22339221b075bc08194b9e6512
+          test "$(git hash-object tests/smoke.mjs)" = 80d3cfa1330eaff8bb7c2e6578791dbf2e9ad893
+          test "$(git hash-object tests/play-ui.mjs)" = 757d80989dcc4ba4c47b550b671e4743c780df54
+          test "$(git hash-object .github/workflows/reboot-game-proof.yml)" = 0d7eeb6b70ca426a6e5140d1ad82bec4aec21d37
+      - name: Apply presentation and proof only
+        run: |
+          python3 tools/readiness-author.py
+          node --check src/game.js
+          node --check src/play-ui.js
+          node --check tests/play-ui.mjs
+          node --check tests/smoke.mjs
+          git diff --check
+      - name: Full original and extended browser suite
+        env:
+          UI_EVIDENCE_DIR: evidence
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+          python3 -m http.server 4173 >/tmp/readiness-server.log 2>&1 &
+          sleep 2
+          mkdir -p evidence
+          set -o pipefail
+          node tests/smoke.mjs http://127.0.0.1:4173/ 2>&1 | tee evidence/full-proof.log
+      - name: Additional small-screen and desktop visual proof
+        env:
+          UI_EVIDENCE_DIR: evidence
+        run: |
+          cat > readiness-screens.mjs <<'JS'
+          import {chromium} from 'playwright';
+          import {provePlayUi} from './tests/play-ui.mjs';
+          import {writeFileSync} from 'node:fs';
+          const browser=await chromium.launch({headless:true});
+          try {
+            for(const vp of [{name:'wide-desktop',width:1440,height:900,touch:false},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}]) {
+              const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch});
+              const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+              try {
+                await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});await page.waitForTimeout(250);
+                await page.screenshot({path:`evidence/${vp.name}-default.png`});
+                await provePlayUi(page,vp);
+                if(errors.length)throw new Error(errors.join(' | '));
+              } catch(error) {
+                await page.screenshot({path:`evidence/${vp.name}-failure.png`});
+                writeFileSync(`evidence/${vp.name}-failure.json`,JSON.stringify({error:String(error),errors},null,2));
+                throw error;
+              } finally {await context.close();}
+            }
+          } finally {await browser.close();}
+          JS
+          node readiness-screens.mjs
+          rm readiness-screens.mjs
+      - name: Preserve exact source and review artifacts
+        if: always()
+        run: |
+          mkdir -p evidence/source/src evidence/source/tests
+          cp index.html styles.css evidence/source/
+          cp src/game.js src/play-ui.js src/play-ui.css evidence/source/src/
+          cp tests/smoke.mjs tests/play-ui.mjs evidence/source/tests/
+          git diff --stat > evidence/diff-stat.txt
+          git diff -- src/game.js src/play-ui.js src/play-ui.css tests/smoke.mjs tests/play-ui.mjs > evidence/candidate.diff
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: equipment-readiness-0.95
+          path: evidence/
+          retention-days: 14
+      - name: Commit only tested slice and remove authoring tools
+        run: |
+          test "$(git ls-remote origin refs/heads/custodian/build-0.95-equipment-readiness | cut -f1)" = "$GITHUB_SHA"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = acf4e523ef6ea9d1b9907dbce2d11f5bbd4933a5
+          test "$(git hash-object .github/workflows/reboot-game-proof.yml)" = 0d7eeb6b70ca426a6e5140d1ad82bec4aec21d37
+          git diff --exit-code -- index.html styles.css
+          git rm tools/readiness-author.py tools/readiness-proof.mjs .github/workflows/readiness-authoring.yml
+          git add src/game.js src/play-ui.js src/play-ui.css tests/play-ui.mjs tests/smoke.mjs
+          test "$(git diff --cached --name-only | wc -l)" = 8
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'BUILD 0.95: equipment readiness and honest carry comfort display'
+          git push origin HEAD:refs/heads/custodian/build-0.95-equipment-readiness
