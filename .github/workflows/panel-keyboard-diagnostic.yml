@@ -1,0 +1,61 @@
+name: Panel reading keyboard diagnostic (never merge)
+on:
+  push:
+    branches: [custodian/verify-journal-keyboard-20261004]
+    paths: [.github/workflows/panel-keyboard-diagnostic.yml]
+permissions:
+  contents: read
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify unchanged baseline and install pinned engines
+        run: |
+          set -eu
+          git fetch origin 2ef0482e8f4acf76bb0eb14b1ed0d30fe33a6a5a
+          git diff --exit-code 2ef0482e8f4acf76bb0eb14b1ed0d30fe33a6a5a -- src tests index.html styles.css
+          mkdir -p evidence/source evidence/screens
+          cp -r src tests index.html styles.css evidence/source/
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+          python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
+          sleep 2
+      - name: Record native reading keys without game-state edits or acceleration
+        run: |
+          cat > .panel-keys.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium,webkit} from 'playwright';
+          const records=[];
+          const read=page=>page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player,el=document.querySelector('#panel-journal');return{x:p.x,y:p.y,hp:p.hp,energy:p.energy,coins:p.coins,inventory:p.inventory,focus:document.activeElement.id,scrollTop:el.scrollTop,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};});
+          try{for(const [engine,type] of Object.entries({chromium,webkit})){
+            const browser=await type.launch();
+            try{for(const viewport of [{width:1280,height:800},{width:844,height:390},{width:390,height:844}])for(const key of ['ArrowDown','Space']){
+              const context=await browser.newContext({viewport}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+              await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.querySelector('#guide-preparation')?.textContent.includes('health'));
+              await page.locator('#objective-open').click();assert.equal(await page.locator('#panel-tab-journal').evaluate(el=>document.activeElement===el),true);
+              await page.keyboard.press('Tab');assert.equal(await page.locator('#panel-journal').evaluate(el=>document.activeElement===el),true,'Native tab reaches reading panel');
+              const before=await read(page),label=`${engine}-${viewport.width}x${viewport.height}-${key}`;
+              await page.screenshot({path:`evidence/screens/${label}-before.png`});
+              await page.keyboard.down(key);await page.waitForTimeout(key==='Space'?35:250);const during=await read(page);await page.keyboard.up(key);
+              await page.screenshot({path:`evidence/screens/${label}-after.png`});
+              const after=await read(page);const r={engine,viewport,key,before,during,after,moved:Math.hypot(during.x-before.x,during.y-before.y),energyDelta:during.energy-before.energy,scrolled:during.scrollTop-before.scrollTop,errors};
+              records.push(r);console.log(JSON.stringify(r));assert.deepEqual(errors,[]);await context.close();
+            }}finally{await browser.close();}
+          }console.log('Diagnostic recording complete. Green means evidence collected, NOT that panel keyboard behavior is acceptable. State reads only, ordinary native keys, no grants/time acceleration.');}
+          finally{await writeFile('evidence/panel-keys.json',JSON.stringify(records,null,2));}
+          JS
+          cp .panel-keys.mjs evidence/panel-keys.mjs
+          set -o pipefail
+          node .panel-keys.mjs 2>&1 | tee evidence/panel-keys.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: panel-keyboard-diagnostic
+          path: evidence
+          retention-days: 14
