@@ -3,6 +3,9 @@ import { mkdir } from 'node:fs/promises';
 
 // Readiness fixtures exercise the original DOM controls; no gameplay outcome is relaxed.
 export async function proveInteractionUi(page, vp) {
+  // A fresh document isolates this suite from ordinary drops deliberately retained by reset().
+  await page.evaluate(()=>localStorage.removeItem('briar-glen-reboot-v1'));
+  await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
   const activate=async selector=>{const el=page.locator(selector);if(vp.touch)await el.tap();else await el.click();};
   const refresh=()=>page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(0));
   // Reset preserves ordinary world drops. Choose an actually empty view, not a presumed empty spawn.
