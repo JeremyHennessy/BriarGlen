@@ -1,0 +1,138 @@
+name: Phone engine evidence (never merge)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/phone-engines-review.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ENGINE: ${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Pin exact verified source and preserve canonical assertions
+        run: |
+          set -eu
+          git merge-base --is-ancestor efb547dc5390a243c465c939f3b3fd27b0844381 HEAD
+          git merge-base --is-ancestor b25cce7600bea24bee42e689af9e84d713982b3e HEAD
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css .github/workflows/reboot-game-proof.yml
+          mkdir -p evidence/source
+          cp -r src tests index.html styles.css evidence/source/
+          git ls-tree -r HEAD > evidence/source-tree.txt
+          git rev-parse HEAD > evidence/branch-head.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          source=Path('tests/smoke.mjs').read_text()
+          old="import { chromium } from 'playwright';"
+          assert source.count(old)==1
+          engine=os.environ['ENGINE']
+          assert engine in ('chromium','webkit')
+          replacement="import { "+engine+" as chromium } from 'playwright';"
+          candidate=source.replace(old,replacement)
+          assert candidate.replace(replacement,old)==source
+          Path('tests/.phone-engine-smoke.mjs').write_text(candidate)
+          Path('evidence/engine-substitution.txt').write_text(old+'\n'+replacement+'\nNo other canonical source/assertion changes.\n')
+          PY
+      - name: Install pinned test browser
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps "$ENGINE"
+      - name: Serve exact release
+        run: |
+          python3 -m http.server 4173 >/tmp/phone-engine-server.log 2>&1 &
+          sleep 2
+      - name: Complete canonical body on selected engine
+        env:
+          UI_EVIDENCE_DIR: evidence/canonical
+        run: |
+          set -o pipefail
+          node tests/.phone-engine-smoke.mjs http://127.0.0.1:4173/ | tee evidence/canonical.log
+      - name: Independent five-size mobile-mode and native panel-session evidence
+        if: ${{ !cancelled() }}
+        run: |
+          cat > .phone-engine-review.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {mkdir,writeFile} from 'node:fs/promises';
+          import {chromium,webkit} from 'playwright';
+          import {provePlayUi} from './tests/play-ui.mjs';
+          const engine=process.env.ENGINE,browser=await({chromium,webkit}[engine]).launch({headless:true});
+          const records=[];
+          const sizes=[{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}];
+          const geometry=page=>page.evaluate(()=>({width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,panels:[...document.querySelectorAll('.play-panel')].filter(el=>!el.hidden).map(el=>({id:el.id,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth})),boxes:['#attack-btn','#interact-btn','#quick-brace','#quick-tonic','#hp','#energy'].map(id=>({id,...document.querySelector(id).getBoundingClientRect().toJSON()}))}));
+          const check=g=>{assert.ok(g.scrollWidth<=g.width+1&&g.scrollHeight<=g.height+1,'Page overflow');assert.equal(g.panels.length,1,'Interactive panels overlap');assert.ok(g.panels[0].scrollWidth<=g.panels[0].clientWidth+1,'Panel horizontal overflow');for(const b of g.boxes){assert.ok(b.left>=0&&b.top>=0&&b.right<=g.width+1&&b.bottom<=g.height+1,`${b.id} offscreen`);if(!['#hp','#energy'].includes(b.id))assert.ok(b.width>=44&&b.height>=44,`${b.id} below44px`);}for(let i=0;i<4;i++)for(let j=i+1;j<4;j++){const a=g.boxes[i],b=g.boxes[j];assert.ok(a.right<=b.left+1||b.right<=a.left+1||a.bottom<=b.top+1||b.bottom<=a.top+1,'Action controls overlap');}};
+          await mkdir('evidence/screens',{recursive:true});
+          try{for(const vp of sizes){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,isMobile:vp.touch});
+            const page=await context.newPage(),errors=[];
+            page.on('pageerror',e=>errors.push(e.message));
+            page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+            const record={engine,viewport:vp,mobileMode:vp.touch};
+            try{
+              await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
+              await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+              await page.screenshot({path:`evidence/screens/${vp.name}-default.png`});
+              record.defaultGeometry=await geometry(page);check(record.defaultGeometry);
+              await provePlayUi(page,{...vp,name:`${engine}-${vp.name}`});
+              record.fullUi=true;
+              // Synthetic fixture stress, NOT the ordinary outing or a physical-device claim.
+              // World simulation continues normally; only real tabs/keys are used during this interval.
+              if(vp.name==='portrait'){
+                const start=Date.now();let transitions=0;
+                while(Date.now()-start<60000){
+                  for(const id of ['pack','craft','character','journal','nearby']){
+                    const tab=page.locator(`[data-panel="${id}"]`);
+                    await tab.tap();await page.waitForTimeout(650);
+                    assert.equal(await page.locator(`#panel-${id}`).isVisible(),true);
+                    check(await geometry(page));transitions++;
+                  }
+                }
+                record.nativePanelSession={milliseconds:Date.now()-start,transitions};
+                await page.screenshot({path:`evidence/screens/${vp.name}-native-session.png`});
+              }
+              if(vp.touch){
+                for(const size of [{width:vp.height,height:vp.width},{width:vp.width,height:vp.height}]){await page.setViewportSize(size);await page.waitForTimeout(250);check(await geometry(page));}
+              }
+              await page.locator('[data-panel="character"]').click();
+              await page.locator('[data-skill="rapport"]').focus();
+              await page.waitForTimeout(650);
+              assert.equal(await page.locator('[data-skill="rapport"]').evaluate(el=>el===document.activeElement),true,'Skill focus lost across native refresh');
+              await page.screenshot({path:`evidence/screens/${vp.name}-skills-focus.png`});
+              if(vp.touch){
+                await page.addStyleTag({content:'body{padding:20px 12px 16px!important}#app{height:calc(100dvh - 36px)!important}'});
+                await page.waitForTimeout(250);check(await geometry(page));
+                await page.screenshot({path:`evidence/screens/${vp.name}-insets.png`});
+              }
+              assert.deepEqual(errors,[],'Browser errors');record.pass=true;
+              console.log(`PASS ${engine} ${vp.name}: full unchanged UI assertions, mobile mode, focus, orientation, insets`);
+            }catch(error){record.pass=false;record.error=String(error.stack||error);record.browserErrors=errors;try{record.failureGeometry=await geometry(page);record.visibleText=await page.locator('body').innerText();await page.screenshot({path:`evidence/screens/${vp.name}-FAIL.png`});}catch{}console.error(record.error);}
+            records.push(record);await writeFile('evidence/mobile-results.json',JSON.stringify(records,null,2));await context.close();
+          }}finally{await browser.close();}
+          if(records.some(r=>!r.pass))process.exitCode=1;
+          JS
+          set -o pipefail
+          UI_EVIDENCE_DIR=evidence/screens node .phone-engine-review.mjs 2>&1 | tee evidence/mobile.log
+      - name: Confirm source stayed byte-identical
+        if: always()
+        run: |
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css .github/workflows/reboot-game-proof.yml
+          git diff --stat d253e62349e1a99b4bdb2291449b7c60626b7eca > evidence/branch-only-diff.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phone-engine-${{ matrix.engine }}
+          path: evidence
+          retention-days: 14
