@@ -36,7 +36,10 @@ export async function provePanelReading(page,vp){
   await page.locator('[data-guide-panel="craft"]').focus();await page.keyboard.down('Space');await page.waitForTimeout(650);await page.keyboard.up('Space');assert.equal(await page.locator('#panel-craft').isVisible(),true);assert.deepEqual(await state(),before);
   // Deliberate Escape/world controls are not swallowed by the panel handler.
   await page.keyboard.press('Escape');assert.equal(await page.locator('#game').evaluate(el=>document.activeElement===el),true);
-  const worldBefore=await state();await page.keyboard.down('ArrowDown');await page.waitForTimeout(150);await page.keyboard.up('ArrowDown');
+  const worldBefore=await state();await page.keyboard.down('ArrowDown');
+  // Require an actual native movement frame, not a fixed 150ms scheduling assumption.
+  try{await page.waitForFunction(y=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.y>y+3,worldBefore.y,{timeout:1500});}
+  finally{await page.keyboard.up('ArrowDown');}
   const moved=await state();assert.ok(moved.y>worldBefore.y+3,'World-focused arrows still move');
   await page.keyboard.press('Space');const hit=await state();assert.ok(hit.energy<moved.energy-2,'World-focused Space still attacks with its original energy cost');
   await page.keyboard.press('j');assert.equal(await page.locator('#panel-journal').isVisible(),true);assert.equal(await page.locator('#game').evaluate(el=>document.activeElement===el),true,'Explicit panel shortcut retains existing world-focus behavior');
