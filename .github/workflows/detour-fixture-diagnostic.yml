@@ -14,18 +14,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Original runtime and original fixture only
+      - name: Verified original source and passive diagnostic copy
         run: |
           set -eu
           test "$(git hash-object src/game.js)" = bbe35f9f86c33b4408f73a20ae4ea803e2c7105e
           test "$(git hash-object tests/smoke.mjs)" = 46f1961cd7538e5d8a38ef73f9c3e8b5c8382214
           mkdir -p evidence
           cp src/game.js tests/smoke.mjs evidence/
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/game.js');s=p.read_text()
+          a='  function residentDangerDetour(n){';b=a+"if(n.id==='mira'&&n.blockedByDanger)(window.__detourCalls??=[]).push({phase:'enter',minute:world.minute,mira:copy(n),enemies:copy(world.enemies)});"
+          assert s.count(a)==1;s=s.replace(a,b)
+          a='const safe=fieldSpot(report.itemId,n,true);return safe?{report,enemy,safe}:null;'
+          b="const safe=fieldSpot(report.itemId,n,true);if(n.id==='mira')(window.__detourCalls??=[]).push({phase:'eligible',minute:world.minute,safe:copy(safe),age:dangerReportAge(report),warden:copy(warden)});return safe?{report,enemy,safe}:null;"
+          assert s.count(a)==1;s=s.replace(a,b)
+          p.write_text(s)
+          PY
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
           python3 -m http.server 4173 >/tmp/game.log 2>&1 &
           sleep 2
-      - name: Sixty-four seeded original-fixture observations with exact runtime preconditions
+      - name: Fixed reproducer seed62 with exact original outcomes
         run: |
           cat > .detour-probe.mjs <<'JS'
           import assert from 'node:assert/strict';
@@ -33,26 +43,20 @@ jobs:
           import {chromium} from 'playwright';
           const source=await readFile('tests/smoke.mjs','utf8'),start='    const autonomousDangerDetour=await page.evaluate(',line=source.split('\n').find(l=>l.startsWith(start));assert.ok(line);
           let fn=line.slice(start.length,-2);assert.ok(fn.startsWith('()=>'));
-          const old='return{wolfId,wardenGoal,before,after};',added='return{wolfId,wardenGoal,before,after,warden:{injury:t.injury,goal:t.goal,memory:t.memory},mira:{x:m.x,y:m.y},minute:d.snapshot().minute,day:d.snapshot().day,resources:d.resourcesAll()};';assert.equal(fn.split(old).length,2);fn=fn.replace(old,added);
+          const old='return{wolfId,wardenGoal,before,after};',added='return{wolfId,wardenGoal,before,after,warden:{...t},mira:{...m},minute:d.snapshot().minute,day:d.snapshot().day,resources:d.resourcesAll(),enemies:d.enemies(),calls:window.__detourCalls};';assert.equal(fn.split(old).length,2);fn=fn.replace(old,added);
           const browser=await chromium.launch(),page=await browser.newPage(),records=[];
           try{await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__);
-            for(let seed=1;seed<=64;seed++){
-              const r=await page.evaluate(({fn,seed})=>{const original=Math.random;let value=seed;Math.random=()=>((value=(Math.imul(value,1664525)+1013904223)>>>0)/4294967296);try{return (0,eval)(`(${fn})`)();}finally{Math.random=original;}},{fn,seed});
-              const distance=(p,a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,len=dx*dx+dy*dy,t=len?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/len)):0;return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);};
-              const wolf=r.after.wolf,item=r.after.blocked?.itemId||r.after.route?.itemId,nodes=r.resources.filter(n=>n.available&&n.type===item),safe=nodes.filter(n=>Math.hypot(n.x-wolf.x,n.y-wolf.y)>=125&&distance(wolf,r.mira,n)>=95);
-              r.seed=seed;r.safeCount=safe.length;r.nodeCount=nodes.length;r.age=r.after.blocked?(r.day-1)*1440+r.minute-r.after.blocked.createdStamp:null;
-              r.pass=r.wardenGoal!=='patrol'&&r.before.goal==='avoid'&&r.before.blocked&&!r.before.route&&r.after.goal==='seek'&&!r.after.blocked&&r.after.avoidEnemyId===r.wolfId&&!!r.after.route?.resourceId&&wolf?.dead===false&&r.after.trust===0&&r.after.memory.some(m=>m.text.includes('After waiting for the Warden'));
-              records.push(r);console.log(JSON.stringify({seed,pass:r.pass,before:r.before,after:r.after.goal,safeCount:r.safeCount,age:r.age,warden:r.warden.injury,mira:r.mira,wolf:{x:wolf.x,y:wolf.y}}));
+            for(const seed of [62,1,62]){
+              const r=await page.evaluate(({fn,seed})=>{window.__detourCalls=[];const original=Math.random;let value=seed;Math.random=()=>((value=(Math.imul(value,1664525)+1013904223)>>>0)/4294967296);try{return (0,eval)(`(${fn})`)();}finally{Math.random=original;}},{fn,seed});
+              r.seed=seed;records.push(r);console.log(JSON.stringify({seed,after:r.after,warden:r.warden,eligibleCalls:r.calls.filter(c=>c.phase==='eligible'),lastCalls:r.calls.slice(-2),enemies:r.enemies}));
             }
-            console.log('OBSERVATIONS '+JSON.stringify({count:records.length,failures:records.filter(r=>!r.pass).map(r=>({seed:r.seed,safeCount:r.safeCount,age:r.age,warden:r.warden.injury}))}));
-          }finally{await writeFile('evidence/detour-records.json',JSON.stringify(records,null,2));await browser.close();}
+          }finally{await writeFile('evidence/rich-detour-records.json',JSON.stringify(records,null,2));await browser.close();}
           JS
-          cp .detour-probe.mjs evidence/probe.mjs
           set -o pipefail
-          node .detour-probe.mjs 2>&1 | tee evidence/diagnostic.log
+          node .detour-probe.mjs 2>&1 | tee evidence/rich.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: detour-fixture-diagnostic
+          name: detour-fixture-rich-diagnostic
           path: evidence
           retention-days: 14
