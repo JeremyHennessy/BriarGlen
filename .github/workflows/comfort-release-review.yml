@@ -1,0 +1,139 @@
+name: Comfort release review (temporary)
+on:
+  push:
+    branches: [custodian/ui-outing-comfort]
+    paths: [.github/workflows/comfort-release-review.yml]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify original baseline and prepare browsers
+        run: |
+          set -eu
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          git merge-base --is-ancestor efb547dc5390a243c465c939f3b3fd27b0844381 HEAD
+          git merge-base --is-ancestor b25cce7600bea24bee42e689af9e84d713982b3e HEAD
+          mkdir -p evidence/before evidence/source
+          git archive d253e62349e1a99b4bdb2291449b7c60626b7eca src tests index.html styles.css | tar -x -C evidence/before
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+          python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
+          sleep 2
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('.github/workflows/comfort-ui-review.yml').read_text()
+          begin="          cat > .comfort-probe.mjs <<'JS'\n";end='          JS\n'
+          assert s.count(begin)==1
+          probe=s.split(begin,1)[1].split(end,1)[0]
+          assert all(not line or line.startswith('          ') for line in probe.splitlines())
+          probe='\n'.join(line[10:] for line in probe.splitlines())+'\n'
+          Path('.comfort-probe.mjs').write_text(probe)
+          Path('evidence/probe.mjs').write_text(probe)
+          PY
+      - name: Original runtime before screenshots and reproduced presentation defects
+        run: node .comfort-probe.mjs before
+      - name: Controlled stale-handle diagnosis using normal live refresh
+        run: |
+          cat > .handle-proof.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium,webkit} from 'playwright';
+          const records=[];
+          try{for(const [engine,type] of Object.entries({chromium,webkit})){
+            const browser=await type.launch();
+            try{for(const viewport of [{width:1280,height:800},{width:844,height:390},{width:390,height:844}]){
+              const context=await browser.newContext({viewport,hasTouch:viewport.width<1000}),page=await context.newPage();
+              await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+              await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){d.npc(n.id).x=30;d.npc(n.id).y=30;}d.setPosition(900,600);const n=d.npc('mira');n.x=900;n.y=600;d.advance(0);});
+              await page.locator('[data-panel=nearby]').click();await page.locator('#interact-btn').focus();
+              const old=await page.locator('[data-near=buy]').elementHandle();assert.ok(old);
+              // Reproduce the interleaving explicitly: the locator's saved handle precedes a normal refresh.
+              const stale=await old.evaluate(el=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira'),before=el.isConnected;n.x=900;n.y=600;n.trust+=.2;d.advance(0);el.scrollIntoView({block:'nearest'});return{before,connected:el.isConnected,same:el===document.querySelector('[data-near=buy]'),b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON()};});
+              const current=await page.evaluate(()=>{const el=document.querySelector('[data-near=buy]');el.scrollIntoView({block:'nearest'});return{connected:el.isConnected,b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON()};});
+              const record={engine,viewport,stale,current};records.push(record);console.log(JSON.stringify(record));
+              assert.equal(stale.before,true);assert.equal(stale.connected,false);assert.equal(stale.same,false);assert.equal(stale.b.width,0);assert.equal(stale.b.height,0);
+              assert.equal(current.connected,true);assert.ok(current.b.width>0&&current.b.height>0);assert.ok(current.b.y>=current.p.y-1&&current.b.y+current.b.height<=current.p.y+current.p.height+1,'Original strict current-control geometry must pass');
+              await context.close();
+            }}finally{await browser.close();}
+          }console.log('PASS controlled old-handle diagnosis: six engine/size cases, unmodified runtime, unchanged strict fresh-node bounds');}
+          finally{await writeFile('evidence/handle-proof.json',JSON.stringify(records,null,2));}
+          JS
+          cp .handle-proof.mjs evidence/handle-proof.mjs
+          node .handle-proof.mjs
+      - name: Apply existing two presentation fixes and evidence-supported atomic test read
+        run: |
+          set -eu
+          python3 .comfort-ui-author.py | tee evidence/preservation.log
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          p=Path('tests/interaction-ui.mjs');s=p.read_text();original=s
+          old="const {b,p}=await page.locator(selector).evaluate(el=>{el.scrollIntoView({block:'nearest'});return{b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON()};});"
+          new="// Resolve and measure in one browser task: normal Nearby refresh may replace a locator's earlier handle.\n    const {b,p}=await page.evaluate(selector=>{const el=document.querySelector(selector);el.scrollIntoView({block:'nearest'});return{b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON()};},selector);\n    assert.ok(b.width>0&&b.height>0,'Resident/help geometry belongs to a live visible control');"
+          assert s.count(old)==1
+          s=s.replace(old,new);assert s.replace(new,old)==original
+          strict="assert.ok(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1,'Resident/help controls remain reachable');"
+          assert s.count(strict)==original.count(strict)==1
+          p.write_text(s)
+          changed=set(subprocess.check_output(['git','diff','--name-only','--','src','tests']).decode().splitlines())
+          assert changed=={'src/game.js','tests/combat-ui.mjs','tests/live-ui-stability.mjs','tests/interaction-ui.mjs'},changed
+          assert "briar-glen-reboot-v1" in Path('src/game.js').read_text()
+          PY
+          node --check src/game.js && node --check tests/combat-ui.mjs && node --check tests/live-ui-stability.mjs && node --check tests/interaction-ui.mjs
+          git diff --check
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src/play-ui.js src/play-ui.css index.html styles.css tests/smoke.mjs tests/play-ui.mjs tests/skill-ui.mjs .github/workflows/reboot-game-proof.yml
+          cp -r src tests index.html styles.css evidence/source/
+          git diff d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests > evidence/candidate.diff
+      - name: Full canonical Chromium gameplay and UI acceptance
+        env:
+          UI_EVIDENCE_DIR: evidence/chromium-canonical
+        run: |
+          set -o pipefail
+          node tests/smoke.mjs http://127.0.0.1:4173/ 2>&1 | tee evidence/chromium-canonical.log
+      - name: Full canonical assertions with WebKit engine only
+        env:
+          UI_EVIDENCE_DIR: evidence/webkit-canonical
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('tests/smoke.mjs').read_text();old="import { chromium } from 'playwright';";assert s.count(old)==1
+          Path('tests/.webkit-smoke.mjs').write_text(s.replace(old,"import { webkit as chromium } from 'playwright';"))
+          PY
+          set -o pipefail
+          node tests/.webkit-smoke.mjs http://127.0.0.1:4173/ 2>&1 | tee evidence/webkit-canonical.log
+      - name: Ten engine-size after cases including orientation and inset screenshots
+        run: node .comfort-probe.mjs after
+      - name: Commit verified candidate and remove previous temporary helpers
+        run: |
+          set -eu
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = d253e62349e1a99b4bdb2291449b7c60626b7eca
+          test "$(git ls-remote origin refs/heads/custodian/ui-outing-comfort | cut -f1)" = "$GITHUB_SHA"
+          python3 - <<'PY'
+          import subprocess
+          added=set(subprocess.check_output(['git','diff','--name-only','--diff-filter=A','d253e62349e1a99b4bdb2291449b7c60626b7eca','HEAD']).decode().splitlines())
+          helpers={'.comfort-ui-author.py','.github/workflows/comfort-full-context-diagnostic.yml','.github/workflows/comfort-ui-review.yml','.github/workflows/outing-comfort-review.yml','.journey/plan.json','.journey/runner.mjs'}
+          assert added==helpers|{'.github/workflows/comfort-release-review.yml'},added
+          subprocess.run(['git','rm','--',*sorted(helpers)],check=True)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/game.js tests/combat-ui.mjs tests/live-ui-stability.mjs tests/interaction-ui.mjs
+          git commit -m 'UI: retain visible live-action focus and avoid false injured-load hits'
+          git push origin HEAD:refs/heads/custodian/ui-outing-comfort
+          git rev-parse HEAD > evidence/candidate-head.txt
+          git ls-tree -r HEAD > evidence/tree.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: comfort-release-acceptance
+          path: evidence
+          retention-days: 14
