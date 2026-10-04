@@ -1,0 +1,19 @@
+  function renderExplorationLeads(p){
+    const section=document.getElementById('exploration-leads');
+    if(!section)return;
+    section.hidden=!p.completed;
+    if(!p.completed)return;
+    const set=(id,text,done=false)=>{const el=document.getElementById(id);if(!el)return;if(el.textContent!==text)el.textContent=text;el.dataset.complete=String(!!done);};
+    const seam=(world.landmarks||[]).find(l=>l.id==='deep-quarry-seam');
+    const well=(world.landmarks||[]).find(l=>l.id==='moonwell-hollow');
+    const mire=world.enemies.find(e=>e.id==='mirecaller');
+    const lens=itemCount('mireglass')>0;
+    const quarryDone=!!seam?.discovered;
+    const quarryText=quarryDone ? '✓ Deep Quarry Seam charted' : player.deeds?.emberback ? '○ Old Quarry reopened · find the Deep Quarry Seam with a working Iron Pick' : '○ Old Quarry · Emberback blocks the deeper seam';
+    const wellDone=!!well?.discovered;
+    const moonwellText=wellDone ? '✓ Moonwell Hollow charted · return after dusk' : '○ Moss Fen · search for Moonwell Hollow; its pale water changes after dusk';
+    const mireText=lens ? '✓ Mireglass Lens carried · Survey reveals resources longer' : mire?.dead ? '○ Far Moss Fen · Mirecaller defeated; pick up the Mireglass Lens' : '○ Far Moss Fen · a dangerous mire creature guards a lens that strengthens Survey';
+    set('lead-quarry',quarryText,quarryDone);
+    set('lead-moonwell',moonwellText,wellDone);
+    set('lead-mireglass',mireText,lens);
+  }
