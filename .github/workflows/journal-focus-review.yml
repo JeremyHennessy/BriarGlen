@@ -1,0 +1,64 @@
+name: Journal live focus probe (prototype only)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/journal-focus-review.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Work only in isolated prototype
+        run: |
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          mkdir -p evidence/source evidence/screens
+          cp -r src tests index.html styles.css evidence/source/
+          (cd evidence/source && python3 ../../.journal-plan-author.py) > evidence/prototype.diff
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+          python3 -m http.server 4173 --directory evidence/source >/tmp/journal-focus.log 2>&1 &
+          sleep 2
+      - name: Record same focused control before and after live text changes
+        run: |
+          cat > .journal-focus.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium,webkit} from 'playwright';
+          const all=[];
+          for(const [engine,type] of Object.entries({chromium,webkit})){
+            const browser=await type.launch({headless:true});
+            try{for(const vp of [{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}]){
+              const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+              await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+              await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.advance(0);});
+              await page.locator('#objective-open').click();const target=page.locator('.guide-sources summary');await target.focus();await page.keyboard.press('Enter');await target.scrollIntoViewIfNeeded();
+              const read=()=>target.evaluate(el=>{const p=document.querySelector('#panel-journal').getBoundingClientRect().toJSON(),b=el.getBoundingClientRect().toJSON();return{b,p,focus:document.activeElement===el,inBounds:b.top>=p.top-1&&b.bottom<=p.bottom+1};});
+              const r={engine,vp,before:await read()};assert.equal(r.before.focus,true);assert.equal(r.before.inBounds,true);
+              await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('bread',1000000);d.give('arrows',1000000);d.advance(0);});
+              r.immediate=await read();await page.waitForTimeout(650);r.delayed=await read();r.errors=errors;
+              await page.screenshot({path:`evidence/screens/${engine}-${vp.name}-growth.png`});assert.deepEqual(errors,[]);
+              all.push(r);await writeFile('evidence/focus.json',JSON.stringify(all,null,2));await context.close();
+            }}finally{await browser.close();}
+          }
+          console.log(JSON.stringify(all.map(r=>({engine:r.engine,size:r.vp.name,focus:r.delayed.focus,inBounds:r.delayed.inBounds})),null,2));
+          console.log('Diagnostic completion is not acceptance; any inBounds=false is retained as a prototype defect.');
+          JS
+          node .journal-focus.mjs | tee evidence/focus.log
+      - name: Confirm tracked source unchanged
+        if: always()
+        run: git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journal-live-focus
+          path: evidence
+          retention-days: 14
