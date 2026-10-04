@@ -22,7 +22,7 @@ export async function proveLiveUiStability(page, vp) {
   await page.keyboard.down('Space');await page.waitForTimeout(650);await page.keyboard.up('Space');await refresh();
   assert.equal((await state()).skills.guard.xp,xp+2,'Held Space must survive ordinary refresh without dropped/double activation');
   const skillUpdate=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setSkillLevel('guard',3);d.advance(0);return d.snapshot().player.skills.guard.level;});
-  await focusIs('[data-skill="guard"]');assert.match(await guard.locator('..').innerText(),new RegExp(` ${skillUpdate}$`));
+  await focusIs('[data-skill="guard"]');assert.equal(await guard.locator('..').locator('.lvl').innerText(),`Guard ${skillUpdate}`);
   await page.locator('#attack-btn').focus();await refresh();await focusIs('#attack-btn');
   assert.equal(await page.locator('.play-panel:visible').count(),1);
 

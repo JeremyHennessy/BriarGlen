@@ -478,7 +478,13 @@
   // Presentation only. Use keeps its existing NPC > landmark > resource > drop priority.
   function renderInteractionCue(progress){
     const cue=document.getElementById('interaction-context');if(!cue)return;
-    const text=(id,value)=>{const el=document.getElementById(id);if(el&&el.textContent!==value)el.textContent=value;};
+    // Context text is above Nearby. Preserve an already-visible focused action after that text grows.
+    const active=document.activeElement,panel=active?.closest('.play-panel');
+    const focusedAction=panel?.id==='panel-nearby'&&!panel.hidden&&active.matches('[data-near],[data-cache-store],[data-cache-take]')?active:null;
+    const before=focusedAction?.getBoundingClientRect(),viewport=focusedAction?panel.getBoundingClientRect():null;
+    const keepVisible=!!before&&before.top>=viewport.top-1&&before.bottom<=viewport.bottom+1;
+    let changed=false;
+    const text=(id,value)=>{const el=document.getElementById(id);if(el&&el.textContent!==value){el.textContent=value;changed=true;}};
     const npc=nearestNPC(),landmark=nearestLandmark(),resource=nearestResource(),drop=nearestDrop();
     const target=npc||landmark||resource||drop,kind=npc?'npc':landmark?'landmark':resource?'resource':drop?'drop':'none';
     const name=(entity,type)=>type==='resource'?itemDefs[entity.type].name:type==='drop'?itemDefs[entity.item].name:entity.name;
@@ -520,6 +526,7 @@
     const button=document.getElementById('interact-btn');button.dataset.readiness=state;button.title=`Use: ${title}. ${help}`;button.setAttribute('aria-label',`Use: ${label} — ${title}`);text('interact-explanation',help);
     const destination=navigation.active&&navigation.target?navigationEntity(navigation.target):null;
     text('interaction-travel',navigation.active?destination?`Walking to ${name(destination,navigation.target.kind)}. Arrival interacts automatically. Use stops walking and acts on what is in reach now.`:'Walking to the selected spot. Use stops walking; movement keys also take control.':'Tap a target to approach it automatically, or move with WASD, arrow keys or the direction buttons.');
+    if(changed&&keepVisible&&document.activeElement===focusedAction){const box=focusedAction.getBoundingClientRect(),bounds=panel.getBoundingClientRect();if(box.top<bounds.top)panel.scrollTop-=bounds.top-box.top;else if(box.bottom>bounds.bottom)panel.scrollTop+=box.bottom-bounds.bottom;}
   }
   // Read-only skill guidance; live text never replaces a held/focused action button.
   function renderSkillReadiness(){
@@ -545,10 +552,10 @@
     if(changed){const active=document.activeElement,panel=active?.closest('.play-panel');if(active?.hasAttribute('data-skill')&&panel&&!panel.hidden){const box=active.getBoundingClientRect(),bounds=panel.getBoundingClientRect();if(box.top<bounds.top)panel.scrollTop-=bounds.top-box.top;else if(box.bottom>bounds.bottom)panel.scrollTop+=box.bottom-bounds.bottom;}}
   }
   // Presentation memory only; never persisted or used by combat resolution.
-  let combatHudHp=player.hp,combatHudLoss=0,combatHudHitUntil=0;
+  let combatHudHp=null,combatHudLoss=0,combatHudHitUntil=0;
   function renderCombatCue(){
     const el=document.getElementById('combat-cue');if(!el)return;
-    const now=performance.now();if(player.hp<combatHudHp){combatHudLoss=Math.round(combatHudHp-player.hp);combatHudHitUntil=now+2200;}else if(player.hp>combatHudHp)combatHudHitUntil=0;combatHudHp=player.hp;
+    const now=performance.now();if(combatHudHp!==null&&player.hp<combatHudHp){combatHudLoss=Math.round(combatHudHp-player.hp);combatHudHitUntil=now+2200;}else if(player.hp>combatHudHp)combatHudHitUntil=0;combatHudHp=player.hp;
     const alive=world.enemies.filter(e=>!e.dead),near=alive.filter(e=>dist(player,e)<=300).sort((a,b)=>dist(player,a)-dist(player,b))[0],profile=combatProfile(),cost=profile.bowReady?5:4;
     const name=e=>e?.type==='emberback'?'Emberback':e?.type==='briarwolf'?'Briar Wolf':e?.type==='mirecaller'?'Mirecaller':'Wolf';
     let target=null,best=Infinity;for(const e of alive){if(e.playerOnly&&player.apprentice?.enabled)continue;const gap=dist(player,e);if(gap>profile.range)continue;if(!profile.bowReady){target=e;break;}if(gap<best){target=e;best=gap;}}
