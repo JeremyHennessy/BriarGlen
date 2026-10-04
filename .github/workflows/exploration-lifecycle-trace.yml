@@ -1,0 +1,66 @@
+name: Exact exploration lifecycle trace (temporary)
+on:
+  push:
+    branches: [custodian/ui-exploration-leads]
+    paths: [.github/workflows/exploration-lifecycle-trace.yml]
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ENGINE: chromium
+      UI_EVIDENCE_DIR: evidence/screens
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Identical baseline and original candidate plus passive event trace
+        run: |
+          set -eu
+          mkdir -p evidence/before evidence/source
+          git diff --exit-code e18b09e4c24ca0e05f51066e1f3f2c42cc20d460 -- src tests index.html styles.css
+          git archive e18b09e4c24ca0e05f51066e1f3f2c42cc20d460 src tests index.html styles.css | tar -x -C evidence/before
+          python3 .exploration-author-final.py
+          cp -r src tests evidence/source/
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/expedition-guide.mjs');s=p.read_text()
+          a="  const leads=page.locator('#exploration-leads'),leadSummary=leads.locator('summary');"
+          b="""  await page.evaluate(()=>{
+            const details=document.querySelector('#exploration-leads'),summary=details.querySelector('summary');window.__leadTrace=[];
+            const record=(kind,e)=>{const b=summary.getBoundingClientRect();window.__leadTrace.push({kind,t:performance.now(),type:e?.type,key:e?.key,code:e?.code,repeat:e?.repeat,defaultPrevented:e?.defaultPrevented,target:e?.target?.outerHTML?.slice(0,160),active:document.activeElement?.outerHTML?.slice(0,180),open:details.open,hidden:details.hidden,connected:summary.isConnected,focus:document.activeElement===summary,documentFocus:document.hasFocus(),rect:b.toJSON(),scroll:document.querySelector('#panel-journal').scrollTop});};
+            window.__leadRecord=record;for(const type of ['keydown','keyup','click','focusin','focusout','pointerdown','pointerup'])document.addEventListener(type,e=>{record('capture',e);queueMicrotask(()=>record('after',e));},true);
+            details.addEventListener('toggle',e=>record('toggle',e));new MutationObserver(records=>{for(const r of records)if(r.attributeName==='open')record('openMutation');}).observe(details,{attributes:true});record('start');
+          });
+          try {
+          """+a
+          assert s.count(a)==1;s=s.replace(a,b)
+          a="  await shot('recorded');"
+          b="""  } finally {
+            await page.waitForTimeout(200);
+            console.log('EXACT_TRACE '+JSON.stringify({vp,events:await page.evaluate(()=>{window.__leadRecord('final');return window.__leadTrace;})}));
+            await shot('exact-trace');
+          }
+          """+a
+          assert s.count(a)==1;p.write_text(s.replace(a,b))
+          PY
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 >/tmp/after.log 2>&1 &
+          python3 -m http.server 4174 --directory evidence/before >/tmp/before.log 2>&1 &
+          sleep 2
+      - name: Original full visual context and strict disclosure assertion
+        run: |
+          set -o pipefail
+          node .exploration-visual-final.mjs 2>&1 | tee evidence/exact-trace.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exploration-exact-lifecycle-trace
+          path: evidence
+          retention-days: 14
