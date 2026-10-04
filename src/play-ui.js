@@ -75,7 +75,7 @@
   interaction.setAttribute('aria-label', 'Current Use action');
   interaction.innerHTML = '<small class="interaction-eyebrow">USE / E · RIGHT NOW</small><strong id="interaction-target">Nothing in reach</strong><p id="interaction-help"></p>';
   cards.nearby.prepend(interaction);
-  cards.nearby.insertAdjacentHTML('beforeend', '<details class="interaction-controls"><summary>Movement &amp; interaction help</summary><p id="interaction-travel"></p><p>Use prioritizes residents, then landmarks, resources and loose items. Nearby can preview things just outside reach. The world keeps moving while panels are open.</p></details>');
+  cards.nearby.insertAdjacentHTML('beforeend', '<details class="interaction-controls"><summary>Movement &amp; interaction help</summary><p id="interaction-travel"></p><p>Use prioritizes residents, then landmarks, resources and loose items. Nearby can preview things just outside reach. With the panel itself focused, arrow keys and Space scroll it; Escape returns focus to the world. The world keeps moving while panels are open.</p></details>');
   const loadout = document.createElement('div'); loadout.id = 'loadout-summary'; loadout.className = 'loadout-summary';
   loadout.setAttribute('role', 'group'); loadout.setAttribute('aria-label', 'Equipped gear and supplies');
   for (const [kind, label] of [['weapon','Weapon'], ['armor','Armor'], ['tool','Tool']]) {
@@ -104,6 +104,14 @@
     if (focus) $(`#panel-tab-${id}`).focus();
   };
   tabs.addEventListener('click', event => { const tab = event.target.closest('[data-panel]'); if (tab) setPanel(tab.dataset.panel); });
+  // Reading keys belong to the focused panel, not the world. Keep native scroll/activation.
+  sidebar.addEventListener('keydown', event => {
+    const panel = event.target.closest('.play-panel');
+    if (!panel || panel.hidden) return;
+    const readingKey = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','PageUp','PageDown','Home','End'].includes(event.code);
+    const readingSpace = event.code === 'Space' && !event.target.closest('button,summary,[role="button"],input,textarea,select,[contenteditable="true"]');
+    if (readingKey || readingSpace) event.stopPropagation();
+  });
   // Capture panel navigation so arrows do not simultaneously move the character.
   tabs.addEventListener('keydown', event => {
     const current = event.target.closest('[data-panel]'); if (!current) return;
