@@ -1,0 +1,142 @@
+name: Crafting UI review (branch only)
+on:
+  push:
+    branches: [custodian/build-0.96-crafting-readiness]
+    paths: [.github/workflows/crafting-ui-review.yml]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Preserve exact before and after source
+        run: |
+          set -eu
+          base=194d61bbed0a0cab13989d663d959e1b76e320a6
+          git merge-base --is-ancestor "$base" HEAD
+          git merge-base --is-ancestor b25cce7600bea24bee42e689af9e84d713982b3e HEAD
+          mkdir -p evidence/source evidence/before /tmp/briar-before
+          git archive "$base" index.html styles.css src tests .github/workflows/reboot-game-proof.yml | tar -x -C /tmp/briar-before
+          cp -r /tmp/briar-before/. evidence/before/
+          git archive HEAD index.html styles.css src tests .github/workflows/reboot-game-proof.yml | tar -x -C evidence/source
+          git rev-parse HEAD > evidence/head.txt
+          git diff "$base" -- src/game.js src/play-ui.css tests/play-ui.mjs > evidence/candidate.diff
+          git diff --stat "$base" > evidence/diff-stat.txt
+          git ls-tree -r HEAD > evidence/tree.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          old=Path('/tmp/briar-before/src/game.js').read_text()
+          new=Path('src/game.js').read_text()
+          a=[x for x in old.splitlines(True) if 'for(const el of document.querySelectorAll' in x and 'data-recipe-requirements' in x]
+          b=[x for x in new.splitlines(True) if 'for(const el of document.querySelectorAll' in x and 'data-recipe-requirements' in x]
+          assert len(a)==len(b)==1
+          assert new.replace(b[0],a[0])==old, 'Runtime diff exceeds the read-only recipe presentation loop'
+          for path in ['index.html','styles.css','src/play-ui.js','tests/smoke.mjs','.github/workflows/reboot-game-proof.yml']:
+              assert Path(path).read_bytes()==Path('/tmp/briar-before',path).read_bytes(),path
+          print('PASS exact runtime preservation outside recipe presentation; canonical tests/workflow unchanged')
+          PY
+      - name: Install canonical browser
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Serve exact versions
+        run: |
+          python3 -m http.server 4173 >/tmp/after-server.log 2>&1 &
+          python3 -m http.server 4174 --directory /tmp/briar-before >/tmp/before-server.log 2>&1 &
+          sleep 2
+      - name: Full unchanged canonical gameplay and UI proof
+        env:
+          UI_EVIDENCE_DIR: evidence/canonical
+        run: |
+          set -o pipefail
+          node tests/smoke.mjs http://127.0.0.1:4173/ | tee evidence/full-proof.log
+      - name: Controlled mismatch reproduction and visual interaction proof
+        run: |
+          cat > .crafting-review.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {mkdir,writeFile} from 'node:fs/promises';
+          import {chromium} from 'playwright';
+          import {provePlayUi} from './tests/play-ui.mjs';
+          const browser=await chromium.launch({headless:true});
+          const records=[];
+          const sizes=[{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}];
+          try{
+            for(const version of ['before','after'])for(const vp of sizes){
+              const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch});
+              const page=await context.newPage(),errors=[];
+              page.on('pageerror',e=>errors.push(e.message));
+              page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+              const activate=async s=>{const el=page.locator(s);if(vp.touch)await el.tap();else await el.click();};
+              const dir=`evidence/${version}-screens`;
+              await mkdir(dir,{recursive:true});
+              await page.goto(`http://127.0.0.1:${version==='before'?4174:4173}/`,{waitUntil:'domcontentloaded'});
+              await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+              await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.advance(0);});
+              await page.waitForTimeout(220);
+              await page.screenshot({path:`${dir}/${vp.name}-default.png`});
+              await activate('[data-panel="craft"]');
+              await page.screenshot({path:`${dir}/${vp.name}-make-empty.png`});
+              await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('iron',4);d.give('wood',3);d.give('hide',4);for(const id of ['bow','bedroll','jerkin','trailpack'])d.give(id,1,2.8);d.advance(0);});
+              await page.waitForTimeout(220);
+              const bow=page.locator('#recipe-bow');
+              const ready=await bow.getAttribute('data-ready');
+              assert.equal(ready,version==='before'?'true':'false',`${version} ${vp.name}: owned bow readiness`);
+              const snapshot=()=>page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return{inventory:p.inventory,skills:p.skills,coins:p.coins,equippedWeapon:p.equippedWeapon,equippedTool:p.equippedTool,equippedArmor:p.equippedArmor,expeditions:p.expeditions};});
+              const before=await snapshot();
+              await activate('[data-craft="bow"]');
+              assert.deepEqual(await snapshot(),before,'Rejected owned recipe must not alter materials, progression or equipment');
+              await page.screenshot({path:`${dir}/${vp.name}-make-owned.png`});
+              records.push({version,viewport:vp,ownedBowReady:ready,ownedBowText:await bow.innerText(),duplicateCraftChangedState:false});
+              if(version==='after'){
+                for(const id of ['bow','jerkin','bedroll'])assert.equal(await page.locator(`#recipe-${id}`).getAttribute('data-state'),'owned');
+                assert.equal(await page.locator('#recipe-trailpack').getAttribute('data-state'),'locked','Expedition gate precedes ownership');
+                assert.equal(await page.locator('#recipe-blade').getAttribute('data-state'),'locked');
+                assert.equal(await page.locator('#recipe-arrows').getAttribute('data-state'),'ready');
+                assert.match(await page.locator('#recipe-jerkin').innerText(),/Patch Jerkin in Make/);
+                assert.match(await page.locator('#recipe-bedroll').innerText(),/works from your pack/);
+                for(const el of await page.locator('[data-craft],#patch-jerkin').all()){
+                  await el.scrollIntoViewIfNeeded();
+                  const box=await el.boundingBox();
+                  const panel=await page.locator('#panel-craft').boundingBox();
+                  assert.ok(box&&panel&&box.x>=panel.x-1&&box.x+box.width<=panel.x+panel.width+1&&box.y>=panel.y-1&&box.y+box.height<=panel.y+panel.height+1,`${vp.name}: recipe action unreachable`);
+                }
+                const overflow=await page.locator('#panel-craft').evaluate(el=>el.scrollWidth>el.clientWidth+1);
+                assert.equal(overflow,false,`${vp.name}: crafting text overflows`);
+                const state=await snapshot();
+                for(const id of ['pack','character','journal','nearby','craft']){await activate(`[data-panel="${id}"]`);assert.equal(await page.locator('.play-panel:visible').count(),1);}
+                assert.deepEqual(await snapshot(),state,'Panel switches must preserve owned/missing/locked state');
+                await page.locator('[data-craft="arrows"]').focus();await page.keyboard.press('Tab');
+                assert.equal(await page.locator('#panel-craft').evaluate(el=>el.contains(document.activeElement)),true,'Recipe keyboard focus must remain reachable');
+                await page.screenshot({path:`${dir}/${vp.name}-make-bottom.png`});
+                if(vp.name.startsWith('small-'))await provePlayUi(page,vp);
+                if(vp.name==='portrait'||vp.name==='landscape'){
+                  await page.addStyleTag({content:'body{padding:20px 12px 16px !important}'});
+                  await page.waitForTimeout(250);
+                  const geometry=await page.evaluate(()=>({w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,boxes:['#hp','#energy','#attack-btn','#interact-btn','#quick-brace','#quick-tonic'].map(s=>document.querySelector(s).getBoundingClientRect().toJSON())}));
+                  assert.ok(geometry.sw<=geometry.w+1&&geometry.sh<=geometry.h+1,'Inset stress overflow');
+                  for(const b of geometry.boxes)assert.ok(b.left>=12&&b.right<=geometry.w-11&&b.top>=20&&b.bottom<=geometry.h-15,'Inset stress inaccessible control');
+                  await page.screenshot({path:`${dir}/${vp.name}-inset-stress.png`});
+                  records.push({version,viewport:vp,insetStress:geometry});
+                }
+              }
+              assert.deepEqual(errors,[],`${version} ${vp.name}: browser errors`);
+              await context.close();
+            }
+            console.log('PASS five-size before/after owned-recipe mismatch, gate precedence, output/readiness, actual duplicate action rejection, all panels, recipe scrolling, keyboard focus and simulated inset stress');
+          }finally{await writeFile('evidence/visual-proof.json',JSON.stringify(records,null,2));await browser.close();}
+          JS
+          set -o pipefail
+          UI_EVIDENCE_DIR=evidence/extra node .crafting-review.mjs | tee evidence/visual-proof.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crafting-ui-review
+          path: evidence
+          retention-days: 14
