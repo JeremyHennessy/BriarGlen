@@ -37,3 +37,6 @@ html,body{height:100%;overflow:hidden}body{padding:max(8px,env(safe-area-inset-t
 
 /* Close threats remain legible without replacing world messages or controls. */
 .combat-cue{position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);box-sizing:border-box;padding:5px 8px;border:1px solid var(--warn);border-radius:7px;background:rgba(14,17,13,.93);color:var(--text);font-size:12px;line-height:1.4;pointer-events:none;z-index:2;overflow-wrap:anywhere}.combat-cue[hidden]{display:none}.combat-cue strong,.combat-cue span{display:block}.combat-cue span{color:var(--warn)}
+
+/* Journal planning reuses the existing panel; links remain stable during live updates. */
+.guide-tools{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.guide-tools button{min-height:44px;flex:1 1 90px;font-size:12px;padding:7px 9px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;cursor:pointer}.guide-provisions p{padding:7px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.guide-provisions [data-state=stored],.guide-provisions [data-state=complete]{color:var(--good)}.guide-provisions [data-state=missing]{color:var(--warn)}.guide-provisions [data-state=carry]{color:var(--accent)}.guide-sources summary{min-height:44px}.expedition-guide .guide-tools+h3{margin-top:12px}
