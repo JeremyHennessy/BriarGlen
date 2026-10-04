@@ -1,3 +1,4 @@
+import { proveNarrowActions } from './narrow-actions.mjs';
 import { provePanelReading } from './panel-reading.mjs';
 import { proveExpeditionGuide } from './expedition-guide.mjs';
 import { proveCombatUi } from './combat-ui.mjs';
@@ -122,6 +123,7 @@ export async function provePlayUi(page, vp) {
   await proveCombatUi(page, vp);
   await proveExpeditionGuide(page, vp);
   await provePanelReading(page, vp);
+  await proveNarrowActions(page, vp);
   console.log(`PASS ${vp.name}: play UI panels, HUD, recipe requirements, shortcuts, action isolation, journal, resize, saved progress`);
 }
 
