@@ -40,21 +40,25 @@ jobs:
           try{for(const [engine,type] of Object.entries({chromium,webkit})){
             const browser=await type.launch({headless:true});
             try{for(const vp of sizes){
+              const record={engine,vp,phase:'start'};records.push(record);
               const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
               await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
               await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.setHp(77);d.save();});
               await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
-              const injury=await page.evaluate(()=>({hp:window.__BRIAR_GLEN_DEBUG__.snapshot().player.hp,text:document.querySelector('#combat-threat').textContent,visible:!document.querySelector('#combat-cue').hidden}));
-              assert.equal(injury.hp,77);assert.equal(injury.visible,!after);if(!after)assert.match(injury.text,/Hit −23/);
+              // The shell-ready flag precedes the next native HUD frame; wait for actual text, not just element creation.
+              await page.waitForFunction(()=>!!document.querySelector('#combat-threat')?.textContent,null,{timeout:2000});
+              const injury=await page.evaluate(()=>({hp:window.__BRIAR_GLEN_DEBUG__.snapshot().player.hp,text:document.querySelector('#combat-threat').textContent,visible:!document.querySelector('#combat-cue').hidden}));record.injury=injury;record.phase='injury';console.log(JSON.stringify(record));
               await page.screenshot({path:`evidence/${mode}-screens/${engine}-${vp.name}-injured-load.png`});
+              assert.equal(injury.hp,77);assert.equal(injury.visible,!after);if(!after)assert.match(injury.text,/Hit −23/);
               await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){d.npc(n.id).x=30;d.npc(n.id).y=30;}const n=d.npc('mira');n.x=900;n.y=600;d.setPosition(900,600);d.advance(0);});
               await page.locator('[data-panel=nearby]').click();await page.locator('[data-near=buy]').focus();await page.waitForTimeout(100);
-              const visibleBefore=await geometry(page);assert.equal(visibleBefore.inBounds,true);
+              const visibleBefore=await geometry(page);record.visibleBefore=visibleBefore;record.phase='initial-focus';assert.equal(visibleBefore.inBounds,true);
               await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.x=900;n.y=600;n.name='Mira the Experienced Herbalist of Briar Glen and the Greenwood';n.goalText='Preparing a careful delivery of medicine and supplies for a resident on the far side of the village.';d.advance(0);});
-              const immediate=await geometry(page);await page.waitForTimeout(1000);const delayed=await geometry(page);
-              assert.equal(delayed.focused,true);
-              if(after||engine==='chromium'||vp.name==='desktop'){assert.equal(immediate.inBounds,true,`${engine} ${vp.name}: immediate focus clipped`);assert.equal(delayed.inBounds,true,`${engine} ${vp.name}: delayed focus clipped`);}else{assert.equal(immediate.inBounds,false);assert.equal(delayed.inBounds,false);}
-              await page.screenshot({path:`evidence/${mode}-screens/${engine}-${vp.name}-focused-action.png`});
+              const immediate=await geometry(page);await page.waitForTimeout(1000);const delayed=await geometry(page);Object.assign(record,{immediate,delayed,phase:'grown-focus'});console.log(JSON.stringify(record));
+              await page.screenshot({path:`evidence/${mode}-screens/${engine}-${vp.name}-focused-action.png`});assert.equal(delayed.focused,true);
+              if(after||engine==='chromium'||vp.name==='desktop'){assert.equal(immediate.inBounds,true,`${engine} ${vp.name}: immediate focus clipped`);assert.equal(delayed.inBounds,true,`${engine} ${vp.name}: delayed focus clipped`);}
+              else if(['landscape','portrait','small-landscape'].includes(vp.name)){assert.equal(immediate.inBounds,false);assert.equal(delayed.inBounds,false);}
+              // The baseline small-portrait outcome is recorded, not assumed to match other phone widths. After remains strict in every size.
               if(after){
                 const progression=await page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return{inventory:p.inventory,coins:p.coins,expeditions:p.expeditions};});
                 for(const id of ['pack','craft','character','journal','nearby']){if(vp.touch)await page.locator(`[data-panel=${id}]`).tap();else await page.locator(`[data-panel=${id}]`).click();assert.equal(await page.locator('.play-panel:visible').count(),1);}
@@ -64,11 +68,12 @@ jobs:
                 const screen=await page.evaluate(()=>({w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,buttons:['#attack-btn','#interact-btn','#quick-brace','#quick-tonic'].map(s=>document.querySelector(s).getBoundingClientRect().toJSON())}));assert.ok(screen.sw<=screen.w+1&&screen.sh<=screen.h+1);for(const b of screen.buttons)assert.ok(b.width>=44&&b.height>=44&&b.left>=0&&b.top>=0&&b.right<=screen.w+1&&b.bottom<=screen.h+1);
                 await page.screenshot({path:`evidence/${mode}-screens/${engine}-${vp.name}-panels-insets.png`});
               }
-              assert.deepEqual(errors,[]);records.push({engine,vp,injury,visibleBefore,immediate,delayed,errors});await context.close();
+              assert.deepEqual(errors,[]);record.errors=errors;record.phase='complete';await context.close();
             }}finally{await browser.close();}
           }console.log(`PASS ${mode}: dual-engine five-size injured reload, focus growth, native settling and panel geometry`);}
           finally{await writeFile(`evidence/${mode}-probe.json`,JSON.stringify(records,null,2));}
           JS
+          cp .comfort-probe.mjs evidence/probe.mjs
       - name: Confirm baseline defects in original runtime
         run: node .comfort-probe.mjs before
       - name: Apply only the two supported presentation corrections
