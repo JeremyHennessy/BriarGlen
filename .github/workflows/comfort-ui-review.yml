@@ -1,0 +1,119 @@
+name: Final comfort acceptance (branch only)
+on:
+  push:
+    branches: [custodian/ui-outing-comfort]
+    paths: [.github/workflows/comfort-ui-review.yml]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exact baseline and browser engines
+        run: |
+          set -eu
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          git merge-base --is-ancestor efb547dc5390a243c465c939f3b3fd27b0844381 HEAD
+          mkdir -p evidence/before evidence/source
+          git archive d253e62349e1a99b4bdb2291449b7c60626b7eca src tests index.html styles.css | tar -x -C evidence/before
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+          python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
+          sleep 2
+      - name: Create unchanged-outcome dual-engine probe
+        run: |
+          cat > .comfort-probe.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {mkdir,writeFile} from 'node:fs/promises';
+          import {chromium,webkit} from 'playwright';
+          const mode=process.argv[2],after=mode==='after',records=[];
+          const sizes=[{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}];
+          const geometry=async page=>page.evaluate(()=>{const b=document.querySelector('[data-near=buy]').getBoundingClientRect(),p=document.querySelector('#panel-nearby').getBoundingClientRect();return{b:b.toJSON(),p:p.toJSON(),focused:document.activeElement?.getAttribute('data-near')==='buy',inBounds:b.top>=p.top-1&&b.bottom<=p.bottom+1};});
+          await mkdir(`evidence/${mode}-screens`,{recursive:true});
+          try{for(const [engine,type] of Object.entries({chromium,webkit})){
+            const browser=await type.launch({headless:true});
+            try{for(const vp of sizes){
+              const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+              await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+              await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.setHp(77);d.save();});
+              await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+              const injury=await page.evaluate(()=>({hp:window.__BRIAR_GLEN_DEBUG__.snapshot().player.hp,text:document.querySelector('#combat-threat').textContent,visible:!document.querySelector('#combat-cue').hidden}));
+              assert.equal(injury.hp,77);assert.equal(injury.visible,!after);if(!after)assert.match(injury.text,/Hit −23/);
+              await page.screenshot({path:`evidence/${mode}-screens/${engine}-${vp.name}-injured-load.png`});
+              await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){d.npc(n.id).x=30;d.npc(n.id).y=30;}const n=d.npc('mira');n.x=900;n.y=600;d.setPosition(900,600);d.advance(0);});
+              await page.locator('[data-panel=nearby]').click();await page.locator('[data-near=buy]').focus();await page.waitForTimeout(100);
+              const visibleBefore=await geometry(page);assert.equal(visibleBefore.inBounds,true);
+              await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.x=900;n.y=600;n.name='Mira the Experienced Herbalist of Briar Glen and the Greenwood';n.goalText='Preparing a careful delivery of medicine and supplies for a resident on the far side of the village.';d.advance(0);});
+              const immediate=await geometry(page);await page.waitForTimeout(1000);const delayed=await geometry(page);
+              assert.equal(delayed.focused,true);
+              if(after||engine==='chromium'||vp.name==='desktop'){assert.equal(immediate.inBounds,true,`${engine} ${vp.name}: immediate focus clipped`);assert.equal(delayed.inBounds,true,`${engine} ${vp.name}: delayed focus clipped`);}else{assert.equal(immediate.inBounds,false);assert.equal(delayed.inBounds,false);}
+              await page.screenshot({path:`evidence/${mode}-screens/${engine}-${vp.name}-focused-action.png`});
+              if(after){
+                const progression=await page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return{inventory:p.inventory,coins:p.coins,expeditions:p.expeditions};});
+                for(const id of ['pack','craft','character','journal','nearby']){if(vp.touch)await page.locator(`[data-panel=${id}]`).tap();else await page.locator(`[data-panel=${id}]`).click();assert.equal(await page.locator('.play-panel:visible').count(),1);}
+                assert.deepEqual(await page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return{inventory:p.inventory,coins:p.coins,expeditions:p.expeditions};}),progression);
+                if(vp.touch){await page.setViewportSize({width:vp.height,height:vp.width});await page.waitForTimeout(220);assert.equal(await page.locator('.play-panel:visible').count(),1);await page.setViewportSize({width:vp.width,height:vp.height});await page.waitForTimeout(220);}
+                if(vp.name==='portrait'||vp.name==='landscape'){await page.addStyleTag({content:'body{padding:20px 12px 16px!important}#app{height:calc(100dvh - 36px)!important}'});await page.waitForTimeout(220);}
+                const screen=await page.evaluate(()=>({w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,buttons:['#attack-btn','#interact-btn','#quick-brace','#quick-tonic'].map(s=>document.querySelector(s).getBoundingClientRect().toJSON())}));assert.ok(screen.sw<=screen.w+1&&screen.sh<=screen.h+1);for(const b of screen.buttons)assert.ok(b.width>=44&&b.height>=44&&b.left>=0&&b.top>=0&&b.right<=screen.w+1&&b.bottom<=screen.h+1);
+                await page.screenshot({path:`evidence/${mode}-screens/${engine}-${vp.name}-panels-insets.png`});
+              }
+              assert.deepEqual(errors,[]);records.push({engine,vp,injury,visibleBefore,immediate,delayed,errors});await context.close();
+            }}finally{await browser.close();}
+          }console.log(`PASS ${mode}: dual-engine five-size injured reload, focus growth, native settling and panel geometry`);}
+          finally{await writeFile(`evidence/${mode}-probe.json`,JSON.stringify(records,null,2));}
+          JS
+      - name: Confirm baseline defects in original runtime
+        run: node .comfort-probe.mjs before
+      - name: Apply only the two supported presentation corrections
+        run: |
+          set -o pipefail
+          python3 .comfort-ui-author.py | tee evidence/preservation.log
+          git diff --check
+          node --check src/game.js && node --check tests/combat-ui.mjs && node --check tests/live-ui-stability.mjs
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src/play-ui.js src/play-ui.css index.html styles.css tests/smoke.mjs tests/play-ui.mjs tests/interaction-ui.mjs tests/skill-ui.mjs .github/workflows/reboot-game-proof.yml
+          cp -r src tests index.html styles.css evidence/source/
+          git diff d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests > evidence/candidate.diff
+      - name: Original full canonical Chromium game and UI proof
+        env:
+          UI_EVIDENCE_DIR: evidence/chromium-canonical
+        run: |
+          set -o pipefail
+          node tests/smoke.mjs http://127.0.0.1:4173/ | tee evidence/chromium-canonical.log
+      - name: Full canonical assertions with WebKit engine only
+        env:
+          UI_EVIDENCE_DIR: evidence/webkit-canonical
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('tests/smoke.mjs').read_text();old="import { chromium } from 'playwright';";assert s.count(old)==1
+          Path('tests/.webkit-smoke.mjs').write_text(s.replace(old,"import { webkit as chromium } from 'playwright';"))
+          PY
+          set -o pipefail
+          node tests/.webkit-smoke.mjs http://127.0.0.1:4173/ | tee evidence/webkit-canonical.log
+      - name: Dual-engine five-size final screenshots and focus acceptance
+        run: node .comfort-probe.mjs after
+      - name: Commit only fully verified candidate to exact owned branch
+        run: |
+          set -eu
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = d253e62349e1a99b4bdb2291449b7c60626b7eca
+          test "$(git ls-remote origin refs/heads/custodian/ui-outing-comfort | cut -f1)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/game.js tests/combat-ui.mjs tests/live-ui-stability.mjs
+          git commit -m 'UI: preserve visible focus after context growth and avoid false reload hits'
+          git push origin HEAD:refs/heads/custodian/ui-outing-comfort
+          git rev-parse HEAD > evidence/candidate-head.txt
+          git ls-tree -r HEAD > evidence/tree.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: final-comfort-acceptance
+          path: evidence
+          retention-days: 14
