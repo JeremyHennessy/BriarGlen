@@ -5,7 +5,8 @@ import { mkdir } from 'node:fs/promises';
 export async function proveInteractionUi(page, vp) {
   const activate=async selector=>{const el=page.locator(selector);if(vp.touch)await el.tap();else await el.click();};
   const refresh=()=>page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(0));
-  const setup=()=>page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){const live=d.npc(n.id);live.x=30;live.y=30;}d.setPosition(900,600);d.advance(0);});
+  // Reset preserves ordinary world drops. Choose an actually empty view, not a presumed empty spawn.
+  const setup=()=>page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){const live=d.npc(n.id);live.x=30;live.y=30;}const objects=[...d.landmarks(),...d.resourcesAll().filter(r=>r.available),...d.drops(),...d.snapshot().npcs];let point=null;for(let y=200;y<=1000&&!point;y+=100)for(let x=200;x<=1600;x+=100)if(objects.every(o=>Math.hypot(o.x-x,o.y-y)>100)){point={x,y};break;}if(!point)throw Error('Fixture needs an empty interaction view');d.setPosition(point.x,point.y);d.advance(0);});
   const savedState=()=>page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return {inventory:p.inventory,coins:p.coins,skills:p.skills,expeditions:p.expeditions,equippedWeapon:p.equippedWeapon,equippedArmor:p.equippedArmor,equippedTool:p.equippedTool};});
   const shot=async name=>{if(process.env.UI_EVIDENCE_DIR){await mkdir(process.env.UI_EVIDENCE_DIR,{recursive:true});await page.screenshot({path:`${process.env.UI_EVIDENCE_DIR}/${vp.name}-use-${name}.png`});}};
   const hint=async (label,kind)=>{assert.equal(await page.locator('#interact-readiness').innerText(),label);assert.equal(await page.locator('#interaction-context').getAttribute('data-kind'),kind);};
@@ -16,7 +17,7 @@ export async function proveInteractionUi(page, vp) {
   await shot('empty');
 
   // The preview ranges deliberately remain wider than the original Use ranges.
-  const resource=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,all=d.resourcesAll(),landmarks=d.landmarks();const r=all.find(r=>r.available&&r.type==='briarleaf'&&all.every(o=>o.id===r.id||!o.available||Math.hypot(o.x-r.x-46,o.y-r.y)>50)&&landmarks.every(l=>Math.hypot(l.x-r.x-46,l.y-r.y)>60));if(!r)throw Error('Fixture needs an isolated Briarleaf');d.setPosition(r.x+46,r.y);d.advance(0);return r;});
+  const resource=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,all=d.resourcesAll(),landmarks=d.landmarks(),drops=d.drops();const r=all.find(r=>r.available&&r.type==='briarleaf'&&all.every(o=>o.id===r.id||!o.available||Math.hypot(o.x-r.x-46,o.y-r.y)>60)&&landmarks.every(l=>Math.hypot(l.x-r.x-46,l.y-r.y)>60)&&drops.every(o=>Math.hypot(o.x-r.x-46,o.y-r.y)>60));if(!r)throw Error('Fixture needs an isolated Briarleaf');d.setPosition(r.x+46,r.y);d.advance(0);return r;});
   await hint('Closer','none');assert.match(await page.locator('#interaction-help').innerText(),/outside Use range/);
   assert.match(await page.locator('#nearby').innerText(),/Briarleaf/);await shot('closer');
   const before=await savedState();await activate('#interact-btn');assert.deepEqual(await savedState(),before);
