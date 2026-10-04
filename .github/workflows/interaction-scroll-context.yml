@@ -1,0 +1,88 @@
+name: Interaction scroll context (evidence only)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/interaction-scroll-context.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: final-comfort-acceptance
+          run-id: 37226895313
+          github-token: ${{ github.token }}
+          path: .candidate-evidence
+      - name: Preserve original and already-tested candidate without any runtime edits
+        run: |
+          set -eu
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          mkdir -p evidence/base evidence/candidate evidence/screens
+          cp -r src tests index.html styles.css evidence/base/
+          cp -r .candidate-evidence/source/. evidence/candidate/
+          cp .candidate-evidence/candidate.diff evidence/owner-candidate.diff
+          git ls-tree -r HEAD > evidence/tree.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          src=Path('tests/interaction-ui.mjs').read_text()
+          assert src==Path('evidence/candidate/tests/interaction-ui.mjs').read_text()
+          a="assert.ok(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1,'Resident/help controls remain reachable');"
+          b="""const initialOk=!!(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1);
+          const read=()=>page.locator(selector).evaluate(el=>({b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON(),st:document.querySelector('#panel-nearby').scrollTop,sh:document.querySelector('#panel-nearby').scrollHeight,active:document.activeElement?.outerHTML,html:document.querySelector('#panel-nearby').innerHTML}));
+          const rec={selector,b,p,initialOk,immediate:await read()};
+          if(!initialOk){await page.waitForTimeout(50);rec.after50=await read();await page.waitForTimeout(250);rec.after300=await read();await page.screenshot({path:`evidence/screens/${vp.name}-scroll-fail.png`});}
+          globalThis.__scrollProbe.push(rec);
+          assert.ok(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1,'Resident/help controls remain reachable');"""
+          assert src.count(a)==1
+          Path('.interaction-observe.mjs').write_text(src.replace(a,b))
+          print('PASS original strict assertion retained; only passive recording and post-failure native settling added in temporary test copy')
+          PY
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+          python3 -m http.server 4173 --directory evidence/base >/tmp/scroll-base.log 2>&1 &
+          python3 -m http.server 4174 --directory evidence/candidate >/tmp/scroll-candidate.log 2>&1 &
+          sleep 2
+      - name: Native original-context comparison with original failure retained
+        run: |
+          cat > .interaction-context-run.mjs <<'JS'
+          import {chromium,webkit} from 'playwright';
+          import {writeFile} from 'node:fs/promises';
+          import {proveInteractionUi} from './.interaction-observe.mjs';
+          const all=[];
+          for(const [engine,type] of Object.entries({chromium,webkit})){
+            const browser=await type.launch({headless:true});
+            try{for(const version of ['base','candidate'])for(const vp of [{name:'desktop',width:1280,height:800,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true}]){
+              const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage();
+              const errors=[],r={engine,version,vp};page.on('pageerror',e=>errors.push(String(e)));
+              globalThis.__scrollProbe=[];
+              try{await page.goto(`http://127.0.0.1:${version==='base'?4173:4174}/`);await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');await proveInteractionUi(page,{...vp,name:`${engine}-${version}-${vp.name}`});r.pass=true;}
+              catch(error){r.pass=false;r.error=String(error.stack||error);}
+              r.records=globalThis.__scrollProbe;r.errors=errors;all.push(r);
+              await writeFile('evidence/results.json',JSON.stringify(all,null,2));console.log(JSON.stringify({engine,version,size:vp.name,pass:r.pass,error:r.error,scroll:r.records.map(x=>({selector:x.selector,initialOk:x.initialOk,b:x.b,p:x.p,after300:x.after300?{b:x.after300.b,p:x.after300.p}:null}))}));
+              await context.close();
+            }}finally{await browser.close();}
+          }
+          console.log('Recorder completed; individual original assertion results above determine acceptance, not this workflow exit status.');
+          JS
+          node .interaction-context-run.mjs | tee evidence/context.log
+      - name: Assert production and original tests remained untouched
+        if: always()
+        run: git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: interaction-scroll-context
+          path: evidence
+          retention-days: 14
