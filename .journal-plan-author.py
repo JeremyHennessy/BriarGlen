@@ -36,7 +36,7 @@ old="  renderInteractionCue(p);";new=old+'\n  renderExpeditionSupplyPlan(p);';ed
 
 p='src/play-ui.css';s=Path(p).read_text();css="""
 /* Journal planning reuses the existing panel; links remain stable during live updates. */
-.guide-tools{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.guide-tools button{min-height:44px;flex:1 1 90px;font-size:12px;padding:7px 9px}.guide-provisions p{padding:7px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.guide-provisions [data-state=stored],.guide-provisions [data-state=complete]{color:var(--good)}.guide-provisions [data-state=missing]{color:var(--warn)}.guide-provisions [data-state=carry]{color:var(--accent)}.guide-sources summary{min-height:44px}.expedition-guide .guide-tools+h3{margin-top:12px}
+.guide-tools{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.guide-tools button{min-height:44px;flex:1 1 90px;font-size:12px;padding:7px 9px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;cursor:pointer}.guide-provisions p{padding:7px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.guide-provisions [data-state=stored],.guide-provisions [data-state=complete]{color:var(--good)}.guide-provisions [data-state=missing]{color:var(--warn)}.guide-provisions [data-state=carry]{color:var(--accent)}.guide-sources summary{min-height:44px}.expedition-guide .guide-tools+h3{margin-top:12px}
 """
 changes[p]=s;Path(p).write_text(s+css)
 for path,old in changes.items():
