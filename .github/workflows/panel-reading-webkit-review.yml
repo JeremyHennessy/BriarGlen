@@ -1,0 +1,83 @@
+name: Fresh WebKit panel reading review (temporary)
+on:
+  push:
+    branches: [custodian/ui-panel-reading]
+    paths: [.github/workflows/panel-reading-webkit-review.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE: 707dd5d2049fa7995a81c51b5ed89aeba5c21136
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Pin exactly the candidate already accepted by Chromium and ten native cases
+        run: |
+          set -eu
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$BASE"
+          git merge-base --is-ancestor "$BASE" HEAD
+          git merge-base --is-ancestor efb547dc5390a243c465c939f3b3fd27b0844381 HEAD
+          git merge-base --is-ancestor b25cce7600bea24bee42e689af9e84d713982b3e HEAD
+          git diff --exit-code "$BASE" -- src tests index.html styles.css
+          mkdir -p evidence/before evidence/source evidence/webkit-canonical
+          git archive "$BASE" src tests index.html styles.css | tar -x -C evidence/before
+          python3 .panel-reading-author.py | tee evidence/preservation.log
+          cp .panel-reading-test.mjs tests/panel-reading.mjs
+          test "$(git hash-object src/play-ui.js)" = 1934bab8c9f2d9cdaeb71a708fcf1f74c1cd5917
+          test "$(git hash-object tests/play-ui.mjs)" = 6a13b53f50b164ac1bebb62650fb9a0d60265fca
+          test "$(git hash-object tests/panel-reading.mjs)" = 0d915309e892062efcd3c4afe4524ab0af6b1478
+          git diff --exit-code "$BASE" -- src/game.js src/play-ui.css index.html styles.css tests/smoke.mjs tests/combat-ui.mjs tests/interaction-ui.mjs tests/live-ui-stability.mjs tests/skill-ui.mjs tests/expedition-guide.mjs .github/workflows/reboot-game-proof.yml
+          git diff --check
+          node --check src/play-ui.js && node --check tests/play-ui.mjs && node --check tests/panel-reading.mjs
+          cp -r src tests index.html styles.css evidence/source/
+          git diff "$BASE" -- src tests > evidence/candidate.diff
+          git diff --no-index /dev/null tests/panel-reading.mjs >> evidence/candidate.diff || test "$?" = 1
+      - name: Fresh pinned WebKit browser and server
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps webkit
+          python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
+          sleep 2
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('tests/smoke.mjs').read_text();a="import { chromium } from 'playwright';";b="import { webkit as chromium } from 'playwright';"
+          assert s.count(a)==1
+          n=s.replace(a,b);assert n.replace(b,a)==s
+          Path('tests/.reading-webkit.mjs').write_text(n)
+          PY
+      - name: Full canonical WebKit with passive browser-process diagnostics
+        env:
+          UI_EVIDENCE_DIR: evidence/webkit-canonical
+          DEBUG: pw:browser
+        run: |
+          set -o pipefail
+          node tests/.reading-webkit.mjs http://127.0.0.1:4173/ 2>&1 | tee evidence/webkit-canonical.log
+      - name: Commit exact cumulatively verified candidate on unchanged owned branch
+        run: |
+          set -eu
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$BASE"
+          test "$(git ls-remote origin refs/heads/custodian/ui-panel-reading | cut -f1)" = "$GITHUB_SHA"
+          test "$(git hash-object src/play-ui.js)" = 1934bab8c9f2d9cdaeb71a708fcf1f74c1cd5917
+          test "$(git hash-object tests/play-ui.mjs)" = 6a13b53f50b164ac1bebb62650fb9a0d60265fca
+          test "$(git hash-object tests/panel-reading.mjs)" = 0d915309e892062efcd3c4afe4524ab0af6b1478
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .panel-reading-author.py .panel-reading-test.mjs .github/workflows/panel-reading-review.yml
+          git add src/play-ui.js tests/play-ui.mjs tests/panel-reading.mjs
+          git commit -m 'UI: let focused panels scroll without moving or attacking'
+          git push origin HEAD:refs/heads/custodian/ui-panel-reading
+          git rev-parse HEAD > evidence/candidate-head.txt
+          git ls-tree -r HEAD > evidence/tree.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: panel-reading-fresh-webkit
+          path: evidence
+          retention-days: 14
