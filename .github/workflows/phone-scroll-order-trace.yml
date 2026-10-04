@@ -1,0 +1,82 @@
+name: Phone focus order trace (never merge)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/phone-scroll-order-trace.yml]
+permissions:
+  contents: read
+jobs:
+  observe:
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ENGINE: ${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Extract original observation and add transparent DOM setter logging
+        run: |
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          mkdir -p evidence/source evidence/screens
+          cp -r src tests index.html styles.css evidence/source/
+          git ls-tree -r HEAD > evidence/source-tree.txt
+          git rev-parse HEAD > evidence/branch-head.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          wf=Path('.github/workflows/phone-scroll-observation.yml').read_text()
+          start="          cat > .native-scroll-observe.mjs <<'JS'\n";assert wf.count(start)==1
+          script=textwrap.dedent(wf.split(start)[1].split('\n          JS\n')[0])+'\n'
+          anchor='await page.waitForTimeout(100);r.trustChanged=await sample(page);'
+          observe=r'''
+            await page.evaluate(()=>{
+              window.__phoneOrderTrace=[];
+              const record=(event,value)=>{
+                if(window.__phoneOrderTrace.length>=60)return;
+                const panel=document.querySelector('#panel-nearby'),buy=document.querySelector('[data-near="buy"]'),cue=document.querySelector('#interaction-context');
+                const b=buy?.getBoundingClientRect().toJSON(),p=panel.getBoundingClientRect().toJSON();
+                window.__phoneOrderTrace.push({event,value,time:performance.now(),scrollTop:panel.scrollTop,scrollHeight:panel.scrollHeight,contextHeight:cue.getBoundingClientRect().height,b,p,focused:document.activeElement===buy,inBounds:b?b.top>=p.top-1&&b.bottom<=p.bottom+1:null});
+              };
+              const text=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');
+              Object.defineProperty(Node.prototype,'textContent',{...text,set(value){const relevant=['interaction-target','interaction-help','interaction-travel'].includes(this.id);if(relevant)record('before text '+this.id);text.set.call(this,value);if(relevant)record('after text '+this.id);}});
+              const html=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
+              Object.defineProperty(Element.prototype,'innerHTML',{...html,set(value){const relevant=this.id==='nearby';if(relevant)record('before nearby markup');html.set.call(this,value);if(relevant)record('after nearby markup');}});
+              let proto=document.querySelector('#panel-nearby'),owner,scroll;
+              while(proto&&!scroll){scroll=Object.getOwnPropertyDescriptor(proto,'scrollTop');if(scroll)owner=proto;else proto=Object.getPrototypeOf(proto);}
+              if(!scroll?.set)throw Error('Native scrollTop setter not found');
+              Object.defineProperty(owner,'scrollTop',{...scroll,set(value){const relevant=this.id==='panel-nearby';if(relevant)record('before scrollTop',value);scroll.set.call(this,value);if(relevant)record('after scrollTop',value);}});
+              record('trace begins');
+            });
+          '''
+          assert script.count(anchor)==1;script=script.replace(anchor,anchor+textwrap.dedent(observe))
+          anchor='r.nativeScroll=[];';assert script.count(anchor)==1
+          script=script.replace(anchor,"r.orderTrace=await page.evaluate(()=>window.__phoneOrderTrace);\n"+anchor)
+          Path('.native-scroll-observe.mjs').write_text(script)
+          PY
+          node --check .native-scroll-observe.mjs
+      - name: Install pinned browser and serve
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps "$ENGINE"
+          python3 -m http.server 4173 >/tmp/order-server.log 2>&1 &
+          sleep 2
+      - name: Observe original renderer order without changing setter behavior
+        run: node .native-scroll-observe.mjs
+      - name: Confirm original source unchanged
+        if: always()
+        run: git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phone-order-${{ matrix.engine }}
+          path: evidence
+          retention-days: 14
