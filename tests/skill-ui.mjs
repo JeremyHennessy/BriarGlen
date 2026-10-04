@@ -3,7 +3,8 @@ import { mkdir } from 'node:fs/promises';
 
 export async function proveSkillReadiness(page,vp){
   // The existing reset intentionally leaves transient combat flags; start this suite in a fresh document.
-  await page.evaluate(()=>localStorage.removeItem('briar-glen-reboot-v1'));
+  // Prevent the old document's native autosave from restoring its combat flags before reload.
+  await page.evaluate(()=>{const key='briar-glen-reboot-v1',write=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k===key)return;return write.call(this,k,v);};localStorage.removeItem(key);});
   await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
   assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.guarded),false);
   const activate=async s=>vp.touch?page.locator(s).tap():page.locator(s).click();
