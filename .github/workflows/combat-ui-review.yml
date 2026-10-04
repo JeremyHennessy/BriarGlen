@@ -2,7 +2,7 @@ name: Combat UI acceptance (branch only)
 on:
   push:
     branches: [custodian/ui-first-outing]
-    paths: [.github/workflows/combat-ui-review.yml]
+    paths: [.github/workflows/combat-ui-review.yml, .combat-ui-author.py, tests/combat-ui.mjs]
 permissions:
   contents: write
 jobs:
