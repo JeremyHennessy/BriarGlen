@@ -27,6 +27,14 @@
   controls.prepend(hint);
   for (const button of document.querySelectorAll('[data-move]')) button.setAttribute('aria-label', `Move ${button.dataset.move}`);
 
+  // Keep the original action elements and event handlers; append status, never a second action.
+  for (const [button, id] of [['attack-btn','attack-readiness'], ['quick-brace','brace-readiness'], ['quick-tonic','tonic-readiness']]) {
+    $(`#${button}`).insertAdjacentHTML('beforeend', `<small id="${id}" class="action-readiness"></small>`);
+  }
+  $('#attack-btn').setAttribute('aria-describedby', 'attack-explanation');
+  const attackExplanation = document.createElement('span'); attackExplanation.id = 'attack-explanation'; attackExplanation.className = 'sr-only';
+  actions.append(attackExplanation);
+
   const meters = $('.meters'); meters.classList.add('hud-meters');
   $('.topbar').insertBefore(meters, $('.top-stats'));
   for (const [id, label] of [['hp', 'Health'], ['energy', 'Energy']]) {
@@ -58,6 +66,13 @@
     sidebar.append(panel);
   }
   for (const id of ['nearby', 'pack', 'craft', 'character']) $(`#panel-${id}`).append(cards[id]);
+  const loadout = document.createElement('div'); loadout.id = 'loadout-summary'; loadout.className = 'loadout-summary';
+  loadout.setAttribute('role', 'group'); loadout.setAttribute('aria-label', 'Equipped gear and supplies');
+  for (const [kind, label] of [['weapon','Weapon'], ['armor','Armor'], ['tool','Tool']]) {
+    loadout.insertAdjacentHTML('beforeend', `<div id="loadout-${kind}" class="loadout-slot" data-condition="empty"><span>${label}</span><strong id="loadout-${kind}-name">Not equipped</strong><small id="loadout-${kind}-detail"></small></div>`);
+  }
+  loadout.insertAdjacentHTML('beforeend', '<p id="loadout-supplies"></p><p id="carry-state"></p><details class="equipment-care"><summary>Equipment care</summary><p>Select an item below to equip or stow it. Weapons, armor and tools work when equipped. Your Trail Pack, Trail Bedroll and Mireglass Lens work from your pack. Worn means 25% durability or less; gear remains functional until broken.</p><p>Mend (You → Skills) services a nearby resident who needs gear repair first. Otherwise it repairs your equipped weapon, or your tool when no weapon is equipped. A bow needs Ashwood; other tools and weapons need Iron Ore. Patch Jerkin in Make uses a Wolf Hide.</p><p>Comfort is not a hard capacity: you may carry more, but you move slower and use more energy. Your Trail Pack increases comfort according to its quality.</p></details><h3 class="inventory-heading">Carried items <small>Select gear to equip or stow</small></h3>');
+  $('#inventory').before(loadout);
   $('#panel-character').append(cards.skills);
   const guide = document.createElement('section'); guide.className = 'card expedition-guide';
   guide.innerHTML = '<div class="card-title"><span>Stonepine expedition</span><small>Optional adventure</small></div><div id="guide-body"></div><h3>Before you leave</h3><p id="guide-preparation"></p><p class="guide-note">Gather Ashwood in Greenwood, herbs in South Meadow and Moss Fen, and hides from wolves. Make a bow and arrows, brew medicine, and rest before heading for the ridge. The world keeps moving while panels are open.</p>';
