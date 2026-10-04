@@ -1,0 +1,58 @@
+name: Exploration disclosure keyboard trace (temporary)
+on:
+  push:
+    branches: [custodian/ui-exploration-leads]
+    paths: [.github/workflows/exploration-keyboard-diagnostic.yml]
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply the identical presentation candidate in a temporary working tree
+        run: |
+          mkdir -p evidence
+          python3 .exploration-author-final.py
+          test "$(git hash-object src/game.js)" = 97ca81a2f598e54a946dafbe26638512691a3aeb
+          test "$(git hash-object src/play-ui.js)" = bc96a9b42d089d183312e027a6df45f665b0183e
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
+          sleep 2
+      - name: Record immediate and settled state under ordinary native held keys
+        run: |
+          cat > .disclosure-trace.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch(),records=[];
+          try{
+            const context=await browser.newContext({viewport:{width:844,height:390},hasTouch:true}),page=await context.newPage();
+            await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.save();const s=JSON.parse(localStorage.getItem('briar-glen-reboot-v1'));s.player.expeditions.stonepine={started:true,completed:true,rewarded:true};localStorage.setItem('briar-glen-reboot-v1',JSON.stringify(s));});
+            await page.reload();await page.waitForFunction(()=>document.querySelector('#exploration-leads')?.hidden===false);await page.locator('#objective-open').tap();
+            await page.evaluate(()=>{const d=document.querySelector('#exploration-leads'),s=d.querySelector('summary');window.__trace=[];for(const type of ['keydown','keyup','click','focus','blur'])s.addEventListener(type,e=>window.__trace.push({type,key:e.key,t:performance.now(),open:d.open,active:document.activeElement===s}));d.addEventListener('toggle',()=>window.__trace.push({type:'toggle',t:performance.now(),open:d.open}));});
+            const read=()=>page.evaluate(()=>({t:performance.now(),open:document.querySelector('#exploration-leads').open,focus:document.activeElement===document.querySelector('#exploration-leads summary'),events:window.__trace.slice(-10)}));
+            for(let i=0;i<30;i++){
+              await page.locator('#exploration-leads summary').focus();
+              if((await read()).open){await page.keyboard.press('Enter');await page.waitForFunction(()=>!document.querySelector('#exploration-leads').open,null,{timeout:1000});}
+              await page.keyboard.down('Space');await page.waitForTimeout(650);await page.keyboard.up('Space');const immediate=await read();
+              await page.waitForFunction(()=>document.querySelector('#exploration-leads').open,null,{timeout:1000});const settled=await read();assert.equal(settled.focus,true);
+              const r={i,immediate,settled};records.push(r);console.log(JSON.stringify(r));
+            }
+            await page.screenshot({path:'evidence/landscape-final.png'});console.log('PASS30 native held activations with bounded positive disclosure state; immediate-null count='+records.filter(r=>!r.immediate.open).length);
+          }finally{await writeFile('evidence/trace.json',JSON.stringify(records,null,2));await browser.close();}
+          JS
+          set -o pipefail
+          node .disclosure-trace.mjs 2>&1 | tee evidence/trace.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exploration-keyboard-trace
+          path: evidence
+          retention-days: 14
