@@ -1,0 +1,85 @@
+name: Independent Journal keyboard audit (never merge)
+on:
+  push:
+    branches: [custodian/verify-journal-keyboard-20261004]
+    paths: [.github/workflows/journal-keyboard-support.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Reapply same owner candidate only in isolated working tree
+        run: |
+          set -eu
+          git merge-base --is-ancestor efb547dc5390a243c465c939f3b3fd27b0844381 HEAD
+          git merge-base --is-ancestor b25cce7600bea24bee42e689af9e84d713982b3e HEAD
+          git diff --exit-code 2ef0482e8f4acf76bb0eb14b1ed0d30fe33a6a5a -- src tests index.html styles.css
+          mkdir -p evidence/before evidence/source evidence/screens
+          git archive 2ef0482e8f4acf76bb0eb14b1ed0d30fe33a6a5a src tests index.html styles.css | tar -x -C evidence/before
+          git show e4eda15b11d00da15052e4f8db90d4b1193d0928:.journal-plan-author.py > .journal-author.py
+          test "$(git hash-object .journal-author.py)" = cd9e1d0fabb471e285c3851a1afdb5f079bf95c2
+          python3 .journal-author.py > evidence/candidate.diff
+          git diff --exit-code 2ef0482e8f4acf76bb0eb14b1ed0d30fe33a6a5a -- tests index.html styles.css
+          cp -r src tests index.html styles.css evidence/source/
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+          python3 -m http.server 4173 >/tmp/after.log 2>&1 &
+          python3 -m http.server 4174 --directory evidence/before >/tmp/before.log 2>&1 &
+          sleep 2
+      - name: Fresh-save real keyboard input, focus and action hit-testing
+        run: |
+          cat > .keyboard-audit.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium,webkit} from 'playwright';
+          const records=[],sizes=[[1440,900],[844,390],[390,844],[375,667],[320,568],[568,320]];
+          const geometry=page=>page.evaluate(()=>{const controls=['attack-btn','interact-btn','quick-brace','quick-tonic'].map(id=>{const el=document.getElementById(id),b=el.getBoundingClientRect(),top=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return{id,b:b.toJSON(),centerHit:top===el||el.contains(top)};});const p=document.querySelector('.play-panel:not([hidden])');return{w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,panels:document.querySelectorAll('.play-panel:not([hidden])').length,panel:p.getBoundingClientRect().toJSON(),controls};});
+          const pass=g=>g.sw<=g.w+1&&g.sh<=g.h+1&&g.panels===1&&g.controls.every(c=>c.centerHit&&c.b.width>=44&&c.b.height>=44&&c.b.left>=0&&c.b.top>=0&&c.b.right<=g.w+1&&c.b.bottom<=g.h+1);
+          try{for(const [engine,type] of Object.entries({chromium,webkit})){
+            const browser=await type.launch();
+            try{for(const [width,height] of sizes)for(const version of ['before','after']){
+              const context=await browser.newContext({viewport:{width,height},hasTouch:width<1000,reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
+              page.on('pageerror',e=>errors.push(e.message));
+              const r={engine,width,height,version,errors};records.push(r);
+              await page.goto(`http://127.0.0.1:${version==='after'?4173:4174}/`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#guide-preparation')?.textContent.includes('health'));
+              r.default=await geometry(page);await page.screenshot({path:`evidence/screens/${engine}-${width}x${height}-${version}-default.png`});
+              await page.locator('#objective-open').click();await page.screenshot({path:`evidence/screens/${engine}-${width}x${height}-${version}-journal.png`});
+              if(version==='after'){
+                for(const id of ['pack','craft','character']){
+                  const button=page.locator(`[data-guide-panel=${id}]`);await button.focus();await page.keyboard.press('Enter');
+                  assert.equal(await page.locator(`#panel-${id}`).isVisible(),true);assert.equal(await page.locator(`#panel-tab-${id}`).evaluate(el=>document.activeElement===el),true);assert.equal(await page.locator('.play-panel:visible').count(),1);
+                  await page.keyboard.press('j');assert.equal(await page.locator('#panel-journal').isVisible(),true);assert.equal(await page.locator('#game').evaluate(el=>document.activeElement===el),true);
+                }
+                const summary=page.locator('.guide-sources summary');await summary.focus();await page.keyboard.press('Enter');assert.notEqual(await page.locator('.guide-sources').getAttribute('open'),null);await page.waitForTimeout(700);assert.equal(await summary.evaluate(el=>document.activeElement===el),true);
+                await page.locator('#guide-arrows-plan').scrollIntoViewIfNeeded();r.supply=await page.locator('#guide-arrows-plan').innerText();assert.match(r.supply,/Carried 0 · Stored 0\/6/);
+                await page.screenshot({path:`evidence/screens/${engine}-${width}x${height}-${version}-provisions.png`});r.keyboardPassed=true;
+              }
+              r.journal=await geometry(page);await page.setViewportSize({width:height,height:width});await page.waitForTimeout(150);r.rotated=await geometry(page);await page.setViewportSize({width,height});await page.waitForTimeout(150);r.restored=await geometry(page);
+              r.results=Object.fromEntries(['default','journal','rotated','restored'].map(k=>[k,pass(r[k])]));assert.deepEqual(errors,[]);
+              if(version==='after'){
+                const before=records.find(b=>b.engine===engine&&b.width===width&&b.height===height&&b.version==='before');
+                for(const k of Object.keys(r.results))if(before.results[k])assert.equal(r.results[k],true,`${engine} ${width}x${height} ${k}: candidate regressed accessible controls`);
+                if(width>=375&&height>=375)for(const k of Object.keys(r.results))assert.equal(r.results[k],true,`${engine} ${width}x${height} ${k}: primary viewport controls`);
+              }
+              console.log(JSON.stringify({engine,width,height,version,results:r.results,keyboardPassed:r.keyboardPassed,errors}));await context.close();
+            }}finally{await browser.close();}
+          }console.log('PASS24 fresh-save browser/size presentations, native Enter/J shortcut paths, live summary focus, action hit-testing, portrait/landscape and additional320px boundary comparison. No debug/game state or grants used.');}
+          finally{await writeFile('evidence/keyboard.json',JSON.stringify(records,null,2));}
+          JS
+          cp .keyboard-audit.mjs evidence/keyboard-audit.mjs
+          set -o pipefail
+          node .keyboard-audit.mjs 2>&1 | tee evidence/keyboard.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journal-keyboard-support
+          path: evidence
+          retention-days: 14
