@@ -1,0 +1,52 @@
+name: Live controls edge review (branch only)
+on:
+  push:
+    branches: [custodian/ui-live-control-stability]
+    paths: [.github/workflows/live-controls-edge.yml]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Browser setup
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+          python3 -m http.server 4173 >/tmp/game.log 2>&1 &
+          sleep 2
+      - name: Keyboard-visible focus and live-object edge evidence
+        run: |
+          mkdir -p evidence
+          cat > .edge.mjs <<'JS'
+          import assert from 'node:assert/strict';import {writeFile} from 'node:fs/promises';import {chromium} from 'playwright';
+          const browser=await chromium.launch(),records=[];
+          try{for(const vp of [{name:'desktop',width:1440,height:900},{name:'landscape',width:844,height:390},{name:'portrait',width:390,height:844},{name:'small-landscape',width:667,height:375},{name:'small-portrait',width:375,height:667}]){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height}}),page=await context.newPage();await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){d.npc(n.id).x=30;d.npc(n.id).y=30;}d.setPosition(900,600);d.advance(0);});
+            await page.locator('[data-panel="character"]').click();await page.keyboard.press('Tab');await page.locator('[data-skill="guard"]').focus();await page.waitForTimeout(650);
+            assert.equal(await page.locator('[data-skill="guard"]').evaluate(el=>el===document.activeElement&&el.matches(':focus-visible')),true);await page.screenshot({path:`evidence/${vp.name}-keyboard-focus.png`});
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.x=900;n.y=600;d.advance(0);});await page.locator('[data-panel="nearby"]').click();await page.keyboard.press('Tab');await page.locator('[data-near="buy"]').focus();
+            const growth=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira'),el=document.querySelector('[data-near="buy"]'),p=document.querySelector('#panel-nearby'),before=el.getBoundingClientRect().toJSON();n.name='Mira the Experienced Herbalist of Briar Glen and the Greenwood';n.goalText='Preparing a careful delivery of medicine and supplies for a resident on the far side of the village.';d.advance(0);const b=document.querySelector('[data-near="buy"]').getBoundingClientRect().toJSON(),r=p.getBoundingClientRect().toJSON();return{before,after:b,panel:r,focused:document.activeElement===document.querySelector('[data-near="buy"]'),visible:b.top>=r.top-1&&b.bottom<=r.bottom+1};});
+            records.push({vp,growth});await page.screenshot({path:`evidence/${vp.name}-content-growth.png`});
+            // Reset makes a NEW live resident with the same id. Retained callbacks must not buy from the old object.
+            const old=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;window.__OLD_RESIDENT_FOR_TEST__=d.npc('mira');return Object.assign({},d.npc('mira').stock);});
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){d.npc(n.id).x=30;d.npc(n.id).y=30;}const n=d.npc('mira');n.x=900;n.y=600;n.stock={wood:2};n.stockMeta={};d.setPosition(900,600);d.advance(0);});
+            assert.equal(await page.locator('#panel-nearby').evaluate(el=>el===document.activeElement),true);
+            await page.locator('[data-near="buy"]').click();
+            const trade=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;return{newStock:d.npc('mira').stock.wood,oldStock:window.__OLD_RESIDENT_FOR_TEST__.stock,wood:d.snapshot().player.inventory.wood?.qty};});assert.equal(trade.newStock,1);assert.equal(trade.wood,1);assert.deepEqual(trade.oldStock,old);records.push({vp,resetCallbackCorrect:true});await context.close();
+          }console.log('PASS native keyboard-visible focus and reset-safe live resident callbacks; content-growth geometry recorded for review');}finally{await writeFile('evidence/edge.json',JSON.stringify(records,null,2));await browser.close();}
+          JS
+          set -o pipefail
+          node .edge.mjs 2>&1 | tee evidence/edge.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-controls-edge
+          path: evidence
+          retention-days: 14
