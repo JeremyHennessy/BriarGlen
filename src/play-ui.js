@@ -11,6 +11,7 @@
   objective.className = 'objective-strip';
   objective.innerHTML = '<div><small>YOUR NEXT STEP</small><strong id="objective-text">Explore Briar Glen</strong><span id="objective-direction"></span></div><button id="objective-open" type="button" title="Open expedition journal (J)">Journal <kbd>J</kbd></button>';
   stage.append(objective, $('.canvas-wrap'));
+  $('.canvas-wrap').insertAdjacentHTML('beforeend', '<div id="combat-cue" class="combat-cue" hidden role="status"><strong id="combat-threat"></strong><span id="combat-action"></span></div>');
   const controls = $('.mobile-controls');
   controls.classList.add('action-deck');
   controls.setAttribute('aria-label', 'Movement and actions');
