@@ -1,0 +1,85 @@
+name: Phone native scroll observation (never merge)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/phone-scroll-observation.yml]
+permissions:
+  contents: read
+jobs:
+  observe:
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ENGINE: ${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Preserve exact source
+        run: |
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          mkdir -p evidence/source evidence/screens
+          cp -r src tests index.html styles.css evidence/source/
+          git ls-tree -r HEAD > evidence/source-tree.txt
+          git rev-parse HEAD > evidence/branch-head.txt
+      - name: Install pinned browser and serve
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps "$ENGINE"
+          python3 -m http.server 4173 >/tmp/scroll-server.log 2>&1 &
+          sleep 2
+      - name: Record exact original UI at immediate and delayed native frames
+        run: |
+          cat > .native-scroll-observe.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium,webkit} from 'playwright';
+          const engine=process.env.ENGINE,browser=await({chromium,webkit}[engine]).launch({headless:true});
+          const records=[];
+          const sample=(page,selector='[data-near="buy"]')=>page.locator(selector).evaluate(el=>{const panel=document.querySelector('#panel-nearby'),b=el.getBoundingClientRect().toJSON(),p=panel.getBoundingClientRect().toJSON();return{b,p,scrollTop:panel.scrollTop,scrollHeight:panel.scrollHeight,clientHeight:panel.clientHeight,focused:document.activeElement===el,inBounds:b.top>=p.top-1&&b.bottom<=p.bottom+1,targetText:document.querySelector('#interaction-target').innerText,contextHeight:document.querySelector('#interaction-context').getBoundingClientRect().height,scrollBehavior:getComputedStyle(panel).scrollBehavior};});
+          try{for(const vp of [{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}]){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch,isMobile:vp.touch}),page=await context.newPage(),errors=[],r={engine,viewport:vp};
+            page.on('pageerror',e=>errors.push(e.message));
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+            // Synthetic setup only: preserve runtime/native frames and all gameplay functions.
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){const p=d.npc(n.id);p.x=30;p.y=30;p.think=60;p.target={x:30,y:30};}d.setPosition(900,600);const n=d.npc('mira');n.x=900;n.y=600;n.target={x:900,y:600};d.advance(0);});
+            const tab=page.locator('[data-panel="nearby"]');if(vp.touch)await tab.tap();else await tab.click();
+            await page.locator('[data-near="buy"]').focus();await page.waitForTimeout(650);r.before=await sample(page);
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.trust=7.25;d.advance(0);});
+            await page.waitForTimeout(100);r.trustChanged=await sample(page);
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.name='Mira the Experienced Herbalist of Briar Glen and the Greenwood';n.goalText='Preparing a careful delivery of medicine and supplies for a resident on the far side of the village.';d.advance(0);});
+            r.growth=[{delay:0,...await sample(page)}];await page.screenshot({path:`evidence/screens/${vp.name}-growth-immediate.png`});
+            for(const delay of [50,250,1000]){await page.waitForTimeout(delay);r.growth.push({delay,...await sample(page)});}
+            await page.screenshot({path:`evidence/screens/${vp.name}-growth-delayed.png`});
+            r.nativeScroll=[];
+            for(const selector of ['[data-near="sell"]','[data-near="buy"]','.interaction-controls summary']){
+              const immediate=await page.locator(selector).evaluate(el=>{el.scrollIntoView({block:'nearest'});const panel=document.querySelector('#panel-nearby'),b=el.getBoundingClientRect().toJSON(),p=panel.getBoundingClientRect().toJSON();return{b,p,scrollTop:panel.scrollTop,inBounds:b.top>=p.top-1&&b.bottom<=p.bottom+1};});
+              await page.waitForTimeout(250);r.nativeScroll.push({selector,immediate,delayed:await sample(page,selector)});
+            }
+            // Real keyboard focus navigation remains available; do not infer reachability from a passing recorder.
+            await page.locator('[data-near="buy"]').focus();await page.waitForTimeout(250);r.refocused=await sample(page);
+            await page.screenshot({path:`evidence/screens/${vp.name}-refocused.png`});
+            assert.deepEqual(errors,[],'Runtime errors');r.browserErrors=errors;r.persistentGrowthClipping=!r.growth.at(-1).inBounds;
+            records.push(r);await writeFile('evidence/observations.json',JSON.stringify(records,null,2));await context.close();
+          }}finally{await browser.close();}
+          const summary={engine,completed:records.length,persistentGrowthClipping:records.filter(r=>r.persistentGrowthClipping).map(r=>r.viewport.name),delayedNativeScrollClipping:records.flatMap(r=>r.nativeScroll.filter(s=>!s.delayed.inBounds).map(s=>({viewport:r.viewport.name,selector:s.selector}))),notice:'Diagnostic completion is NOT UI acceptance. Original source unchanged; no runtime fix tested.'};
+          await writeFile('evidence/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));
+          JS
+          node .native-scroll-observe.mjs
+      - name: Confirm original source unchanged
+        if: always()
+        run: git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phone-scroll-${{ matrix.engine }}
+          path: evidence
+          retention-days: 14
