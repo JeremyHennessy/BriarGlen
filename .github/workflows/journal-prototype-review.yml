@@ -1,0 +1,76 @@
+name: Journal prototype visual review (never merge)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/journal-prototype-review.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Create isolated working prototype only
+        run: |
+          set -eu
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          mkdir -p evidence/before evidence/after evidence/screens
+          cp -r src tests index.html styles.css evidence/before/
+          cp -r src tests index.html styles.css evidence/after/
+          (cd evidence/after && python3 ../../.journal-plan-author.py) > evidence/prototype.diff
+          node --check evidence/after/src/game.js
+          node --check evidence/after/src/play-ui.js
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+          python3 -m http.server 4173 --directory evidence/before >/tmp/journal-before.log 2>&1 &
+          python3 -m http.server 4174 --directory evidence/after >/tmp/journal-after.log 2>&1 &
+          sleep 2
+      - name: Native navigation, truthful counts and five-size screenshots
+        run: |
+          cat > .journal-prototype-review.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch({headless:true}),records=[];
+          try{for(const version of ['before','after'])for(const vp of [{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}]){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage();
+            const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            const activate=async s=>vp.touch?page.locator(s).tap():page.locator(s).click();
+            await page.goto(`http://127.0.0.1:${version==='before'?4173:4174}/`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#guide-preparation')?.textContent.includes('health'));
+            await page.screenshot({path:`evidence/screens/${version}-${vp.name}-default.png`});
+            await activate('#objective-open');await page.screenshot({path:`evidence/screens/${version}-${vp.name}-journal-top.png`});
+            // Separately labelled fixture; browser navigation above is ordinary but this is not a no-debug outing.
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.give('arrows',6);d.advance(0);});
+            const state=()=>page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return{inventory:p.inventory,coins:p.coins,skills:p.skills,expeditions:p.expeditions,weapon:p.equippedWeapon,armor:p.equippedArmor,tool:p.equippedTool};});
+            const initial=await state(),record={version,vp};
+            if(version==='after'){
+              assert.match(await page.locator('#guide-arrows-plan').innerText(),/Carried 6 · Stored 0\/6 · Carry enough; store 6/);
+              for(const id of ['pack','craft','character']){await activate(`[data-guide-panel="${id}"]`);assert.equal(await page.locator(`#panel-${id}`).isVisible(),true);assert.equal(await page.locator('.play-panel:visible').count(),1);assert.deepEqual(await state(),initial);await activate('#objective-open');}
+              await page.locator('#guide-bread-plan').scrollIntoViewIfNeeded();await page.screenshot({path:`evidence/screens/${version}-${vp.name}-provisions.png`});
+              const gear=page.locator('[data-guide-panel="pack"]');await gear.focus();await page.keyboard.down('Space');await page.waitForTimeout(650);await page.keyboard.up('Space');assert.equal(await page.locator('#panel-pack').isVisible(),true);assert.deepEqual(await state(),initial);
+              await activate('#objective-open');await activate('.guide-sources summary');await page.screenshot({path:`evidence/screens/${version}-${vp.name}-sources.png`});
+            }else{await page.locator('#guide-preparation').scrollIntoViewIfNeeded();await page.screenshot({path:`evidence/screens/${version}-${vp.name}-preparation.png`});}
+            record.geometry=await page.evaluate(()=>({w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,panelW:document.querySelector('#panel-journal').clientWidth,panelSW:document.querySelector('#panel-journal').scrollWidth,controls:['attack-btn','interact-btn','quick-brace','quick-tonic'].map(id=>({id,...document.getElementById(id).getBoundingClientRect().toJSON()}))}));
+            const g=record.geometry;assert.ok(g.sw<=g.w+1&&g.sh<=g.h+1&&g.panelSW<=g.panelW+1);for(const b of g.controls)assert.ok(b.width>=44&&b.height>=44&&b.top>=0&&b.bottom<=g.h+1&&b.left>=0&&b.right<=g.w+1);
+            assert.deepEqual(errors,[]);records.push(record);await context.close();
+          }}finally{await writeFile('evidence/visual.json',JSON.stringify(records,null,2));await browser.close();}
+          console.log('PASS isolated five-size before/after Journal prototype, native shortcuts/held input/counts/nonmutation/controls. Not canonical release acceptance.');
+          JS
+          set -o pipefail
+          node .journal-prototype-review.mjs 2>&1 | tee evidence/visual.log
+      - name: Confirm no tracked runtime/test change
+        if: always()
+        run: git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journal-prototype-review
+          path: evidence
+          retention-days: 14
