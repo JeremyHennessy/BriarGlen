@@ -2,7 +2,7 @@ name: Narrow action lane (evidence only)
 on:
   push:
     branches: [custodian/verify-narrow-actions-20261004]
-    paths: [.github/workflows/narrow-actions-review.yml]
+    paths: [.github/workflows/narrow-actions-review.yml, .narrow-probe.mjs, .narrow-candidate.css]
 permissions:
   contents: read
 jobs:
@@ -16,35 +16,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Preserve exact approved source and prepare unchanged CSS hypothesis
+      - name: Preserve approved source and prepare the same CSS hypothesis
         run: |
           set -eu
           git diff --exit-code 707dd5d2049fa7995a81c51b5ed89aeba5c21136 -- src tests index.html styles.css
           mkdir -p evidence/before evidence/screens
           cp -r src tests index.html styles.css evidence/before/
-          python3 - <<'PY'
-          import subprocess,textwrap
-          from pathlib import Path
-          source=subprocess.check_output(['git','show','ce815f394fc05560fcdec86fc85e549ecfee6095:.github/workflows/narrow-actions-review.yml'],text=True)
-          s=textwrap.dedent(source.split("cat > .narrow-probe.mjs <<'JS'\n",1)[1].split('\n          JS',1)[0])
-          old="querySelectorAll('.action-deck button')].map(el=>"
-          assert s.count(old)==1
-          s=s.replace(old,"querySelectorAll('.action-deck button')].filter(el=>el.getClientRects().length>0).map(el=>")
-          old='g.targets.length===8'
-          assert s.count(old)==1
-          s=s.replace(old,'g.targets.length===(g.w<=1100?8:4)')
-          Path('.narrow-probe.mjs').write_text(s)
-          Path('evidence/probe.mjs').write_text(s)
-          PY
+          cp .narrow-probe.mjs evidence/probe.mjs
+          cp .narrow-candidate.css evidence/proposed.css
           node --check .narrow-probe.mjs
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium webkit
           python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
           sleep 2
-      - name: Original defect and reversible CSS candidate with exact visible-control requirements
+      - name: Atomic same-scene before-after and native panel acceptance
         run: |
           set -o pipefail
-          node .narrow-probe.mjs | tee evidence/probe.log
+          node .narrow-probe.mjs 2>&1 | tee evidence/probe.log
       - name: Confirm original runtime and tests remain untouched
         if: always()
         run: git diff --exit-code 707dd5d2049fa7995a81c51b5ed89aeba5c21136 -- src tests index.html styles.css
