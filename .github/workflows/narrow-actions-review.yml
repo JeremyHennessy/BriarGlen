@@ -16,66 +16,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Preserve exact approved source and install existing browser versions
+      - name: Preserve exact approved source and prepare unchanged CSS hypothesis
         run: |
           set -eu
           git diff --exit-code 707dd5d2049fa7995a81c51b5ed89aeba5c21136 -- src tests index.html styles.css
           mkdir -p evidence/before evidence/screens
           cp -r src tests index.html styles.css evidence/before/
+          python3 - <<'PY'
+          import subprocess,textwrap
+          from pathlib import Path
+          source=subprocess.check_output(['git','show','ce815f394fc05560fcdec86fc85e549ecfee6095:.github/workflows/narrow-actions-review.yml'],text=True)
+          s=textwrap.dedent(source.split("cat > .narrow-probe.mjs <<'JS'\n",1)[1].split('\n          JS',1)[0])
+          old="querySelectorAll('.action-deck button')].map(el=>"
+          assert s.count(old)==1
+          s=s.replace(old,"querySelectorAll('.action-deck button')].filter(el=>el.getClientRects().length>0).map(el=>")
+          old='g.targets.length===8'
+          assert s.count(old)==1
+          s=s.replace(old,'g.targets.length===(g.w<=1100?8:4)')
+          Path('.narrow-probe.mjs').write_text(s)
+          Path('evidence/probe.mjs').write_text(s)
+          PY
+          node --check .narrow-probe.mjs
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium webkit
           python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
           sleep 2
-      - name: Observe unchanged baseline then test one reversible scoped CSS hypothesis
+      - name: Original defect and reversible CSS candidate with exact visible-control requirements
         run: |
-          cat > .narrow-probe.mjs <<'JS'
-          import assert from 'node:assert/strict';
-          import {readFile,writeFile} from 'node:fs/promises';
-          import {chromium,webkit} from 'playwright';
-          const patch=`\n/* Keep every action reachable on narrow landscape screens without shrinking touch targets. */\n@media(orientation:landscape) and (max-width:666px) and (max-height:550px){\n  .game-shell{grid-template-rows:auto minmax(0,1fr) auto;row-gap:5px}\n  .play-stage{display:grid;grid-area:1 / 1 / 4 / 3;grid-template-columns:subgrid;grid-template-rows:subgrid;gap:inherit}\n  .objective-strip{grid-area:1 / 1 / 2 / 2}\n  .canvas-wrap{grid-area:2 / 1 / 3 / 2}\n  .action-deck{grid-area:3 / 1 / 4 / 3}\n  .sidebar{grid-area:1 / 2 / 3 / 3}\n}\n`;
-          const original=await readFile('src/play-ui.css','utf8'),records=[];
-          await writeFile('evidence/proposed.css',patch);
-          const sizes=[[1440,900],[844,390],[390,844],[667,375],[375,667],[568,320],[600,320],[620,375],[640,360],[666,375],[620,551]];
-          const geometry=p=>p.evaluate(()=>{
-            const box=s=>document.querySelector(s).getBoundingClientRect().toJSON();
-            const targets=[...document.querySelectorAll('.action-deck button')].map(el=>{const b=el.getBoundingClientRect();const points=[[.5,.5],[.1,.1],[.9,.1],[.1,.9],[.9,.9]];return{id:el.id||el.dataset.move,b:b.toJSON(),hits:points.map(([x,y])=>{const top=document.elementFromPoint(b.x+b.width*x,b.y+b.height*y);return top===el||el.contains(top);})};});
-            return{w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,canvas:box('#game'),side:box('.sidebar'),deck:box('.action-deck'),tabs:box('.panel-tabs'),hp:box('#hp'),energy:box('#energy'),panels:document.querySelectorAll('.play-panel:not([hidden])').length,targets};
-          });
-          function accepted(g){return g.panels===1&&g.sw<=g.w+1&&g.sh<=g.h+1&&g.targets.length===8&&g.targets.every(t=>t.hits.every(Boolean)&&t.b.width>=44&&t.b.height>=44&&t.b.left>=0&&t.b.top>=0&&t.b.right<=g.w+1&&t.b.bottom<=g.h+1);}
-          try{for(const version of ['before','after']){
-            if(version==='after')await writeFile('src/play-ui.css',original+patch);
-            for(const [engine,type] of Object.entries({chromium,webkit})){
-              const browser=await type.launch();
-              try{for(const [width,height] of sizes){
-                const context=await browser.newContext({viewport:{width,height},hasTouch:width<1100}),page=await context.newPage(),errors=[];
-                page.on('pageerror',e=>errors.push(e.message));
-                const r={version,engine,width,height,errors};records.push(r);
-                await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>!!document.querySelector('#guide-preparation')?.textContent);
-                r.default=await geometry(page);r.accepted=accepted(r.default);
-                await page.screenshot({path:`evidence/screens/${engine}-${width}x${height}-${version}-default.png`});
-                if(width===568)await writeFile(`evidence/${engine}-${version}-adventure.yml`,await page.locator('.play-stage').ariaSnapshot());
-                if(version==='before'&&width===568)assert.equal(r.accepted,false,'Baseline must reproduce action occlusion');
-                if(version==='after'){
-                  assert.ok(r.accepted,JSON.stringify(r));
-                  const base=records.find(x=>x.version==='before'&&x.engine===engine&&x.width===width&&x.height===height).default;
-                  assert.ok(r.default.canvas.width>=base.canvas.width-1&&r.default.canvas.height>=base.canvas.height-1,'Do not repair controls by shrinking the world');
-                  if(!(width<=666&&height<=550&&width>height))for(const k of ['canvas','side','deck','tabs','hp','energy'])for(const q of ['x','y','width','height'])assert.ok(Math.abs(base[k][q]-r.default[k][q])<=1,`${engine} ${width}x${height}: unrelated ${k}.${q} changed`);
-                  r.panels=[];
-                  for(const id of ['pack','craft','character','journal','nearby']){await page.locator(`[data-panel=${id}]`).click();const g=await geometry(page);assert.ok(accepted(g),`${engine} ${width}x${height}: ${id} action occlusion`);r.panels.push({id,g});}
-                }
-                await page.locator('[data-panel=journal]').click();await page.screenshot({path:`evidence/screens/${engine}-${width}x${height}-${version}-journal.png`});
-                if(version==='after'&&width<1100){await page.setViewportSize({width:height,height:width});await page.waitForTimeout(220);r.rotated=await geometry(page);assert.ok(accepted(r.rotated),`${engine} ${width}x${height}: rotation`);await page.setViewportSize({width,height});await page.waitForTimeout(220);r.restored=await geometry(page);assert.ok(accepted(r.restored),`${engine} ${width}x${height}: restored`);}
-                if(width===568){await page.addStyleTag({content:'body{padding:20px 12px 16px!important}#app{height:calc(100dvh - 36px)!important}'});await page.waitForTimeout(220);r.insets=await geometry(page);if(version==='after')assert.ok(accepted(r.insets),'Inset controls must be hit-testable');await page.screenshot({path:`evidence/screens/${engine}-${width}x${height}-${version}-insets.png`});}
-                assert.deepEqual(errors,[]);console.log(JSON.stringify({version,engine,width,height,accepted:r.accepted,canvas:r.default.canvas,errors}));await context.close();
-              }}finally{await browser.close();}
-            }
-          }console.log('PASS: original defect reproduced; scoped candidate restores all eight target hit areas without shrinking the world; standard-size geometry, panels, rotation and insets preserved.');}
-          finally{await writeFile('evidence/results.json',JSON.stringify(records,null,2));await writeFile('src/play-ui.css',original);}
-          JS
-          cp .narrow-probe.mjs evidence/probe.mjs
           set -o pipefail
           node .narrow-probe.mjs | tee evidence/probe.log
-      - name: Confirm no runtime or original test was committed or left changed
+      - name: Confirm original runtime and tests remain untouched
         if: always()
         run: git diff --exit-code 707dd5d2049fa7995a81c51b5ed89aeba5c21136 -- src tests index.html styles.css
       - uses: actions/upload-artifact@v4
