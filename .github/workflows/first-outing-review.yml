@@ -1,0 +1,49 @@
+name: Ordinary first-outing inspection (branch only)
+on:
+  push:
+    branches: [custodian/ui-first-outing]
+    paths: [.journey/plan.json]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify exact frontend and read continuation pointer
+        id: plan
+        run: |
+          set -eu
+          git diff --exit-code 9c1c957ebf48b97e93ea23d7daa2ed7e87a7dcdf -- src index.html styles.css
+          echo "resume=$(node -p 'JSON.parse(require("fs").readFileSync(".journey/plan.json")).resume || 0')" >> "$GITHUB_OUTPUT"
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/source-head.txt
+          git ls-tree -r HEAD > evidence/source-tree.txt
+      - uses: actions/download-artifact@v4
+        if: steps.plan.outputs.resume != '0'
+        with:
+          name: ordinary-first-outing
+          path: .journey/resume
+          run-id: ${{ steps.plan.outputs.resume }}
+          github-token: ${{ github.token }}
+      - name: Install canonical browser and serve game
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+          python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
+          sleep 2
+      - name: Perform only player-visible inputs
+        run: node .journey/runner.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ordinary-first-outing
+          path: evidence
+          retention-days: 14
