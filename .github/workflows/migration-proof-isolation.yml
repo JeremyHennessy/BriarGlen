@@ -19,7 +19,7 @@ jobs:
           node-version: '24'
       - name: Verify exact unchanged main and fixture
         run: |
-          test "$(git rev-parse HEAD^)" = 82da3b933b3a0ba3b0c5deed9badff3c47e1d918
+          test "$(git rev-parse HEAD^)" = 3d1347a654537a42db29e1249e68cd8cbc9e0518
           test "$(git hash-object tests/smoke.mjs)" = 9e9c0ca69062ec25c434e9f7e13377f5ce6377f2
           test "$(git hash-object .github/workflows/reboot-game-proof.yml)" = 0d7eeb6b70ca426a6e5140d1ad82bec4aec21d37
       - name: Prepare identical runtime and targeted fixtures
@@ -38,7 +38,6 @@ jobs:
           guard="const write=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k===key)return;return write.call(this,k,v);};"
           assert old.endswith('localStorage.setItem(key,JSON.stringify(state));});')
           new=old.replace('localStorage.setItem(key,JSON.stringify(state));});','localStorage.setItem(key,JSON.stringify(state));'+guard+'});')
-          # Save exact setup expressions for a controlled browser reproduction, with no gameplay changes.
           for label,line in [('original',old),('isolated',new)]:
               Path(f'evidence/{label}-setup.txt').write_text(line.strip().removeprefix('await page.evaluate(').removesuffix(');'))
           Path('evidence/replacement-old.txt').write_text(old)
@@ -57,7 +56,7 @@ jobs:
               await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
               await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__?.build().version==='0.95.0');
               const expression=readFileSync(`evidence/${isolated?'isolated':'original'}-setup.txt`,'utf8');
-              await page.evaluate(expression+'()');
+              await page.evaluate('('+expression+')()');
               const setup=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,key=d.build().saveKey;window.__migrationWrites=0;const write=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k===key)window.__migrationWrites++;return write.call(this,k,v);};return JSON.parse(localStorage.getItem(key));});
               assert.equal(setup.world.enemies.find(e=>e.id==='emberback').dead,true);
               await page.waitForFunction(()=>window.__migrationWrites>0,null,{timeout:7000});
