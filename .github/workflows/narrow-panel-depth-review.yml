@@ -1,0 +1,67 @@
+name: Narrow populated panel depth (evidence only)
+on:
+  push:
+    branches: [custodian/verify-narrow-actions-20261004]
+    paths: [.github/workflows/narrow-panel-depth-review.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply only the same isolated CSS hypothesis
+        run: |
+          set -eu
+          git diff --exit-code 707dd5d2049fa7995a81c51b5ed89aeba5c21136 -- src tests index.html styles.css
+          mkdir -p evidence/source
+          cat .narrow-candidate.css >> src/play-ui.css
+          cp -r src tests index.html styles.css evidence/source/
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+          python3 -m http.server 4173 >/tmp/briar.log 2>&1 &
+          sleep 2
+      - name: Original subproofs at additional narrow landscape size with no assertion modifications
+        run: |
+          cat > .narrow-depth.mjs <<'JS'
+          import {chromium,webkit} from 'playwright';
+          import {proveEquipmentReadiness} from './tests/play-ui.mjs';
+          import {proveInteractionUi} from './tests/interaction-ui.mjs';
+          import {proveLiveUiStability} from './tests/live-ui-stability.mjs';
+          import {proveSkillReadiness} from './tests/skill-ui.mjs';
+          import {proveCombatUi} from './tests/combat-ui.mjs';
+          import {proveExpeditionGuide} from './tests/expedition-guide.mjs';
+          const vp={name:'narrow-landscape',width:568,height:320,touch:true};
+          for(const [engine,type] of Object.entries({chromium,webkit})){
+            const browser=await type.launch();
+            try{
+              const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:true}),page=await context.newPage(),errors=[];
+              page.on('pageerror',e=>errors.push(e.message));
+              process.env.UI_EVIDENCE_DIR=`evidence/${engine}`;
+              await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>!!document.querySelector('#guide-preparation')?.textContent);
+              for(const prove of [proveEquipmentReadiness,proveInteractionUi,proveLiveUiStability,proveSkillReadiness,proveCombatUi,proveExpeditionGuide])await prove(page,vp);
+              if(errors.length)throw new Error(JSON.stringify(errors));
+              console.log(`PASS ${engine}: every original equipment, interaction, live focus, skill, combat and Journal lifecycle subproof at additional568x320; no assertion changes or skipped subproofs`);
+            }finally{await browser.close();}
+          }
+          JS
+          cp .narrow-depth.mjs evidence/probe.mjs
+          set -o pipefail
+          node .narrow-depth.mjs 2>&1 | tee evidence/depth.log
+      - name: Restore experiment and verify untouched source and original tests
+        if: always()
+        run: |
+          git restore src/play-ui.css
+          git diff --exit-code 707dd5d2049fa7995a81c51b5ed89aeba5c21136 -- src tests index.html styles.css
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: narrow-panel-depth
+          path: evidence
+          retention-days: 14
