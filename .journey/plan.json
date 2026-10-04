@@ -1,0 +1,13 @@
+{
+ "resume":37222858294,
+ "viewport":{"width":1440,"height":900},
+ "touch":false,
+ "collectNearby":true,
+ "actions":[
+  {"point":[722,594],"wait":4500,"shot":"retrieve-visible-hide"},
+  {"wait":4000,"shot":"react-to-close-threats"},
+  {"click":"[data-panel=pack]","shot":"earned-supplies"},
+  {"click":"[data-panel=craft]","shot":"equipment-readiness"},
+  {"click":"[data-panel=nearby]","shot":"next-visible-resources"}
+ ]
+}
