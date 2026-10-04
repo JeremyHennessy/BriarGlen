@@ -1,18 +1,17 @@
 {
- "resume":37224775858,
+ "resume":37225183366,
  "viewport":{"width":1440,"height":900},
  "touch":false,
  "collectNearby":true,
  "actions":[
-  {"wait":20000,"shot":"recover-energy"},
-  {"seek":{"keys":["ArrowRight"],"target":"Ashwood","limit":1800},"shot":"wood-three"},
-  {"seek":{"keys":["ArrowUp","ArrowRight"],"target":"Ashwood","limit":2200},"shot":"wood-four"},
-  {"click":"[data-panel=craft]","shot":"crafting-materials"},
-  {"click":"[data-craft=arrows]","shot":"arrows-six"},
-  {"click":"[data-craft=arrows]","shot":"arrows-twelve"},
-  {"click":"[data-craft=bow]","shot":"crafted-bow"},
-  {"click":"[data-panel=pack]","shot":"equipment-before-choice"},
-  {"clickIfVisible":"[data-equip=bow][aria-label='Equip Briar Bow']","shot":"bow-equipment"},
-  {"click":"[data-panel=nearby]","wait":1800,"shot":"prepared-greenwood"}
+  {"click":"#interact-btn","shot":"wood-for-armor"},
+  {"click":"[data-panel=craft]","clickIfVisible":"[data-craft=jerkin]","shot":"craft-trail-jerkin"},
+  {"click":"[data-panel=pack]","clickIfVisible":"[data-equip=jerkin][aria-label='Equip Trail Jerkin']","shot":"armor-equipped"},
+  {"click":"[data-panel=nearby]","point":[597,348],"wait":2400,"shot":"extra-ashwood"},
+  {"click":"[data-panel=craft]","clickIfVisible":"[data-craft=arrows]","shot":"reserve-arrows"},
+  {"click":"[data-panel=nearby]","track":{"limit":15000},"shot":"follow-east-to-stonepine"},
+  {"click":"#interact-btn","shot":"nearby-objective-action"},
+  {"click":"[data-panel=journal]","shot":"route-progress"},
+  {"click":"[data-panel=nearby]","shot":"ridge-view"}
  ]
 }
