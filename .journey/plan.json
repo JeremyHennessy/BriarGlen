@@ -1,12 +1,18 @@
 {
- "resume":37224566093,
+ "resume":37224775858,
  "viewport":{"width":1440,"height":900},
  "touch":false,
  "collectNearby":true,
  "actions":[
-  {"wait":18000,"shot":"ordinary-rest"},
-  {"point":[768,258],"wait":4000,"shot":"gather-visible-ashwood"},
-  {"click":"[data-panel=pack]","shot":"gathered-supplies"},
-  {"click":"[data-panel=nearby]","wait":1400,"shot":"greenwood-next-step"}
+  {"wait":20000,"shot":"recover-energy"},
+  {"seek":{"keys":["ArrowRight"],"target":"Ashwood","limit":1800},"shot":"wood-three"},
+  {"seek":{"keys":["ArrowUp","ArrowRight"],"target":"Ashwood","limit":2200},"shot":"wood-four"},
+  {"click":"[data-panel=craft]","shot":"crafting-materials"},
+  {"click":"[data-craft=arrows]","shot":"arrows-six"},
+  {"click":"[data-craft=arrows]","shot":"arrows-twelve"},
+  {"click":"[data-craft=bow]","shot":"crafted-bow"},
+  {"click":"[data-panel=pack]","shot":"equipment-before-choice"},
+  {"clickIfVisible":"[data-equip=bow][aria-label='Equip Briar Bow']","shot":"bow-equipment"},
+  {"click":"[data-panel=nearby]","wait":1800,"shot":"prepared-greenwood"}
  ]
 }
