@@ -9,7 +9,6 @@ const context=await browser.newContext({viewport:plan.viewport||{width:1440,heig
 const page=await context.newPage(),records=[],errors=[],inputs=[];
 page.on('pageerror',e=>errors.push(e.message));
 const activate=async s=>plan.touch?page.locator(s).tap():page.locator(s).click();
-// Reactions use visible UI text and ordinary controls, not hidden target or combat state.
 const watch=async ms=>{const end=Date.now()+ms;while(Date.now()<end){
  const cue=page.locator('#combat-cue');
  if(await cue.isVisible()){
@@ -22,21 +21,26 @@ const watch=async ms=>{const end=Date.now()+ms;while(Date.now()<end){
  if(plan.collectNearby&&(await page.locator('#interact-readiness').innerText())==='Pick up'){await activate('#interact-btn');inputs.push({at:Date.now(),action:'Use',visible:'Pick up'});}
  await page.waitForTimeout(Math.min(160,Math.max(1,end-Date.now())));
 }};
+const hold=async(keys,ms)=>{await page.locator('#game').focus();for(const k of keys)await page.keyboard.down(k);try{await watch(ms);}finally{for(const k of keys)await page.keyboard.up(k);}};
+const seek=async a=>{const end=Date.now()+(a.limit||2000);let found=false;await page.locator('#game').focus();for(const k of a.keys)await page.keyboard.down(k);try{while(Date.now()<end){if((await page.locator('#interact-readiness').innerText())==='Gather'&&(await page.locator('#interaction-target').innerText())===a.target){found=true;break;}await watch(100);}}finally{for(const k of a.keys)await page.keyboard.up(k);}inputs.push({action:'Seek by visible prompt',target:a.target,keys:a.keys,found});if(found){await activate('#interact-btn');await watch(250);}};
+const track=async a=>{const initial=await page.locator('#objective-text').innerText(),end=Date.now()+(a.limit||15000),dirs={'East':['ArrowRight'],'South-east':['ArrowRight','ArrowDown'],'South':['ArrowDown'],'South-west':['ArrowLeft','ArrowDown'],'West':['ArrowLeft'],'North-west':['ArrowLeft','ArrowUp'],'North':['ArrowUp'],'North-east':['ArrowRight','ArrowUp']};while(Date.now()<end){const objective=await page.locator('#objective-text').innerText(),text=await page.locator('#objective-direction').innerText();if(objective!==initial||/Within reach|Close by|resident has Use priority/.test(text))break;if(text.startsWith('Walking')){await hold(['ArrowRight'],20);continue;}const direction=text.split(' · ')[0],keys=dirs[direction];if(!keys)break;inputs.push({action:'Follow visible compass',objective,text,keys});await hold(keys,300);await watch(80);}};
 const capture=async label=>{await page.screenshot({path:`evidence/screens/${label}.png`});const visible=await page.locator('body').innerText();records.push({label,visible});console.log(`${label}\n${visible}`);};
 try{
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});await page.locator('#objective-text').waitFor();await page.waitForTimeout(250);await capture('00-start');
  for(let i=0;i<plan.actions.length;i++){
   const a=plan.actions[i];
   if(a.click)await activate(a.click);
+  if(a.clickIfVisible&&await page.locator(a.clickIfVisible).isVisible())await activate(a.clickIfVisible);
   if(a.point){if(plan.touch)await page.touchscreen.tap(a.point[0],a.point[1]);else await page.mouse.click(a.point[0],a.point[1]);}
-  if(a.hold){await page.locator('#game').focus();for(const key of a.hold)await page.keyboard.down(key);await watch(a.ms||500);for(const key of a.hold)await page.keyboard.up(key);}
+  if(a.hold)await hold(a.hold,a.ms||500);
+  if(a.seek)await seek(a.seek);
+  if(a.track)await track(a.track);
   if(a.key)await page.keyboard.press(a.key);
   if(a.scroll)await page.locator(a.scroll).scrollIntoViewIfNeeded();
   if(a.viewport)await page.setViewportSize(a.viewport);
   if(a.wait)await watch(a.wait);
   if(a.shot)await capture(`${String(i+1).padStart(2,'0')}-${a.shot}`);
  }
- // Allow normal autosave, while still reacting to visible threats instead of leaving the player unattended.
  await watch(5200);await capture('99-end');assert.deepEqual(errors,[]);
 }finally{
  await context.storageState({path:'evidence/state.json'});
