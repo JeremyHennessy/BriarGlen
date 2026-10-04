@@ -2,7 +2,7 @@ name: Contextual Use review (branch only)
 on:
   push:
     branches: [custodian/ui-contextual-use]
-    paths: [.github/workflows/interaction-ui-review.yml]
+    paths: [.github/workflows/interaction-ui-review.yml, tests/interaction-ui.mjs]
 permissions:
   contents: write
 jobs:
@@ -18,7 +18,7 @@ jobs:
           node-version: '24'
       - name: Apply bounded presentation patch to exact base
         run: |
-          set -eu
+          set -euo pipefail
           test "$GITHUB_REF" = refs/heads/custodian/ui-contextual-use
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = d84d354aaf5918805160377e76efdebee686a984
           git merge-base --is-ancestor d84d354aaf5918805160377e76efdebee686a984 HEAD
@@ -58,7 +58,8 @@ jobs:
             const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
             await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');await page.waitForTimeout(220);await mkdir('evidence/screens',{recursive:true});await page.screenshot({path:`evidence/screens/${vp.name}-default.png`});
             await provePlayUi(page,vp);
-            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setPosition(30,30);const n=d.npc('mira');n.x=30;n.y=30;n.name='Mira the Very Experienced Village Herbalist With a Long Display Name';for(const id of ['wood','iron','hide','bread','briarleaf','mooncap','tonic','arrows','bow','blade','pick','jerkin','bedroll','trailpack'])d.give(id,1,2.8);d.advance(0);});
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setPosition(900,600);for(const n of d.snapshot().npcs){const live=d.npc(n.id);live.x=30;live.y=30;}const n=d.npc('mira');n.x=900;n.y=600;n.name='Mira the Very Experienced Village Herbalist With a Long Display Name';for(const id of ['wood','iron','hide','bread','briarleaf','mooncap','tonic','arrows','bow','blade','pick','jerkin','bedroll','trailpack'])d.give(id,1,2.8);d.advance(0);});
+            assert.match(await page.locator('#interaction-target').textContent(),/Long Display Name/);
             for(const id of ['nearby','pack','craft','character','journal']){
               if(vp.touch)await page.locator(`[data-panel="${id}"]`).tap();else await page.locator(`[data-panel="${id}"]`).click();
               const geometry=await page.locator(`#panel-${id}`).evaluate(el=>({w:el.clientWidth,sw:el.scrollWidth}));assert.ok(geometry.sw<=geometry.w+1,`${vp.name} ${id}: long content overflow`);assert.equal(await page.locator('.play-panel:visible').count(),1);
@@ -93,4 +94,5 @@ jobs:
         with:
           name: contextual-use-candidate
           path: evidence
+          include-hidden-files: true
           retention-days: 14
