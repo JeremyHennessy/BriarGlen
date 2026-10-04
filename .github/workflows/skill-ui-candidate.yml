@@ -24,6 +24,12 @@ jobs:
           mkdir -p evidence/source evidence/before
           git archive e6dd6005e3bf19fe7012fbc5543d33c2d2d1798d src tests index.html styles.css .github/workflows/reboot-game-proof.yml | tar -x -C evidence/before
           python3 .skill-ui-author.py | tee evidence/preservation.log
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/skill-ui.mjs');s=p.read_text();needle='export async function proveSkillReadiness(page,vp){\n';assert s.count(needle)==1
+          setup="  // The existing reset intentionally leaves transient combat flags; start this suite in a fresh document.\n  await page.evaluate(()=>localStorage.removeItem('briar-glen-reboot-v1'));\n  await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');\n  assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.guarded),false);\n"
+          p.write_text(s.replace(needle,needle+setup))
+          PY
           node --check src/game.js && node --check src/play-ui.js && node --check tests/skill-ui.mjs && node --check tests/play-ui.mjs && node --check tests/smoke.mjs
           git diff --check
           cp -r src tests index.html styles.css evidence/source/
@@ -74,7 +80,7 @@ jobs:
           test "$(git ls-remote origin refs/heads/custodian/ui-skill-readiness | cut -f1)" = "$GITHUB_SHA"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/game.js src/play-ui.css tests/play-ui.mjs
+          git add src/game.js src/play-ui.css tests/play-ui.mjs tests/skill-ui.mjs
           git commit -m 'UI: show skill costs and target readiness without replacing live controls'
           git push origin HEAD:refs/heads/custodian/ui-skill-readiness
           git rev-parse HEAD > evidence/candidate-head.txt
