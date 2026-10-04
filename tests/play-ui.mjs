@@ -1,3 +1,4 @@
+import { proveLiveUiStability } from './live-ui-stability.mjs';
 import { proveInteractionUi } from './interaction-ui.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -112,6 +113,7 @@ export async function provePlayUi(page, vp) {
   }
   await proveEquipmentReadiness(page,vp);
   await proveInteractionUi(page,vp);
+  await proveLiveUiStability(page,vp);
   console.log(`PASS ${vp.name}: play UI panels, HUD, recipe requirements, shortcuts, action isolation, journal, resize, saved progress`);
 }
 
