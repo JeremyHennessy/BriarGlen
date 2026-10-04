@@ -2,7 +2,7 @@ name: Live controls acceptance (branch only)
 on:
   push:
     branches: [custodian/ui-live-control-stability]
-    paths: [.github/workflows/live-controls-review.yml]
+    paths: [.github/workflows/live-controls-review.yml, .live-controls-author.py, tests/live-ui-stability.mjs]
 permissions:
   contents: write
 jobs:
