@@ -1,0 +1,71 @@
+name: Journal planning baseline (evidence only)
+on:
+  push:
+    branches: [custodian/verify-phone-engines-20261004]
+    paths: [.github/workflows/journal-baseline-review.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Preserve exact verified release
+        run: |
+          git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+          mkdir -p evidence/source evidence/screens
+          cp -r src tests index.html styles.css evidence/source/
+          git ls-tree -r HEAD > evidence/tree.txt
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+          python3 -m http.server 4173 >/tmp/journal-server.log 2>&1 &
+          sleep 2
+      - name: Actual Journal navigation and separately labelled planning fixtures
+        run: |
+          cat > .journal-baseline.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch({headless:true}),records=[];
+          try{for(const vp of [{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true}]){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage();
+            const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            const activate=async selector=>vp.touch?page.locator(selector).tap():page.locator(selector).click();
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+            await activate('#objective-open');
+            const record={vp,freshVisibleJournal:await page.locator('#panel-journal').innerText(),freshObjective:await page.locator('#objective-text').innerText()};
+            assert.equal(await page.locator('.expedition-guide button').count(),0,'Baseline has no in-guide preparation shortcut');
+            await page.screenshot({path:`evidence/screens/${vp.name}-fresh-journal.png`});
+            await page.locator('#guide-preparation').scrollIntoViewIfNeeded();
+            record.preparation=await page.locator('#guide-preparation').innerText();
+            await page.screenshot({path:`evidence/screens/${vp.name}-preparation.png`});
+            await activate('[data-panel="craft"]');assert.equal(await page.locator('#panel-craft').isVisible(),true);
+            record.recipe=await page.locator('#recipe-arrows').innerText();
+            // Synthetic planning fixture below is NOT the ordinary first-outing assessment.
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.give('arrows',6);d.advance(0);});
+            await activate('#objective-open');
+            record.carryWithoutDeposit=await page.locator('.expedition-guide').innerText();
+            record.counts=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;return{inventoryArrows:d.snapshot().player.inventory.arrows.qty,deposit:d.stonepineExpedition().arrows};});
+            assert.deepEqual(record.counts,{inventoryArrows:6,deposit:0});
+            await page.locator('#guide-body').scrollIntoViewIfNeeded();await page.screenshot({path:`evidence/screens/${vp.name}-carried-not-stored.png`});
+            assert.deepEqual(errors,[]);records.push(record);await context.close();
+          }}finally{await writeFile('evidence/baseline.json',JSON.stringify(records,null,2));await browser.close();}
+          console.log('PASS recorded exact existing preparation/recipe/navigation and carried-versus-stored presentation; no frontend changes');
+          JS
+          node .journal-baseline.mjs
+      - name: Confirm production and canonical tests unchanged
+        if: always()
+        run: git diff --exit-code d253e62349e1a99b4bdb2291449b7c60626b7eca -- src tests index.html styles.css
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journal-planning-baseline
+          path: evidence
+          retention-days: 14
