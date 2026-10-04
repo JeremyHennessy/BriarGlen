@@ -1,0 +1,14 @@
+{
+  "resume": 0,
+  "viewport": {"width": 1440, "height": 900},
+  "touch": false,
+  "actions": [
+    {"click":"[data-panel=pack]","wait":220,"shot":"fresh-pack"},
+    {"click":"[data-panel=craft]","wait":220,"shot":"fresh-make"},
+    {"click":"[data-panel=character]","wait":220,"shot":"fresh-you"},
+    {"click":"[data-panel=journal]","wait":220,"shot":"fresh-journal"},
+    {"click":"[data-panel=nearby]","point":[755,619],"wait":2500,"shot":"ledger-arrival"},
+    {"click":"[data-panel=journal]","wait":220,"shot":"expedition-directions"},
+    {"click":"[data-panel=nearby]","wait":220,"shot":"world-at-ledger"}
+  ]
+}
