@@ -65,10 +65,12 @@ export async function provePlayUi(page, vp) {
   const layout = await page.evaluate(() => {
     const box=s=>document.querySelector(s).getBoundingClientRect().toJSON();
     const panel=document.querySelector('#panel-pack');
-    return {w:innerWidth,h:innerHeight,scrollW:document.documentElement.scrollWidth,scrollH:document.documentElement.scrollHeight,canvas:box('#game'),side:box('.sidebar'),deck:box('.action-deck'),hp:box('#hp'),energy:box('#energy'),panelW:panel.clientWidth,panelScrollW:panel.scrollWidth,controls:['#attack-btn','#interact-btn','#quick-brace','#quick-tonic'].map(box)};
+    return {w:innerWidth,h:innerHeight,scrollW:document.documentElement.scrollWidth,scrollH:document.documentElement.scrollHeight,canvas:box('#game'),side:box('.sidebar'),deck:box('.action-deck'),hp:box('#hp'),energy:box('#energy'),panelW:panel.clientWidth,panelScrollW:panel.scrollWidth,panelBox:box('#panel-pack'),tabs:box('.panel-tabs'),tabBoxes:[...document.querySelectorAll('[data-panel]')].map(el=>el.getBoundingClientRect().toJSON()),controls:['#attack-btn','#interact-btn','#quick-brace','#quick-tonic'].map(box)};
   });
   assert.ok(layout.scrollW<=layout.w+1&&layout.scrollH<=layout.h+1,`${vp.name}: page overflow ${JSON.stringify(layout)}`);
   assert.ok(layout.canvas.width>=250&&layout.canvas.height>=140,`${vp.name}: unusable world`);
+  assert.ok(layout.panelBox.width>=layout.side.width-12&&layout.tabs.width>=layout.side.width-12&&layout.tabs.bottom<=layout.panelBox.top+1,`${vp.name}: legacy grid squeezed tabs beside content`);
+  for(const tab of layout.tabBoxes)assert.ok(tab.width>=44&&tab.height>=44,`${vp.name}: tab touch target too small`);
   assert.ok(layout.panelScrollW<=layout.panelW+1,`${vp.name}: pack text overflows horizontally`);
   assert.ok(layout.deck.top>=layout.canvas.bottom-1,`${vp.name}: controls cover the world`);
   for(const box of [layout.hp,layout.energy,...layout.controls])assert.ok(box.x>=0&&box.y>=0&&box.right<=layout.w+1&&box.bottom<=layout.h+1,`${vp.name}: essential control offscreen`);
