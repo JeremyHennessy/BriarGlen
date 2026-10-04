@@ -47,10 +47,12 @@ export async function proveLiveUiStability(page, vp) {
   // Store/take controls update totals honestly, preserving action focus until that action disappears.
   await setup();await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,l=d.landmarks().find(l=>l.id==='stonepine-waycache');d.setPosition(l.x,l.y);d.advance(0);});
   await activate('#interact-btn');await refresh();assert.equal(await page.locator('#interact-readiness').innerText(),'Stash');
+  const initialBread=(await state()).inventory.bread.qty;assert.equal(initialBread,3,'Fresh supplies plus the existing Waycache bread reward');
   const store=page.locator('[data-cache-store="bread"]');await store.focus();await page.waitForTimeout(650);await focusIs('[data-cache-store="bread"]');
-  await page.keyboard.press('Enter');await refresh();assert.equal((await state()).inventory.bread.qty,1);await focusIs('[data-cache-store="bread"]');
+  await page.keyboard.press('Enter');await refresh();assert.equal((await state()).inventory.bread.qty,initialBread-1);await focusIs('[data-cache-store="bread"]');
   await shot('store');await page.keyboard.down('Space');await page.waitForTimeout(650);await page.keyboard.up('Space');await refresh();
-  assert.equal((await state()).inventory.bread,undefined);assert.equal(await page.locator('[data-cache-store="bread"]').count(),0);await focusIs('#panel-nearby');
+  assert.equal((await state()).inventory.bread.qty,initialBread-2);await focusIs('[data-cache-store="bread"]');
+  await page.keyboard.press('Enter');await refresh();assert.equal((await state()).inventory.bread,undefined);assert.equal(await page.locator('[data-cache-store="bread"]').count(),0);await focusIs('#panel-nearby');
   const take=page.locator('[data-cache-take="bread"]');await take.focus();await page.waitForTimeout(650);await page.keyboard.press('Enter');await refresh();
   assert.equal((await state()).inventory.bread.qty,1);await focusIs('[data-cache-take="bread"]');await shot('take');
   await take.focus();const beforeExit=await state();await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setPosition(900,600);d.advance(0);});
