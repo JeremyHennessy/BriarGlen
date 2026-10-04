@@ -1,0 +1,87 @@
+name: Skill UI candidate (branch only)
+on:
+  push:
+    branches: [custodian/ui-skill-readiness]
+    paths: [.github/workflows/skill-ui-candidate.yml]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply bounded presentation to verified base
+        run: |
+          set -eu
+          test "$GITHUB_REF" = refs/heads/custodian/ui-skill-readiness
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = e6dd6005e3bf19fe7012fbc5543d33c2d2d1798d
+          mkdir -p evidence/source evidence/before
+          git archive e6dd6005e3bf19fe7012fbc5543d33c2d2d1798d src tests index.html styles.css .github/workflows/reboot-game-proof.yml | tar -x -C evidence/before
+          python3 .skill-ui-author.py | tee evidence/preservation.log
+          node --check src/game.js && node --check src/play-ui.js && node --check tests/skill-ui.mjs && node --check tests/play-ui.mjs && node --check tests/smoke.mjs
+          git diff --check
+          cp -r src tests index.html styles.css evidence/source/
+          git diff e6dd6005e3bf19fe7012fbc5543d33c2d2d1798d -- src tests > evidence/candidate.diff
+      - name: Install canonical browser and serve
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+          python3 -m http.server 4173 >/tmp/skill-server.log 2>&1 &
+          sleep 2
+      - name: Full canonical gameplay and UI proof
+        env:
+          UI_EVIDENCE_DIR: evidence/canonical
+        run: |
+          set -o pipefail
+          node tests/smoke.mjs http://127.0.0.1:4173/ | tee evidence/full-proof.log
+      - name: Five-size default, skill, populated panel, resize and inset acceptance
+        run: |
+          cat > .skill-visual.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {mkdir,writeFile} from 'node:fs/promises';
+          import {chromium} from 'playwright';
+          import {provePlayUi} from './tests/play-ui.mjs';
+          const browser=await chromium.launch({headless:true}),records=[];
+          const geometry=async page=>page.evaluate(()=>({w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,boxes:['#attack-btn','#interact-btn','#quick-brace','#quick-tonic','#hp','#energy'].map(s=>document.querySelector(s).getBoundingClientRect().toJSON()),panel:{w:document.querySelector('#panel-character').clientWidth,sw:document.querySelector('#panel-character').scrollWidth}}));
+          const check=g=>{assert.ok(g.sw<=g.w+1&&g.sh<=g.h+1,'Page overflow');assert.ok(g.panel.sw<=g.panel.w+1,'Skill text overflow');for(const b of g.boxes)assert.ok(b.left>=0&&b.top>=0&&b.right<=g.w+1&&b.bottom<=g.h+1,'Control out of bounds');};
+          try{for(const vp of [{name:'desktop',width:1440,height:900,touch:false},{name:'landscape',width:844,height:390,touch:true},{name:'portrait',width:390,height:844,touch:true},{name:'small-landscape',width:667,height:375,touch:true},{name:'small-portrait',width:375,height:667,touch:true}]){
+            const context=await browser.newContext({viewport:{width:vp.width,height:vp.height},hasTouch:vp.touch}),page=await context.newPage(),errors=[];
+            page.on('pageerror',e=>errors.push(e.message));
+            await page.goto('http://127.0.0.1:4173/');await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+            await mkdir('evidence/screens',{recursive:true});await page.screenshot({path:`evidence/screens/${vp.name}-default.png`});
+            await provePlayUi(page,vp);
+            await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){d.npc(n.id).x=30;d.npc(n.id).y=30;}d.setPosition(900,600);d.setEnergy(100);d.advance(0);});
+            await page.locator('[data-panel="character"]').click();await page.locator('.skill').first().scrollIntoViewIfNeeded();await page.screenshot({path:`evidence/screens/${vp.name}-ready.png`});
+            check(await geometry(page));
+            if(vp.touch){await page.setViewportSize({width:vp.height,height:vp.width});await page.waitForTimeout(250);check(await geometry(page));await page.setViewportSize({width:vp.width,height:vp.height});await page.waitForTimeout(250);}
+            if(vp.name==='portrait'||vp.name==='landscape'){await page.addStyleTag({content:'body{padding:20px 12px 16px!important}#app{height:calc(100dvh - 36px)!important}'});await page.waitForTimeout(250);check(await geometry(page));await page.screenshot({path:`evidence/screens/${vp.name}-insets.png`});}
+            assert.deepEqual(errors,[]);records.push({viewport:vp,geometry:await geometry(page),pass:true});await context.close();
+          }console.log('PASS five-size full UI flows, skill gates/actions, default/long content, keyboard/touch, orientation and inset stress');}
+          finally{await writeFile('evidence/visual.json',JSON.stringify(records,null,2));await browser.close();}
+          JS
+          set -o pipefail
+          UI_EVIDENCE_DIR=evidence/screens node .skill-visual.mjs | tee evidence/visual.log
+      - name: Commit tested changes to the unchanged owned branch
+        run: |
+          set -eu
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = e6dd6005e3bf19fe7012fbc5543d33c2d2d1798d
+          test "$(git ls-remote origin refs/heads/custodian/ui-skill-readiness | cut -f1)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/game.js src/play-ui.css tests/play-ui.mjs
+          git commit -m 'UI: show skill costs and target readiness without replacing live controls'
+          git push origin HEAD:refs/heads/custodian/ui-skill-readiness
+          git rev-parse HEAD > evidence/candidate-head.txt
+          git ls-tree -r HEAD > evidence/tree.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: skill-ui-candidate
+          path: evidence
+          retention-days: 14
