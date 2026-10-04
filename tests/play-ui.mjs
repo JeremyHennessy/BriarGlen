@@ -1,3 +1,4 @@
+import { proveCombatUi } from './combat-ui.mjs';
 import { proveSkillReadiness } from './skill-ui.mjs';
 import { proveLiveUiStability } from './live-ui-stability.mjs';
 import { proveInteractionUi } from './interaction-ui.mjs';
@@ -116,6 +117,7 @@ export async function provePlayUi(page, vp) {
   await proveInteractionUi(page,vp);
   await proveLiveUiStability(page,vp);
   await proveSkillReadiness(page,vp);
+  await proveCombatUi(page, vp);
   console.log(`PASS ${vp.name}: play UI panels, HUD, recipe requirements, shortcuts, action isolation, journal, resize, saved progress`);
 }
 
