@@ -54,12 +54,16 @@ jobs:
             const worldCanvas=page.locator('#game'),canvasBox=await worldCanvas.boundingBox();assert.ok(canvasBox);
             const point={x:canvasBox.width/2-90,y:canvasBox.height/2};
             if(vp.touch)await worldCanvas.tap({position:point});else await worldCanvas.click({position:point});
-            await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started,{timeout:5000});
+            await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__.stonepineExpedition().started,null,{timeout:5000});
             assert.equal(await page.locator('#panel-nearby').isVisible(),true);await shot('canvas-approach');
           
           '''
-          assert text.count(anchor)==1;test.write_text(text.replace(anchor,addition+anchor))
-          print('PASS final source preservation; only display text and additional real-input test changed')
+          assert text.count(anchor)==1;text=text.replace(anchor,addition+anchor)
+          oldline=next(x for x in text.splitlines() if 'locator(selector).scrollIntoViewIfNeeded()' in x)
+          newline='''  // The existing Nearby renderer replaces its buttons each tick; native scrolling and bounds are sampled in one browser turn.
+            for(const selector of ['[data-near="sell"]','[data-near="buy"]','.interaction-controls summary']){const {b,p}=await page.locator(selector).evaluate(el=>{el.scrollIntoView({block:'nearest'});return{b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON()};});assert.ok(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1,'Resident/help controls remain reachable');}'''
+          text=text.replace(oldline,newline);test.write_text(text)
+          print('PASS final source preservation; only display text and real-input/atomic-scrolling test changes')
           PY
           node --check src/game.js && node --check src/play-ui.js && node --check tests/play-ui.mjs && node --check tests/interaction-ui.mjs && node --check tests/smoke.mjs
           git diff --check
