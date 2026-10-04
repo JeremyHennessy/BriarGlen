@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: '24'
       - name: Syntax check
-        run: node --check src/game.js && node --check tests/smoke.mjs
+        run: node --check src/game.js && node --check src/play-ui.js && node --check tests/smoke.mjs && node --check tests/play-ui.mjs
       - name: Install browser
         run: |
           npm install --no-save playwright@1.55.0
@@ -39,23 +39,29 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/$GH_REPO/pages/builds"
-      - name: Wait for exact Pages game bytes
+      - name: Wait for exact Pages frontend bytes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          expected="$(git hash-object src/game.js)"
           for attempt in $(seq 1 18); do
-            curl -fsSL "https://jeremyhennessy.github.io/BriarGlen/src/game.js?sha=$GITHUB_SHA&attempt=$attempt" -o /tmp/live-game.js || true
-            if [ -s /tmp/live-game.js ]; then
-              actual="$(git hash-object /tmp/live-game.js)"
-              echo "Pages attempt $attempt: $actual"
-              if [ "$actual" = "$expected" ]; then
-                echo "GitHub Pages is serving the exact checked-out game blob."
-                exit 0
+            matched=true
+            for asset in index.html styles.css src/game.js src/play-ui.js src/play-ui.css; do
+              expected="$(git hash-object "$asset")"
+              rm -f /tmp/live-asset
+              if ! curl -fsSL --connect-timeout 10 --max-time 20 "https://jeremyhennessy.github.io/BriarGlen/$asset?sha=$GITHUB_SHA&attempt=$attempt" -o /tmp/live-asset; then
+                matched=false
+                continue
               fi
+              actual="$(git hash-object /tmp/live-asset)"
+              echo "Pages attempt $attempt $asset: $actual (expected $expected)"
+              if [ "$actual" != "$expected" ]; then matched=false; fi
+            done
+            if [ "$matched" = true ]; then
+              echo "GitHub Pages is serving the exact checked-out frontend assets."
+              exit 0
             fi
             sleep 10
           done
-          echo "Pages did not converge to expected game blob $expected"
+          echo "Pages did not converge to all expected frontend blobs."
           exit 1
       - name: Hosted proof
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
