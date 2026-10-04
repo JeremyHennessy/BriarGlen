@@ -9,6 +9,12 @@ export async function proveCombatUi(page,vp){
   const shot=async label=>{if(process.env.UI_EVIDENCE_DIR){await mkdir(process.env.UI_EVIDENCE_DIR,{recursive:true});await page.screenshot({path:`${process.env.UI_EVIDENCE_DIR}/${vp.name}-combat-${label}.png`});}};
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.advance(0);});
   await activate('[data-panel=nearby]');assert.equal(await page.locator('#combat-cue').isVisible(),false);await shot('quiet');
+  // Loading an already-injured save is not a new hit; subsequent real-hit assertions below remain unchanged.
+  await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setHp(77);d.save();});
+  await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');await refresh();
+  assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.hp),77);
+  assert.equal(await page.locator('#combat-cue').isVisible(),false,'Existing saved injury must not announce a new hit');await shot('injured-reload');
+  await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setHp(100);d.advance(0);});
   const wolf=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;const id=d.spawnWolfAt(900,600);d.enemy(id).attackCd=100;d.advance(0);return id;});
   await page.waitForTimeout(80);assert.equal(await page.locator('#combat-cue').isVisible(),true);assert.match(await page.locator('#combat-threat').innerText(),/Wolf.*36\/36 health.*Close threat/);assert.match(await page.locator('#combat-action').innerText(),/Attack Wolf · 4 energy/);
   const ring=await page.evaluate(()=>{const c=document.querySelector('#game'),ctx=c.getContext('2d'),x=Math.floor(c.width/2),y=Math.floor(c.height/2);let count=0;for(let dy=-21;dy<=21;dy++)for(let dx=-21;dx<=21;dx++){if(Math.hypot(dx,dy)<15||Math.hypot(dx,dy)>21)continue;const p=ctx.getImageData(x+dx,y+dy,1,1).data;if(Math.abs(p[0]-213)<8&&Math.abs(p[1]-122)<8&&Math.abs(p[2]-111)<8)count++;}return count;});

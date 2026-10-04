@@ -66,7 +66,9 @@ export async function proveInteractionUi(page, vp) {
   await setup();await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.x=900;n.y=600;d.setPosition(900,600);d.advance(0);});
   await hint('Details','npc');assert.match(await page.locator('#interaction-help').innerText(),/Help and trade/);await activate('#interact-btn');assert.match(await page.locator('#nearby').innerText(),/Mira/);
   // The existing Nearby renderer replaces its buttons each tick; native scrolling and bounds are sampled in one browser turn.
-  for(const selector of ['[data-near="sell"]','[data-near="buy"]','.interaction-controls summary']){const {b,p}=await page.locator(selector).evaluate(el=>{el.scrollIntoView({block:'nearest'});return{b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON()};});assert.ok(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1,'Resident/help controls remain reachable');}
+  for(const selector of ['[data-near="sell"]','[data-near="buy"]','.interaction-controls summary']){// Resolve and measure in one browser task: normal Nearby refresh may replace a locator's earlier handle.
+    const {b,p}=await page.evaluate(selector=>{const el=document.querySelector(selector);el.scrollIntoView({block:'nearest'});return{b:el.getBoundingClientRect().toJSON(),p:document.querySelector('#panel-nearby').getBoundingClientRect().toJSON()};},selector);
+    assert.ok(b.width>0&&b.height>0,'Resident/help geometry belongs to a live visible control');assert.ok(b&&p&&b.y>=p.y-1&&b.y+b.height<=p.y+p.height+1,'Resident/help controls remain reachable');}
   await activate('.interaction-controls summary');assert.equal(await page.locator('.interaction-controls').getAttribute('open'),'');
   const expeditionDirection=await page.locator('#objective-direction').innerText();
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.tapWorld(1800,1100);d.advance(0);});
