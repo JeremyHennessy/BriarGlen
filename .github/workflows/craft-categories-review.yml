@@ -1,0 +1,114 @@
+name: Make categories acceptance (temporary)
+on:
+  push:
+    branches: [custodian/ui-crafting-categories]
+    paths: [.github/workflows/craft-categories-review.yml, .craft-categories-author.py, .craft-categories-test.mjs, .craft-categories-visual.mjs]
+permissions:
+  contents: read
+env:
+  BASE: 66a7211a767cbfc2952f99937465ad4d1844bd87
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit]
+    env:
+      ENGINE: ${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exact verified baseline and bounded source inversion
+        run: |
+          set -eu
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$BASE"
+          git merge-base --is-ancestor "$BASE" HEAD
+          git merge-base --is-ancestor efb547dc5390a243c465c939f3b3fd27b0844381 HEAD
+          git merge-base --is-ancestor b25cce7600bea24bee42e689af9e84d713982b3e HEAD
+          git diff --exit-code "$BASE" -- src tests index.html styles.css
+          mkdir -p evidence/before evidence/source
+          git archive "$BASE" src tests index.html styles.css | tar -x -C evidence/before
+          python3 .craft-categories-author.py | tee evidence/preservation.log
+          cp .craft-categories-test.mjs tests/craft-categories.mjs
+          test "$(git hash-object src/play-ui.js)" = 60d8c50f8a9bef2130ba425ee612c1f89d4374f3
+          test "$(git hash-object src/play-ui.css)" = 411e9a9742ad9e64cbac7df4eabdf43d1a066817
+          test "$(git hash-object tests/play-ui.mjs)" = 2eed7bb97ec805274a8523e3b469799faf986c07
+          test "$(git hash-object tests/craft-categories.mjs)" = 5657ae3b84819196b6c910d3113d1dac90911e14
+          git diff --exit-code "$BASE" -- src/game.js index.html styles.css tests/smoke.mjs tests/combat-ui.mjs tests/interaction-ui.mjs tests/live-ui-stability.mjs tests/skill-ui.mjs tests/panel-reading.mjs tests/narrow-actions.mjs tests/expedition-guide.mjs .github/workflows/reboot-game-proof.yml
+          git diff --check
+          node --check src/play-ui.js && node --check tests/play-ui.mjs && node --check tests/craft-categories.mjs && node --check .craft-categories-visual.mjs
+          cp -r src tests index.html styles.css evidence/source/
+          git diff "$BASE" -- src tests > evidence/candidate.diff
+          git diff --no-index /dev/null tests/craft-categories.mjs >> evidence/candidate.diff || test "$?" = 1
+          git rev-parse HEAD > evidence/author-head.txt
+      - name: Pinned browser and baseline/candidate servers
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps $ENGINE
+          python3 -m http.server 4173 >/tmp/after.log 2>&1 &
+          python3 -m http.server 4174 --directory evidence/before >/tmp/before.log 2>&1 &
+          sleep 2
+      - name: Actual before-after screenshots and full category flow at seven sizes
+        env:
+          UI_EVIDENCE_DIR: evidence/screens
+        run: |
+          set -o pipefail
+          node .craft-categories-visual.mjs 2>&1 | tee evidence/visual.log
+      - name: Entire canonical game and UI suite without weakening any assertion
+        env:
+          UI_EVIDENCE_DIR: evidence/canonical
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          s=Path('tests/smoke.mjs').read_text()
+          if os.environ['ENGINE']=='webkit':
+              a="import { chromium } from 'playwright';";b="import { webkit as chromium } from 'playwright';"
+              assert s.count(a)==1;n=s.replace(a,b);assert n.replace(b,a)==s
+          else:n=s
+          Path('tests/.craft-canonical.mjs').write_text(n)
+          PY
+          set -o pipefail
+          node tests/.craft-canonical.mjs http://127.0.0.1:4173/ 2>&1 | tee evidence/canonical.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: craft-categories-${{ matrix.engine }}
+          path: evidence
+          retention-days: 14
+  commit-candidate:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Commit only verified files with exact owned-head preconditions
+        run: |
+          set -eu
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$BASE"
+          test "$(git ls-remote origin refs/heads/custodian/ui-crafting-categories | cut -f1)" = "$GITHUB_SHA"
+          git diff --exit-code "$BASE" -- src tests index.html styles.css
+          python3 .craft-categories-author.py
+          cp .craft-categories-test.mjs tests/craft-categories.mjs
+          test "$(git hash-object src/play-ui.js)" = 60d8c50f8a9bef2130ba425ee612c1f89d4374f3
+          test "$(git hash-object src/play-ui.css)" = 411e9a9742ad9e64cbac7df4eabdf43d1a066817
+          test "$(git hash-object tests/play-ui.mjs)" = 2eed7bb97ec805274a8523e3b469799faf986c07
+          test "$(git hash-object tests/craft-categories.mjs)" = 5657ae3b84819196b6c910d3113d1dac90911e14
+          git diff --check
+          git rm .craft-categories-author.py .craft-categories-test.mjs .craft-categories-visual.mjs
+          git add src/play-ui.js src/play-ui.css tests/play-ui.mjs tests/craft-categories.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'UI: organize existing Make actions into clear categories'
+          git push origin HEAD:refs/heads/custodian/ui-crafting-categories
+          git rev-parse HEAD
