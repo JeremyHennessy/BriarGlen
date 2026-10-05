@@ -95,6 +95,28 @@
     const note = document.createElement('small'); note.id = `recipe-${button.dataset.craft}`; note.dataset.recipeRequirements = button.dataset.craft;
     row.append(note); button.setAttribute('aria-describedby', note.id);
   }
+  // Presentation-only categories: retain every original recipe/care button and handler.
+  const craftList = cards.craft.querySelector('.nearby'); craftList.id = 'craft-list';
+  const craftCategories = [['all','All'], ['supplies','Supplies'], ['gear','Gear'], ['care','Care']];
+  const craftFilters = document.createElement('div'); craftFilters.className = 'craft-filters';
+  craftFilters.setAttribute('role', 'group'); craftFilters.setAttribute('aria-label', 'Make categories');
+  for (const [id, label] of craftCategories) craftFilters.insertAdjacentHTML('beforeend', `<button type="button" data-craft-filter="${id}" aria-pressed="${id === 'all'}" aria-controls="craft-list">${label}</button>`);
+  const craftStatus = cards.craft.querySelector('.card-title small'); craftStatus.id = 'craft-filter-status'; craftStatus.setAttribute('role', 'status');
+  craftList.before(craftFilters);
+  const gearRecipes = new Set(['pick','blade','bow','bedroll','trailpack','jerkin']);
+  const craftEntries = [...craftList.querySelectorAll('.recipe-row')].map(row => ({node:row, category:gearRecipes.has(row.querySelector('[data-craft]').dataset.craft) ? 'gear' : 'supplies'}));
+  for (const id of ['patch-jerkin','make-camp','drink-tonic']) craftEntries.push({node:document.getElementById(id), category:'care'});
+  const selectCraftCategory = id => {
+    const category = craftCategories.find(([key]) => key === id); if (!category) return;
+    for (const entry of craftEntries) entry.node.hidden = id !== 'all' && entry.category !== id;
+    for (const button of craftFilters.querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.craftFilter === id));
+    craftStatus.textContent = `${category[1]} · ${craftEntries.filter(entry => !entry.node.hidden).length} actions`;
+  };
+  craftFilters.addEventListener('click', event => {
+    const button = event.target.closest('[data-craft-filter]'); if (!button || !craftFilters.contains(button)) return;
+    selectCraftCategory(button.dataset.craftFilter); button.focus({preventScroll:true});
+  });
+  selectCraftCategory('all');
   const setPanel = (id, focus = false) => {
     if (!definitions.some(([key]) => key === id)) return;
     for (const [key] of definitions) {

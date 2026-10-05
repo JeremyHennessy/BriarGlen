@@ -10,7 +10,10 @@ export async function proveCraftCategories(page, vp) {
   const groups={supplies:['tonic','arrows'],gear:['pick','blade','bow','bedroll','trailpack','jerkin'],care:['patch-jerkin','make-camp','drink-tonic']};groups.all=[...groups.supplies,...groups.gear,...groups.care];
   const visible=()=>page.locator('#craft-list button:visible').evaluateAll(nodes=>nodes.map(el=>el.dataset.craft||el.id).sort());
   const choose=async id=>{await activate(`[data-craft-filter="${id}"]`);assert.equal(await page.locator(`[data-craft-filter="${id}"]`).getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.craft-filters [aria-pressed=true]').count(),1);assert.deepEqual(await visible(),[...groups[id]].sort());assert.match(await page.locator('#craft-filter-status').innerText(),new RegExp(`${groups[id].length} actions`));};
-  await setup();await activate('[data-panel="craft"]');await choose('all');
+  await setup();
+  // The prior canonical proof really attacks; reset() intentionally leaves transient cooldowns alone.
+  await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.attackCd===0,null,{timeout:1500});
+  await activate('[data-panel="craft"]');await choose('all');
   await page.evaluate(()=>window.__craftOriginalNodes=[...document.querySelectorAll('#craft-list button')]);
   const before=await state();
   for(const id of ['supplies','gear','care','all']){
