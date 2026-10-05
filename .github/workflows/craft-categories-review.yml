@@ -2,7 +2,7 @@ name: Make categories acceptance (temporary)
 on:
   push:
     branches: [custodian/ui-crafting-categories]
-    paths: [.github/workflows/craft-categories-review.yml, .craft-categories-author.py, .craft-categories-test.mjs, .craft-categories-visual.mjs, .craft-categories-fixture.py]
+    paths: [.github/workflows/craft-categories-review.yml, .craft-categories-author.py, .craft-categories-test.mjs, .craft-categories-visual.mjs, .craft-categories-fixture.py, .craft-categories-compact.py]
 permissions:
   contents: read
 env:
@@ -35,10 +35,11 @@ jobs:
           mkdir -p evidence/before evidence/source
           git archive "$BASE" src tests index.html styles.css | tar -x -C evidence/before
           python3 .craft-categories-author.py | tee evidence/preservation.log
+          python3 .craft-categories-compact.py
           cp .craft-categories-test.mjs tests/craft-categories.mjs
           python3 .craft-categories-fixture.py
-          test "$(git hash-object src/play-ui.js)" = 60d8c50f8a9bef2130ba425ee612c1f89d4374f3
-          test "$(git hash-object src/play-ui.css)" = 411e9a9742ad9e64cbac7df4eabdf43d1a066817
+          test "$(git hash-object src/play-ui.js)" = caf7b2bd27f2b8c79431c68060238356759a7b4a
+          test "$(git hash-object src/play-ui.css)" = 4e0dad24084763ccf744af8355fef90d4b2556ab
           test "$(git hash-object tests/play-ui.mjs)" = 2eed7bb97ec805274a8523e3b469799faf986c07
           test "$(git hash-object tests/craft-categories.mjs)" = 24b47a09a5c0fecb32f4f4cb31aff5f73abebaa2
           git diff --exit-code "$BASE" -- src/game.js index.html styles.css tests/smoke.mjs tests/combat-ui.mjs tests/interaction-ui.mjs tests/live-ui-stability.mjs tests/skill-ui.mjs tests/panel-reading.mjs tests/narrow-actions.mjs tests/expedition-guide.mjs .github/workflows/reboot-game-proof.yml
@@ -100,14 +101,15 @@ jobs:
           test "$(git ls-remote origin refs/heads/custodian/ui-crafting-categories | cut -f1)" = "$GITHUB_SHA"
           git diff --exit-code "$BASE" -- src tests index.html styles.css
           python3 .craft-categories-author.py
+          python3 .craft-categories-compact.py
           cp .craft-categories-test.mjs tests/craft-categories.mjs
           python3 .craft-categories-fixture.py
-          test "$(git hash-object src/play-ui.js)" = 60d8c50f8a9bef2130ba425ee612c1f89d4374f3
-          test "$(git hash-object src/play-ui.css)" = 411e9a9742ad9e64cbac7df4eabdf43d1a066817
+          test "$(git hash-object src/play-ui.js)" = caf7b2bd27f2b8c79431c68060238356759a7b4a
+          test "$(git hash-object src/play-ui.css)" = 4e0dad24084763ccf744af8355fef90d4b2556ab
           test "$(git hash-object tests/play-ui.mjs)" = 2eed7bb97ec805274a8523e3b469799faf986c07
           test "$(git hash-object tests/craft-categories.mjs)" = 24b47a09a5c0fecb32f4f4cb31aff5f73abebaa2
           git diff --check
-          git rm .craft-categories-author.py .craft-categories-test.mjs .craft-categories-visual.mjs .craft-categories-fixture.py
+          git rm .craft-categories-author.py .craft-categories-test.mjs .craft-categories-visual.mjs .craft-categories-fixture.py .craft-categories-compact.py
           git add src/play-ui.js src/play-ui.css tests/play-ui.mjs tests/craft-categories.mjs
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
