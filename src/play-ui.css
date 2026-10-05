@@ -57,3 +57,4 @@ html,body{height:100%;overflow:hidden}body{padding:max(8px,env(safe-area-inset-t
 /* Carried-item categories preserve original rows, actions, and the complete loadout summary. */
 .pack-filters{display:grid;grid-template-columns:repeat(4,minmax(44px,1fr));gap:4px;margin:8px 0}.pack-filters button{min-height:44px;min-width:44px;padding:5px 0;font-size:11px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;cursor:pointer}.pack-filters button[aria-pressed=true]{color:var(--accent);border-color:var(--accent)}
 #inventory[data-pack-view=gear]>.item-row:not([data-pack-group=gear]),#inventory[data-pack-view=supplies]>.item-row:not([data-pack-group=supplies]),#inventory[data-pack-view=materials]>.item-row:not([data-pack-group=materials]){display:none}
+#pack-filter-status{top:0;left:0}
