@@ -2,7 +2,7 @@ name: Make categories acceptance (temporary)
 on:
   push:
     branches: [custodian/ui-crafting-categories]
-    paths: [.github/workflows/craft-categories-review.yml, .craft-categories-author.py, .craft-categories-test.mjs, .craft-categories-visual.mjs]
+    paths: [.github/workflows/craft-categories-review.yml, .craft-categories-author.py, .craft-categories-test.mjs, .craft-categories-visual.mjs, .craft-categories-fixture.py]
 permissions:
   contents: read
 env:
@@ -36,10 +36,11 @@ jobs:
           git archive "$BASE" src tests index.html styles.css | tar -x -C evidence/before
           python3 .craft-categories-author.py | tee evidence/preservation.log
           cp .craft-categories-test.mjs tests/craft-categories.mjs
+          python3 .craft-categories-fixture.py
           test "$(git hash-object src/play-ui.js)" = 60d8c50f8a9bef2130ba425ee612c1f89d4374f3
           test "$(git hash-object src/play-ui.css)" = 411e9a9742ad9e64cbac7df4eabdf43d1a066817
           test "$(git hash-object tests/play-ui.mjs)" = 2eed7bb97ec805274a8523e3b469799faf986c07
-          test "$(git hash-object tests/craft-categories.mjs)" = 5657ae3b84819196b6c910d3113d1dac90911e14
+          test "$(git hash-object tests/craft-categories.mjs)" = 24b47a09a5c0fecb32f4f4cb31aff5f73abebaa2
           git diff --exit-code "$BASE" -- src/game.js index.html styles.css tests/smoke.mjs tests/combat-ui.mjs tests/interaction-ui.mjs tests/live-ui-stability.mjs tests/skill-ui.mjs tests/panel-reading.mjs tests/narrow-actions.mjs tests/expedition-guide.mjs .github/workflows/reboot-game-proof.yml
           git diff --check
           node --check src/play-ui.js && node --check tests/play-ui.mjs && node --check tests/craft-categories.mjs && node --check .craft-categories-visual.mjs
@@ -100,12 +101,13 @@ jobs:
           git diff --exit-code "$BASE" -- src tests index.html styles.css
           python3 .craft-categories-author.py
           cp .craft-categories-test.mjs tests/craft-categories.mjs
+          python3 .craft-categories-fixture.py
           test "$(git hash-object src/play-ui.js)" = 60d8c50f8a9bef2130ba425ee612c1f89d4374f3
           test "$(git hash-object src/play-ui.css)" = 411e9a9742ad9e64cbac7df4eabdf43d1a066817
           test "$(git hash-object tests/play-ui.mjs)" = 2eed7bb97ec805274a8523e3b469799faf986c07
-          test "$(git hash-object tests/craft-categories.mjs)" = 5657ae3b84819196b6c910d3113d1dac90911e14
+          test "$(git hash-object tests/craft-categories.mjs)" = 24b47a09a5c0fecb32f4f4cb31aff5f73abebaa2
           git diff --check
-          git rm .craft-categories-author.py .craft-categories-test.mjs .craft-categories-visual.mjs
+          git rm .craft-categories-author.py .craft-categories-test.mjs .craft-categories-visual.mjs .craft-categories-fixture.py
           git add src/play-ui.js src/play-ui.css tests/play-ui.mjs tests/craft-categories.mjs
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
