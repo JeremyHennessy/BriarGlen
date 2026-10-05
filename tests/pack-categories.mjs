@@ -53,8 +53,13 @@ export async function provePackCategories(page,vp){
   await page.waitForFunction(()=>!document.querySelector('#inventory [data-item-id=tonic]'));
   assert.deepEqual(await visible(),['arrows','bread']);assert.ok((await state()).hp>40);assert.equal((await state()).inventory.blade.qty,1);
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setHp(100);d.give('wood',1000000);d.advance(0);});await choose('materials');await shot('large-counts');
-  const saved=await state();await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
-  assert.deepEqual(await state(),saved,'Pack filters add no gameplay save state');await activate('[data-panel=pack]');
+  const saved=await state(),persisted=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.save();const p=JSON.parse(localStorage.getItem(d.build().saveKey)).player;return{x:p.x,y:p.y,hp:p.hp,energy:p.energy,coins:p.coins,inventory:p.inventory,skills:p.skills,expeditions:p.expeditions,deeds:p.deeds,discoveries:p.discoveries,equippedTool:p.equippedTool,equippedWeapon:p.equippedWeapon,equippedArmor:p.equippedArmor};});
+  assert.deepEqual(persisted,saved,'Pack filters add no gameplay save state');
+  await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
+  const restored=await state(),{energy:restoredEnergy,...restoredStable}=restored,{energy:savedEnergy,...savedStable}=saved;
+  assert.deepEqual(restoredStable,savedStable,'Pack filtering must preserve durable gameplay state across reload');
+  assert.ok(Math.abs(restoredEnergy-savedEnergy)<=.06,'Reload may advance at most one native .05 frame of energy');
+  await activate('[data-panel=pack]');
   assert.equal(await page.locator('#inventory').getAttribute('data-pack-view'),'all');assert.deepEqual(await visible(),Object.keys(saved.inventory).sort());
   await choose('gear');await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.advance(0);});
   assert.deepEqual(await visible(),[]);assert.match(await page.locator('#pack-filter-empty').innerText(),/No carried gear/);assert.equal(await page.locator('#pack-filter-empty').isVisible(),true);
