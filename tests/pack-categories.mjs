@@ -13,11 +13,14 @@ export async function provePackCategories(page,vp){
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.setHp(100);d.setEnergy(100);for(const n of d.snapshot().npcs){const live=d.npc(n.id);live.x=30;live.y=30;live.think=60;live.target={x:30,y:30};}d.advance(0);});
   await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.attackCd===0,null,{timeout:1500});
   await activate('[data-panel=pack]');await choose('all');
-  assert.match(await page.locator('#inventory').innerText(),/Your pack is empty/);
-  for(const id of ['gear','supplies','materials']){await choose(id);assert.deepEqual(await visible(),[]);assert.equal(await page.locator('#pack-filter-empty').isVisible(),false,'Original empty-pack message remains authoritative');}
+  assert.deepEqual(await visible(),['bread'],'Fresh reset intentionally starts with Brown Bread');
+  assert.match(await page.locator('#pack-filter-status').textContent(),/All: 1 of 1 carried item types/);
+  await choose('gear');assert.deepEqual(await visible(),[]);assert.match(await page.locator('#pack-filter-empty').innerText(),/No carried gear/);assert.equal(await page.locator('#pack-filter-empty').isVisible(),true);
+  await choose('materials');assert.deepEqual(await visible(),[]);assert.match(await page.locator('#pack-filter-empty').innerText(),/No carried materials/);assert.equal(await page.locator('#pack-filter-empty').isVisible(),true);
+  await choose('supplies');assert.deepEqual(await visible(),['bread']);assert.equal(await page.locator('#pack-filter-empty').isVisible(),false);
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('wood',1);d.advance(0);});
   await choose('gear');assert.match(await page.locator('#pack-filter-empty').innerText(),/No carried gear/);
-  const empty=await state();await choose('all');assert.deepEqual(await visible(),['wood']);assert.deepEqual(await state(),empty);
+  const empty=await state();await choose('all');assert.deepEqual(await visible(),['bread','wood']);assert.deepEqual(await state(),empty);
   await page.evaluate(ids=>{const d=window.__BRIAR_GLEN_DEBUG__;for(const id of ids)if(id!=='wood')d.give(id,1,2.8);d.advance(0);},groups.all);
   await page.waitForFunction(()=>document.querySelectorAll('#inventory .item-row').length===17);
   const before=await state(),weight=await page.locator('#pack-weight').innerText(),loadout=await page.locator('#loadout-summary').innerText();
@@ -54,7 +57,8 @@ export async function provePackCategories(page,vp){
   assert.deepEqual(await state(),saved,'Pack filters add no gameplay save state');await activate('[data-panel=pack]');
   assert.equal(await page.locator('#inventory').getAttribute('data-pack-view'),'all');assert.deepEqual(await visible(),Object.keys(saved.inventory).sort());
   await choose('gear');await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.advance(0);});
-  assert.deepEqual(await visible(),[]);assert.match(await page.locator('#inventory').innerText(),/Your pack is empty/);assert.equal(await page.locator('#pack-filter-empty').isVisible(),false);
-  await choose('all');
+  assert.deepEqual(await visible(),[]);assert.match(await page.locator('#pack-filter-empty').innerText(),/No carried gear/);assert.equal(await page.locator('#pack-filter-empty').isVisible(),true);
+  await choose('supplies');assert.deepEqual(await visible(),['bread']);assert.equal(await page.locator('#pack-filter-empty').isVisible(),false);
+  await choose('all');assert.deepEqual(await visible(),['bread']);
   console.log(`PASS ${vp.name}: Pack groups for all17 types, empty/live/depleted lists, stable nodes and focus, native filtering/equip/stow/tonic, full weight/loadout and exact saved state`);
 }
