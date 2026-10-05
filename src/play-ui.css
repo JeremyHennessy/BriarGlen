@@ -50,3 +50,6 @@ html,body{height:100%;overflow:hidden}body{padding:max(8px,env(safe-area-inset-t
   .action-deck{grid-area:3 / 1 / 4 / 3}
   .sidebar{grid-area:1 / 2 / 3 / 3}
 }
+
+/* Make categories change visibility only; original actions and readiness remain intact. */
+.craft-filters{display:grid;grid-template-columns:repeat(4,minmax(44px,1fr));gap:4px;margin:8px 0}.craft-filters button{min-height:44px;min-width:44px;padding:5px 2px;font-size:11px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;cursor:pointer}.craft-filters button[aria-pressed=true]{color:var(--accent);border-color:var(--accent)}#craft-list>[hidden]{display:none!important}
