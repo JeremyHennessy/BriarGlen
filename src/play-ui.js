@@ -83,6 +83,32 @@
   }
   loadout.insertAdjacentHTML('beforeend', '<p id="loadout-supplies"></p><p id="carry-state"></p><details class="equipment-care"><summary>Equipment care</summary><p>Select an item below to equip or stow it. Weapons, armor and tools work when equipped. Your Trail Pack, Trail Bedroll and Mireglass Lens work from your pack. Worn means 25% durability or less; gear remains functional until broken.</p><p>Mend (You → Skills) services a nearby resident who needs gear repair first. Otherwise it repairs your equipped weapon, or your tool when no weapon is equipped. A bow needs Ashwood; other tools and weapons need Iron Ore. Patch Jerkin in Make uses a Wolf Hide.</p><p>Comfort is not a hard capacity: you may carry more, but you move slower and use more energy. Your Trail Pack increases comfort according to its quality.</p></details><h3 class="inventory-heading">Carried items <small>Select gear to equip or stow</small></h3>');
   $('#inventory').before(loadout);
+  // Read-only Pack categories: CSS filters existing rows before layout/focus restoration.
+  const inventory = $('#inventory'), packCategories = [['all','All'],['gear','Gear'],['supplies','Supplies'],['materials','Materials']];
+  const packFilters = document.createElement('div'); packFilters.className = 'pack-filters';
+  packFilters.setAttribute('role','group'); packFilters.setAttribute('aria-label','Carried item categories');
+  for (const [id,label] of packCategories) packFilters.insertAdjacentHTML('beforeend', `<button type="button" data-pack-filter="${id}" aria-pressed="${id === 'all'}" aria-controls="inventory">${label}</button>`);
+  const packStatus = document.createElement('span'); packStatus.id = 'pack-filter-status'; packStatus.className = 'sr-only'; packStatus.setAttribute('role','status');
+  const packEmpty = document.createElement('p'); packEmpty.id = 'pack-filter-empty'; packEmpty.className = 'guide-note'; packEmpty.hidden = true;
+  inventory.before(packFilters,packStatus,packEmpty);
+  const updatePackCategoryCount = () => {
+    const id = inventory.dataset.packView, rows = [...inventory.querySelectorAll('.item-row')];
+    const count = rows.filter(row => id === 'all' || row.dataset.packGroup === id).length;
+    const label = packCategories.find(([key]) => key === id)[1], text = `${label}: ${count} of ${rows.length} carried item types`;
+    if (packStatus.textContent !== text) packStatus.textContent = text;
+    packEmpty.hidden = rows.length === 0 || count > 0;
+    if (!packEmpty.hidden) packEmpty.textContent = `No carried ${label.toLowerCase()}. Choose All to see other items.`;
+  };
+  packFilters.addEventListener('click', event => {
+    const button = event.target.closest('[data-pack-filter]'); if (!button || !packFilters.contains(button)) return;
+    inventory.dataset.packView = button.dataset.packFilter;
+    for (const choice of packFilters.querySelectorAll('button')) choice.setAttribute('aria-pressed',String(choice === button));
+    updatePackCategoryCount(); button.focus({preventScroll:true});
+  });
+  inventory.dataset.packView = 'all';
+  // Observe only replaced inventory children; filtering never writes into the item rows.
+  new MutationObserver(updatePackCategoryCount).observe(inventory,{childList:true});
+  updatePackCategoryCount();
   $('#panel-character').append(cards.skills);
   const guide = document.createElement('section'); guide.className = 'card expedition-guide';
   guide.innerHTML = '<div class="card-title"><span>Stonepine expedition</span><small>Optional adventure</small></div><div class="guide-tools" role="group" aria-label="Expedition preparation panels"><button type="button" data-guide-panel="pack">Check gear</button><button type="button" data-guide-panel="craft">Make supplies</button><button type="button" data-guide-panel="character">Skills &amp; recovery</button></div><h3>Field preparation</h3><p id="guide-preparation"></p><h3>Waycache provisions</h3><div class="guide-provisions"><p id="guide-bread-plan"></p><p id="guide-arrows-plan"></p><p id="guide-deposit-help"></p></div><h3>Route checklist</h3><div id="guide-body"></div><details class="guide-sources"><summary>Where to get supplies</summary><p class="guide-note">Gather Ashwood in Greenwood, herbs in South Meadow and Moss Fen, and hides from wolves. Make a bow and arrows, brew medicine, and rest before heading for the ridge. Keep Brown Bread for the cache; check Nearby trades when you need more. Bring extra arrows for bow combat. The world keeps moving while panels are open.</p></details><details id="exploration-leads" hidden><summary>Exploration leads</summary><p class="guide-note">Beyond Stonepine: these are existing places to explore, not new tracked quests. You may have visited them already.</p><p><strong>Old Quarry · Deep Quarry Seam.</strong> Defeating Emberback reopens the seam. Equip a working Iron Pick and bring 14 energy to mine fine Iron Ore; it can be worked once each day.</p><p><strong>Moss Fen · Moonwell Hollow.</strong> Visit after dusk for fine Mooncaps. Its harvest is available once each night.</p><p><strong>Far Moss Fen · Mirecaller.</strong> Defeating this creature leaves a Mireglass Lens in the reeds. Pick it up and carry it to extend Survey from 7 to 11 seconds.</p></details>';
