@@ -9,7 +9,7 @@ export async function proveLiveUiStability(page, vp) {
   const state=()=>page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return{inventory:p.inventory,coins:p.coins,skills:p.skills,expeditions:p.expeditions,equippedWeapon:p.equippedWeapon,equippedTool:p.equippedTool,equippedArmor:p.equippedArmor};});
   const focusIs=async selector=>assert.equal(await page.locator(selector).evaluate(el=>el===document.activeElement),true,`${vp.name}: focus lost from ${selector}`);
   const shot=async name=>{if(process.env.UI_EVIDENCE_DIR){await mkdir(process.env.UI_EVIDENCE_DIR,{recursive:true});await page.screenshot({path:`${process.env.UI_EVIDENCE_DIR}/${vp.name}-stable-${name}.png`});}};
-  await setup();await activate('[data-panel="character"]');
+  await setup();await activate('[data-panel="character"]');await activate('[data-character-section="skills"]');
   const guard=page.locator('[data-skill="guard"]');await page.keyboard.press('Tab');await guard.focus();
   const oldButton=await guard.elementHandle(),before=await state();
   await page.waitForTimeout(650);await focusIs('[data-skill="guard"]');assert.equal(await guard.evaluate(el=>el.matches(':focus-visible')),true,'Keyboard focus must remain visibly indicated');
