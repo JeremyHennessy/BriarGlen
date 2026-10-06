@@ -35,6 +35,82 @@ async function snapshotVisible(page,label){
   };
 }
 
+function compassFromVisible(text=''){
+  return (text.match(/North-east|South-east|South-west|North-west|North|South|East|West/i)||[])[0]?.toLowerCase()||null;
+}
+async function holdVisibleDirection(page,direction,ms){
+  const button=page.locator(`[data-move="${direction}"]`);
+  const box=await button.boundingBox();
+  assert.ok(box,`Visible ${direction} control must be onscreen`);
+  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
+  await page.mouse.down();
+  try{await page.waitForTimeout(ms);}finally{await page.mouse.up();}
+}
+async function followVisibleCompass(page,vp){
+  const trace=[];
+  const keyboard={
+    north:['KeyW'],south:['KeyS'],east:['KeyD'],west:['KeyA'],
+    'north-east':['KeyW','KeyD'],'north-west':['KeyW','KeyA'],
+    'south-east':['KeyS','KeyD'],'south-west':['KeyS','KeyA'],
+  };
+  const touch={
+    north:['up'],south:['down'],east:['right'],west:['left'],
+    'north-east':['up','right'],'north-west':['up','left'],
+    'south-east':['down','right'],'south-west':['down','left'],
+  };
+
+  await activate(page,'[data-panel="nearby"]',vp.touch);
+  await page.waitForFunction(()=>document.querySelector('#objective-text')?.textContent.includes('Visit the Stonepine Trail Ledger'),{timeout:3000});
+
+  let residentWaits=0;
+  for(let step=0;step<90;step++){
+    const state=await snapshotVisible(page,`route-${step}`);
+    trace.push({step,objective:state.objective,direction:state.direction,currentUse:state.currentUse,useReadiness:state.useReadiness,useHelp:state.useHelp});
+
+    if(state.objective?.includes('Chart Stonepine Overlook')){
+      return{success:true,reason:'Objective advanced before explicit final check',steps:trace.length,trace};
+    }
+
+    if(state.currentUse==='Stonepine Trail Ledger'&&state.useReadiness==='Begin'){
+      await page.screenshot({path:`${evidence}/${vp.name}-07-ledger-ready.png`});
+      await activate(page,'#interact-btn',vp.touch);
+      await page.waitForTimeout(260);
+      const after=await snapshotVisible(page,'after-ledger-use');
+      trace.push({step:'use',objective:after.objective,direction:after.direction,currentUse:after.currentUse,useReadiness:after.useReadiness,useHelp:after.useHelp});
+      await page.screenshot({path:`${evidence}/${vp.name}-08-ledger-used.png`});
+      return{success:!!after.objective?.includes('Chart Stonepine Overlook'),reason:after.objective||'No objective text after Use',steps:trace.length,trace};
+    }
+
+    if(state.direction?.includes('Nearby resident has Use priority')){
+      residentWaits++;
+      if(residentWaits<=6){await page.waitForTimeout(500);continue;}
+      return{success:false,reason:'Visible objective reports a resident still has Use priority near the Ledger',steps:trace.length,trace};
+    }
+    residentWaits=0;
+
+    if(state.direction?.includes('Close by')){
+      return{success:false,reason:`Objective lost compass guidance before Ledger became usable: ${state.direction}`,steps:trace.length,trace};
+    }
+
+    const compass=compassFromVisible(state.direction);
+    if(!compass){
+      return{success:false,reason:`No actionable compass direction was visible: ${state.direction||'(blank)'}`,steps:trace.length,trace};
+    }
+
+    if(vp.touch){
+      for(const direction of touch[compass])await holdVisibleDirection(page,direction,120);
+    }else{
+      await page.locator('#game').focus();
+      for(const key of keyboard[compass])await page.keyboard.down(key);
+      try{await page.waitForTimeout(150);}finally{
+        for(const key of [...keyboard[compass]].reverse())await page.keyboard.up(key);
+      }
+    }
+    await page.waitForTimeout(70);
+  }
+  return{success:false,reason:'Visible compass did not reach a usable Ledger within 90 bounded movement steps',steps:trace.length,trace};
+}
+
 try{
   for(const vp of [
     {name:'desktop',width:1280,height:800,touch:false},
@@ -93,8 +169,8 @@ try{
 
     await activate(page,'[data-panel="nearby"]',vp.touch);
     record.afterReading=await snapshotVisible(page,'after-reading');
+    record.firstObjective=await followVisibleCompass(page,vp);
     record.errors=errors;
-    assert.deepEqual(errors,[],`${vp.name}: runtime errors during fresh-player reading audit`);
     results.push(record);
     await context.close();
   }
@@ -103,4 +179,8 @@ try{
 }
 
 await writeFile(`${evidence}/fresh-player-visible.json`,JSON.stringify(results,null,2));
+for(const record of results){
+  assert.deepEqual(record.errors,[],`${record.viewport.name}: runtime errors during fresh-player audit`);
+  assert.equal(record.firstObjective.success,true,`${record.viewport.name}: fresh player could not reach/start the first objective from visible guidance — ${record.firstObjective.reason}`);
+}
 console.log('FRESH_PLAYER_VISIBLE '+JSON.stringify(results));
