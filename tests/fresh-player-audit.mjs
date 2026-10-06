@@ -201,7 +201,7 @@ async function followVisibleOverlook(page,vp){
         return{success:false,reason:'Visible combat cue persisted through 30 bounded Attack/Brace responses',steps:trace.length,trace};
       }
       combatResponses++;
-      const braceAvailable=state.braceReadiness&&!/Braced|Too tired|Need|0 energy/i.test(state.braceReadiness);
+      const braceAvailable=/^10 energy$/i.test(String(state.braceReadiness||'').trim());
       trace.push({step:`combat-${combatResponses}`,threat:state.combatThreat,action:state.combatAction,brace:braceAvailable?'Brace then Attack':'Attack'});
       if(braceAvailable)await activate(page,'#quick-brace',vp.touch);
       await activate(page,'#attack-btn',vp.touch);
