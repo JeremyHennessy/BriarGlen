@@ -87,7 +87,7 @@ export async function proveStonepinePreparationCue(page,vp){
   await page.waitForTimeout(180);
   await activate('[data-panel="pack"]');
   await activate('#inventory [data-equip="blade"]');
-  await page.waitForFunction(()=>document.querySelector('#loadout-weapon')?.dataset.condition==='good');
+  await page.waitForFunction(()=>document.querySelector('#loadout-weapon')?.dataset.condition==='ready');
   await page.waitForFunction(()=>document.querySelector('#objective-preparation')?.hidden===true);
   assert.equal(await page.locator('#loadout-weapon-name').innerText(),'Iron Blade');
   assert.match(await page.locator('#objective-text').innerText(),/Chart Stonepine Overlook/);
