@@ -62,7 +62,7 @@ async function followVisibleCompass(page,vp){
   await activate(page,'[data-panel="nearby"]',vp.touch);
   await page.waitForFunction(()=>document.querySelector('#objective-text')?.textContent.includes('Visit the Stonepine Trail Ledger'),{timeout:3000});
 
-  let residentWaits=0;
+  let residentWaits=0, lastCompass=null, closeByNudges=0;
   for(let step=0;step<90;step++){
     const state=await snapshotVisible(page,`route-${step}`);
     trace.push({step,objective:state.objective,direction:state.direction,currentUse:state.currentUse,useReadiness:state.useReadiness,useHelp:state.useHelp});
@@ -89,13 +89,33 @@ async function followVisibleCompass(page,vp){
     residentWaits=0;
 
     if(state.direction?.includes('Close by')){
-      return{success:false,reason:`Objective lost compass guidance before Ledger became usable: ${state.direction}`,steps:trace.length,trace};
+      if(!lastCompass){
+        return{success:false,reason:`Close-by instruction appeared before any usable compass direction: ${state.direction}`,steps:trace.length,trace};
+      }
+      if(closeByNudges>=8){
+        return{success:false,reason:`Eight tiny native move-closer steps still did not make the Ledger usable: ${state.direction}`,steps:trace.length,trace};
+      }
+      closeByNudges++;
+      trace.push({step:`close-${closeByNudges}`,instruction:state.direction,action:`tiny ${lastCompass} nudge`});
+      if(vp.touch){
+        for(const direction of touch[lastCompass])await holdVisibleDirection(page,direction,35);
+      }else{
+        await page.locator('#game').focus();
+        for(const key of keyboard[lastCompass])await page.keyboard.down(key);
+        try{await page.waitForTimeout(35);}finally{
+          for(const key of [...keyboard[lastCompass]].reverse())await page.keyboard.up(key);
+        }
+      }
+      await page.waitForTimeout(70);
+      continue;
     }
 
     const compass=compassFromVisible(state.direction);
     if(!compass){
       return{success:false,reason:`No actionable compass direction was visible: ${state.direction||'(blank)'}`,steps:trace.length,trace};
     }
+    lastCompass=compass;
+    closeByNudges=0;
 
     if(vp.touch){
       for(const direction of touch[compass])await holdVisibleDirection(page,direction,120);
