@@ -29,6 +29,10 @@ async function snapshotVisible(page,label){
     attackReadiness:await visibleText(page,'#attack-readiness'),
     braceReadiness:await visibleText(page,'#brace-readiness'),
     tonicReadiness:await visibleText(page,'#tonic-readiness'),
+    health:await visibleText(page,'#hp-text'),
+    energy:await visibleText(page,'#energy-text'),
+    combatThreat:await visibleText(page,'#combat-threat'),
+    combatAction:await visibleText(page,'#combat-action'),
     worldNotice:await visibleText(page,'#world-line'),
     nearby:await visibleText(page,'#panel-nearby'),
     visiblePanel:await page.locator('.play-panel:visible').getAttribute('id'),
@@ -131,6 +135,89 @@ async function followVisibleCompass(page,vp){
   return{success:false,reason:'Visible compass did not reach a usable Ledger within 90 bounded movement steps',steps:trace.length,trace};
 }
 
+async function followVisibleOverlook(page,vp){
+  const trace=[];
+  const keyboard={
+    north:['KeyW'],south:['KeyS'],east:['KeyD'],west:['KeyA'],
+    'north-east':['KeyW','KeyD'],'north-west':['KeyW','KeyA'],
+    'south-east':['KeyS','KeyD'],'south-west':['KeyS','KeyA'],
+  };
+  const touch={
+    north:['up'],south:['down'],east:['right'],west:['left'],
+    'north-east':['up','right'],'north-west':['up','left'],
+    'south-east':['down','right'],'south-west':['down','left'],
+  };
+  const move=async(compass,ms)=>{
+    if(vp.touch){
+      for(const direction of touch[compass])await holdVisibleDirection(page,direction,ms);
+    }else{
+      await page.locator('#game').focus();
+      for(const key of keyboard[compass])await page.keyboard.down(key);
+      try{await page.waitForTimeout(ms);}finally{
+        for(const key of [...keyboard[compass]].reverse())await page.keyboard.up(key);
+      }
+    }
+  };
+
+  await activate(page,'[data-panel="nearby"]',vp.touch);
+  await page.waitForFunction(()=>document.querySelector('#objective-text')?.textContent.includes('Chart Stonepine Overlook'),{timeout:3000});
+
+  let residentWaits=0,lastCompass=null,closeByNudges=0;
+  for(let step=0;step<120;step++){
+    const state=await snapshotVisible(page,`overlook-${step}`);
+    trace.push({
+      step,objective:state.objective,direction:state.direction,currentUse:state.currentUse,
+      useReadiness:state.useReadiness,useHelp:state.useHelp,health:state.health,energy:state.energy,
+      combatThreat:state.combatThreat,combatAction:state.combatAction,worldNotice:state.worldNotice
+    });
+
+    if(state.objective?.includes('Secure the Stonepine Waycache')){
+      return{success:true,reason:'Objective advanced before explicit final check',steps:trace.length,trace};
+    }
+
+    if(state.currentUse==='Stonepine Overlook'&&state.useReadiness==='Chart'){
+      await page.screenshot({path:`${evidence}/${vp.name}-09-overlook-ready.png`});
+      await activate(page,'#interact-btn',vp.touch);
+      await page.waitForTimeout(260);
+      const after=await snapshotVisible(page,'after-overlook-use');
+      trace.push({
+        step:'use',objective:after.objective,direction:after.direction,currentUse:after.currentUse,
+        useReadiness:after.useReadiness,useHelp:after.useHelp,health:after.health,energy:after.energy,
+        combatThreat:after.combatThreat,combatAction:after.combatAction,worldNotice:after.worldNotice
+      });
+      await page.screenshot({path:`${evidence}/${vp.name}-10-overlook-charted.png`});
+      return{success:!!after.objective?.includes('Secure the Stonepine Waycache'),reason:after.objective||'No objective text after charting Overlook',steps:trace.length,trace};
+    }
+
+    if(state.direction?.includes('Nearby resident has Use priority')){
+      residentWaits++;
+      if(residentWaits<=6){await page.waitForTimeout(500);continue;}
+      return{success:false,reason:'Visible objective reports a resident still has Use priority near the Overlook',steps:trace.length,trace};
+    }
+    residentWaits=0;
+
+    if(state.direction?.includes('Close by')){
+      if(!lastCompass)return{success:false,reason:`Close-by instruction appeared before any usable compass direction: ${state.direction}`,steps:trace.length,trace};
+      if(closeByNudges>=8)return{success:false,reason:`Eight tiny native move-closer steps still did not make the Overlook chartable: ${state.direction}`,steps:trace.length,trace};
+      closeByNudges++;
+      trace.push({step:`close-${closeByNudges}`,instruction:state.direction,action:`tiny ${lastCompass} nudge`});
+      await move(lastCompass,35);
+      await page.waitForTimeout(70);
+      continue;
+    }
+
+    const compass=compassFromVisible(state.direction);
+    if(!compass){
+      return{success:false,reason:`No actionable Overlook compass direction was visible: ${state.direction||'(blank)'}`,steps:trace.length,trace};
+    }
+    lastCompass=compass;
+    closeByNudges=0;
+    await move(compass,vp.touch?120:150);
+    await page.waitForTimeout(70);
+  }
+  return{success:false,reason:'Visible guidance did not reach a chartable Stonepine Overlook within 120 bounded movement steps',steps:trace.length,trace};
+}
+
 try{
   for(const vp of [
     {name:'desktop',width:1280,height:800,touch:false},
@@ -190,6 +277,7 @@ try{
     await activate(page,'[data-panel="nearby"]',vp.touch);
     record.afterReading=await snapshotVisible(page,'after-reading');
     record.firstObjective=await followVisibleCompass(page,vp);
+    record.secondObjective=record.firstObjective.success?await followVisibleOverlook(page,vp):{success:false,reason:'First objective did not complete',steps:0,trace:[]};
     record.errors=errors;
     results.push(record);
     await context.close();
@@ -202,5 +290,6 @@ await writeFile(`${evidence}/fresh-player-visible.json`,JSON.stringify(results,n
 for(const record of results){
   assert.deepEqual(record.errors,[],`${record.viewport.name}: runtime errors during fresh-player audit`);
   assert.equal(record.firstObjective.success,true,`${record.viewport.name}: fresh player could not reach/start the first objective from visible guidance — ${record.firstObjective.reason}`);
+  assert.equal(record.secondObjective.success,true,`${record.viewport.name}: fresh player could not chart Stonepine Overlook from visible guidance — ${record.secondObjective.reason}`);
 }
 console.log('FRESH_PLAYER_VISIBLE '+JSON.stringify(results));
