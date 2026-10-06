@@ -110,6 +110,34 @@
   new MutationObserver(updatePackCategoryCount).observe(inventory,{childList:true});
   updatePackCategoryCount();
   $('#panel-character').append(cards.skills);
+  cards.character.id = 'character-status'; cards.skills.id = 'character-skills';
+  const characterSections = document.createElement('div'); characterSections.className = 'character-sections';
+  characterSections.setAttribute('role', 'tablist'); characterSections.setAttribute('aria-label', 'Character sections');
+  characterSections.innerHTML = '<button type="button" role="tab" data-character-section="status" aria-controls="character-status" aria-selected="true" tabindex="0">Status</button><button type="button" role="tab" data-character-section="skills" aria-controls="character-skills" aria-selected="false" tabindex="-1">Skills</button>';
+  const setCharacterSection = (id, focus = false) => {
+    if (!['status','skills'].includes(id)) return;
+    cards.character.hidden = id !== 'status'; cards.skills.hidden = id !== 'skills';
+    for (const button of characterSections.querySelectorAll('[data-character-section]')) {
+      const selected = button.dataset.characterSection === id;
+      button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1;
+      if (selected && focus) button.focus({preventScroll:true});
+    }
+  };
+  characterSections.addEventListener('click', event => {
+    const button = event.target.closest('[data-character-section]'); if (button) setCharacterSection(button.dataset.characterSection);
+  });
+  characterSections.addEventListener('keydown', event => {
+    const current = event.target.closest('[data-character-section]'); if (!current) return;
+    const ids = ['status','skills'], index = ids.indexOf(current.dataset.characterSection);
+    let next;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (index + 1) % ids.length;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (index + ids.length - 1) % ids.length;
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = ids.length - 1;
+    if (next !== undefined) { event.preventDefault(); event.stopPropagation(); setCharacterSection(ids[next], true); }
+  });
+  $('#panel-character').prepend(characterSections);
+  setCharacterSection('status');
   const guide = document.createElement('section'); guide.id = 'journal-plan'; guide.className = 'card expedition-guide';
   guide.innerHTML = '<div class="card-title"><span>Stonepine expedition</span><small>Optional adventure</small></div><div class="guide-tools" role="group" aria-label="Expedition preparation panels"><button type="button" data-guide-panel="pack">Check gear</button><button type="button" data-guide-panel="craft">Make supplies</button><button type="button" data-guide-panel="character">Skills &amp; recovery</button></div><h3>Field preparation</h3><p id="guide-preparation"></p><h3>Waycache provisions</h3><div class="guide-provisions"><p id="guide-bread-plan"></p><p id="guide-arrows-plan"></p><p id="guide-deposit-help"></p></div><h3>Route checklist</h3><div id="guide-body"></div><details class="guide-sources"><summary>Where to get supplies</summary><p class="guide-note">Gather Ashwood in Greenwood, herbs in South Meadow and Moss Fen, and hides from wolves. Make a bow and arrows, brew medicine, and rest before heading for the ridge. Keep Brown Bread for the cache; check Nearby trades when you need more. Bring extra arrows for bow combat. The world keeps moving while panels are open.</p></details><details id="exploration-leads" hidden><summary>Exploration leads</summary><p class="guide-note">Beyond Stonepine: these are existing places to explore, not new tracked quests. You may have visited them already.</p><p><strong>Old Quarry · Deep Quarry Seam.</strong> Defeating Emberback reopens the seam. Equip a working Iron Pick and bring 14 energy to mine fine Iron Ore; it can be worked once each day.</p><p><strong>Moss Fen · Moonwell Hollow.</strong> Visit after dusk for fine Mooncaps. Its harvest is available once each night.</p><p><strong>Far Moss Fen · Mirecaller.</strong> Defeating this creature leaves a Mireglass Lens in the reeds. Pick it up and carry it to extend Survey from 7 to 11 seconds.</p></details>';
   cards.log.id = 'journal-log';
@@ -200,14 +228,18 @@
   });
   document.addEventListener('keydown', event => {
     if (event.ctrlKey || event.metaKey || event.altKey || event.target.closest('input,textarea,select,[contenteditable="true"]')) return;
-    const id = {KeyI:'pack', KeyC:'craft', KeyJ:'journal', KeyK:'character', Escape:'nearby'}[event.code];
+    if (event.code === 'KeyK') { event.preventDefault(); setCharacterSection('skills'); setPanel('character'); canvas.focus({preventScroll:true}); return; }
+    const id = {KeyI:'pack', KeyC:'craft', KeyJ:'journal', Escape:'nearby'}[event.code];
     if (id) { event.preventDefault(); setPanel(id); canvas.focus({preventScroll:true}); }
     if (event.code === 'KeyE') setPanel('nearby');
   });
   // Navigation only: these shortcuts never craft, equip, travel or spend a resource.
   guide.addEventListener('click', event => {
     const button = event.target.closest('[data-guide-panel]');
-    if (button && guide.contains(button)) setPanel(button.dataset.guidePanel, true);
+    if (button && guide.contains(button)) {
+      if (button.dataset.guidePanel === 'character') setCharacterSection('skills');
+      setPanel(button.dataset.guidePanel, true);
+    }
   });
   $('#objective-open').addEventListener('click', () => { setJournalSection('plan'); setPanel('journal', true); });
   $('#interact-btn').addEventListener('click', () => setPanel('nearby'));
