@@ -8,9 +8,10 @@ export async function proveSkillReadiness(page,vp){
   await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');
   assert.equal(await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.guarded),false);
   const activate=async s=>vp.touch?page.locator(s).tap():page.locator(s).click();
+  const openSkills=async()=>{await activate('[data-panel="character"]');await activate('[data-character-section="skills"]');};
   const refresh=()=>page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.advance(0));
   const state=()=>page.evaluate(()=>{const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return {inventory:p.inventory,coins:p.coins,skills:p.skills,expeditions:p.expeditions,equippedWeapon:p.equippedWeapon,equippedTool:p.equippedTool,equippedArmor:p.equippedArmor};});
-  const setup=async()=>{await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){d.npc(n.id).x=30;d.npc(n.id).y=30;}d.setPosition(900,600);d.setEnergy(0);d.advance(0);});await activate('[data-panel="character"]');};
+  const setup=async()=>{await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();for(const n of d.snapshot().npcs){d.npc(n.id).x=30;d.npc(n.id).y=30;}d.setPosition(900,600);d.setEnergy(0);d.advance(0);});await openSkills();};
   const note=id=>page.locator(`#skill-${id}-readiness`);
   const shot=async name=>{if(process.env.UI_EVIDENCE_DIR){await mkdir(process.env.UI_EVIDENCE_DIR,{recursive:true});await page.screenshot({path:`${process.env.UI_EVIDENCE_DIR}/${vp.name}-skills-${name}.png`});}};
   const hint=async(id,status,text)=>{assert.equal(await note(id).getAttribute('data-state'),status);assert.match(await note(id).innerText(),text);assert.equal(await page.locator(`[data-skill="${id}"]`).isEnabled(),true,'Explain gates without suppressing original action/message');};
@@ -36,7 +37,7 @@ export async function proveSkillReadiness(page,vp){
 
   // The existing Mend action chooses a nearby damaged resident BEFORE the equipped weapon/tool.
   await setup();await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;for(const id of ['bow','pick','jerkin'])d.give(id,1,2.8);d.setDurability('bow',40);d.setDurability('pick',40);d.give('wood',1);d.advance(0);});
-  await activate('[data-panel="pack"]');await activate('[data-equip="bow"]');await activate('[data-equip="pick"]');await activate('[data-equip="jerkin"]');await activate('[data-panel="character"]');await refresh();
+  await activate('[data-panel="pack"]');await activate('[data-equip="bow"]');await activate('[data-equip="pick"]');await activate('[data-equip="jerkin"]');await openSkills();await refresh();
   await hint('smithing','ready',/1 Ashwood.*Briar Bow/);
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('alden');n.x=1000;n.y=600;n.stock={pick:1};n.stockMeta={pick:{quality:1,durability:20,maxDurability:80,provenance:{maker:'Fixture',history:[]}}};d.advance(0);});
   await hint('smithing','blocked',/Need 1 Iron Ore.*Alden.*Iron Pick.*first/);
@@ -52,7 +53,7 @@ export async function proveSkillReadiness(page,vp){
   // A full weapon is still a valid action under the original rules; warn rather than inventing a new prohibition.
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('wood',1);d.setDurability('bow',100);d.advance(0);});await hint('smithing','caution',/Full durability.*still costs 1 Ashwood/);await note('smithing').scrollIntoViewIfNeeded();await shot('full-gear-warning');
   await activate('[data-skill="smithing"]');assert.equal((await state()).inventory.wood,undefined,'Full-gear warning must not silently alter the original cost');
-  await activate('[data-panel="pack"]');await activate('[data-equip="bow"]');await activate('[data-panel="character"]');await refresh();await hint('smithing','blocked',/Need 1 Iron Ore.*Iron Pick/);
+  await activate('[data-panel="pack"]');await activate('[data-equip="bow"]');await openSkills();await refresh();await hint('smithing','blocked',/Need 1 Iron Ore.*Iron Pick/);
 
   // Connect has its own strict 110-unit radius and no energy charge; no broker outcome is promised.
   const connectBoundary=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,n=d.npc('mira');n.x=1010;n.y=600;d.setEnergy(0);d.advance(0);const outside=document.querySelector('#skill-rapport-readiness').dataset.state;n.x=1009.9;d.advance(0);return[outside,document.querySelector('#skill-rapport-readiness').dataset.state];});assert.deepEqual(connectBoundary,['blocked','ready']);
@@ -63,7 +64,7 @@ export async function proveSkillReadiness(page,vp){
   const unchanged=await state();for(const panel of ['craft','pack','nearby','journal','character']){await activate(`[data-panel="${panel}"]`);assert.equal(await page.locator('.play-panel:visible').count(),1);}assert.deepEqual(await state(),unchanged);
   const geometry=await page.locator('#panel-character').evaluate(el=>({w:el.clientWidth,sw:el.scrollWidth}));assert.ok(geometry.sw<=geometry.w+1,`${vp.name}: skill text overflow`);
   for(const id of ['fieldcraft','smithing','guard','rapport']){await page.locator(`[data-skill="${id}"]`).scrollIntoViewIfNeeded();const r=await page.locator(`[data-skill="${id}"]`).boundingBox();assert.ok(r.width>=44&&r.height>=44,'Skill touch targets remain usable');}
-  await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());const saved=await state();await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');assert.deepEqual(await state(),saved);await activate('[data-panel="character"]');await refresh();
+  await page.evaluate(()=>window.__BRIAR_GLEN_DEBUG__.save());const saved=await state();await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready');assert.deepEqual(await state(),saved);await openSkills();await refresh();
   assert.equal(await note('fieldcraft').count(),1);assert.equal(await page.locator('[data-skill="guard"]').getAttribute('aria-label'),'Brace (3)');
   console.log(`PASS ${vp.name}: skill costs/gates, resident-first Mend, original action outcomes, strict range, native held input, persistent focus, long text, panels and save`);
 }
