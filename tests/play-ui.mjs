@@ -1,5 +1,6 @@
 import { provePackCategories } from './pack-categories.mjs';
 import { proveJournalSections } from './journal-sections.mjs';
+import { proveCharacterSections } from './character-sections.mjs';
 import { proveCraftCategories } from './craft-categories.mjs';
 import { proveNarrowActions } from './narrow-actions.mjs';
 import { provePanelReading } from './panel-reading.mjs';
@@ -20,7 +21,7 @@ export async function provePlayUi(page, vp) {
   await page.evaluate(() => { const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.clearEnemies();d.setPosition(900,600);d.advance(0); });
   await activate('[data-panel="nearby"]');
   const original = await page.evaluate(() => {const p=window.__BRIAR_GLEN_DEBUG__.snapshot().player;return {inventory:p.inventory,coins:p.coins,deeds:p.deeds,expeditions:p.expeditions};});
-  for (const [id, content] of [['pack','#inventory'], ['craft','[data-craft="arrows"]'], ['journal','#guide-body'], ['character','#skills'], ['nearby','#nearby']]) {
+  for (const [id, content] of [['pack','#inventory'], ['craft','[data-craft="arrows"]'], ['journal','#guide-body'], ['character','#character-status'], ['nearby','#nearby']]) {
     await activate(`[data-panel="${id}"]`);
     assert.equal(await page.locator(`#panel-${id}`).isVisible(),true,`${vp.name}: ${id} did not open`);
     assert.equal(await page.locator(content).isVisible(),true,`${vp.name}: ${id} contents unreachable`);
@@ -130,6 +131,7 @@ export async function provePlayUi(page, vp) {
   await proveCraftCategories(page, vp);
   await provePackCategories(page, vp);
   await proveJournalSections(page, vp);
+  await proveCharacterSections(page, vp);
   console.log(`PASS ${vp.name}: play UI panels, HUD, recipe requirements, shortcuts, action isolation, journal, resize, saved progress`);
 }
 
