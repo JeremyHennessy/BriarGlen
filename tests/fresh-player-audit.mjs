@@ -33,6 +33,7 @@ async function snapshotVisible(page,label){
     energy:await visibleText(page,'#energy-text'),
     combatThreat:await visibleText(page,'#combat-threat'),
     combatAction:await visibleText(page,'#combat-action'),
+    toast:await visibleText(page,'#toast'),
     worldNotice:await visibleText(page,'#world-line'),
     nearby:await visibleText(page,'#panel-nearby'),
     visiblePanel:await page.locator('.play-panel:visible').getAttribute('id'),
@@ -83,6 +84,19 @@ async function followVisibleCompass(page,vp){
       trace.push({step:'use',objective:after.objective,direction:after.direction,currentUse:after.currentUse,useReadiness:after.useReadiness,useHelp:after.useHelp});
       await page.screenshot({path:`${evidence}/${vp.name}-08-ledger-used.png`});
       return{success:!!after.objective?.includes('Chart Stonepine Overlook'),reason:after.objective||'No objective text after Use',steps:trace.length,trace};
+    }
+
+    if(state.combatThreat&&state.combatAction?.includes('Attack')&&/Close threat|Hit/.test(state.combatThreat)){
+      if(combatResponses>=30){
+        return{success:false,reason:'Visible combat cue persisted through 30 bounded Attack/Brace responses',steps:trace.length,trace};
+      }
+      combatResponses++;
+      const braceAvailable=state.braceReadiness&&!/Braced|Too tired|Need|0 energy/i.test(state.braceReadiness);
+      trace.push({step:`combat-${combatResponses}`,threat:state.combatThreat,action:state.combatAction,brace:braceAvailable?'Brace then Attack':'Attack'});
+      if(braceAvailable)await activate(page,'#quick-brace',vp.touch);
+      await activate(page,'#attack-btn',vp.touch);
+      await page.waitForTimeout(560);
+      continue;
     }
 
     if(state.direction?.includes('Nearby resident has Use priority')){
@@ -162,14 +176,20 @@ async function followVisibleOverlook(page,vp){
   await activate(page,'[data-panel="nearby"]',vp.touch);
   await page.waitForFunction(()=>document.querySelector('#objective-text')?.textContent.includes('Chart Stonepine Overlook'),{timeout:3000});
 
-  let residentWaits=0,lastCompass=null,closeByNudges=0;
-  for(let step=0;step<120;step++){
+  let residentWaits=0,lastCompass=null,closeByNudges=0,combatResponses=0,previousHp=null;
+  for(let step=0;step<180;step++){
     const state=await snapshotVisible(page,`overlook-${step}`);
+    const hp=Number.parseFloat(String(state.health||'').split('/')[0]);
     trace.push({
       step,objective:state.objective,direction:state.direction,currentUse:state.currentUse,
       useReadiness:state.useReadiness,useHelp:state.useHelp,health:state.health,energy:state.energy,
-      combatThreat:state.combatThreat,combatAction:state.combatAction,worldNotice:state.worldNotice
+      attackReadiness:state.attackReadiness,braceReadiness:state.braceReadiness,
+      combatThreat:state.combatThreat,combatAction:state.combatAction,toast:state.toast,worldNotice:state.worldNotice
     });
+    if(Number.isFinite(previousHp)&&previousHp<=20&&Number.isFinite(hp)&&hp>=90){
+      return{success:false,reason:`Player was defeated while following visible Overlook guidance; latest cue: ${state.combatAction||state.combatThreat||state.toast||'none'}`,steps:trace.length,trace};
+    }
+    if(Number.isFinite(hp))previousHp=hp;
 
     if(state.objective?.includes('Secure the Stonepine Waycache')){
       return{success:true,reason:'Objective advanced before explicit final check',steps:trace.length,trace};
@@ -215,7 +235,7 @@ async function followVisibleOverlook(page,vp){
     await move(compass,vp.touch?120:150);
     await page.waitForTimeout(70);
   }
-  return{success:false,reason:'Visible guidance did not reach a chartable Stonepine Overlook within 120 bounded movement steps',steps:trace.length,trace};
+  return{success:false,reason:'Visible guidance plus bounded native combat response did not reach a chartable Stonepine Overlook within 180 steps',steps:trace.length,trace};
 }
 
 try{
