@@ -1,4 +1,5 @@
 import { provePackCategories } from './pack-categories.mjs';
+import { proveJournalSections } from './journal-sections.mjs';
 import { proveCraftCategories } from './craft-categories.mjs';
 import { proveNarrowActions } from './narrow-actions.mjs';
 import { provePanelReading } from './panel-reading.mjs';
@@ -128,6 +129,7 @@ export async function provePlayUi(page, vp) {
   await proveNarrowActions(page, vp);
   await proveCraftCategories(page, vp);
   await provePackCategories(page, vp);
+  await proveJournalSections(page, vp);
   console.log(`PASS ${vp.name}: play UI panels, HUD, recipe requirements, shortcuts, action isolation, journal, resize, saved progress`);
 }
 
