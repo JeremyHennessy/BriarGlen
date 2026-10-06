@@ -86,19 +86,6 @@ async function followVisibleCompass(page,vp){
       return{success:!!after.objective?.includes('Chart Stonepine Overlook'),reason:after.objective||'No objective text after Use',steps:trace.length,trace};
     }
 
-    if(state.combatThreat&&state.combatAction?.includes('Attack')&&/Close threat|Hit/.test(state.combatThreat)){
-      if(combatResponses>=30){
-        return{success:false,reason:'Visible combat cue persisted through 30 bounded Attack/Brace responses',steps:trace.length,trace};
-      }
-      combatResponses++;
-      const braceAvailable=state.braceReadiness&&!/Braced|Too tired|Need|0 energy/i.test(state.braceReadiness);
-      trace.push({step:`combat-${combatResponses}`,threat:state.combatThreat,action:state.combatAction,brace:braceAvailable?'Brace then Attack':'Attack'});
-      if(braceAvailable)await activate(page,'#quick-brace',vp.touch);
-      await activate(page,'#attack-btn',vp.touch);
-      await page.waitForTimeout(560);
-      continue;
-    }
-
     if(state.direction?.includes('Nearby resident has Use priority')){
       residentWaits++;
       if(residentWaits<=6){await page.waitForTimeout(500);continue;}
@@ -207,6 +194,19 @@ async function followVisibleOverlook(page,vp){
       });
       await page.screenshot({path:`${evidence}/${vp.name}-10-overlook-charted.png`});
       return{success:!!after.objective?.includes('Secure the Stonepine Waycache'),reason:after.objective||'No objective text after charting Overlook',steps:trace.length,trace};
+    }
+
+    if(state.combatThreat&&state.combatAction?.includes('Attack')&&/Close threat|Hit/.test(state.combatThreat)){
+      if(combatResponses>=30){
+        return{success:false,reason:'Visible combat cue persisted through 30 bounded Attack/Brace responses',steps:trace.length,trace};
+      }
+      combatResponses++;
+      const braceAvailable=state.braceReadiness&&!/Braced|Too tired|Need|0 energy/i.test(state.braceReadiness);
+      trace.push({step:`combat-${combatResponses}`,threat:state.combatThreat,action:state.combatAction,brace:braceAvailable?'Brace then Attack':'Attack'});
+      if(braceAvailable)await activate(page,'#quick-brace',vp.touch);
+      await activate(page,'#attack-btn',vp.touch);
+      await page.waitForTimeout(560);
+      continue;
     }
 
     if(state.direction?.includes('Nearby resident has Use priority')){
