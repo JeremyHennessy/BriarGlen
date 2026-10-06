@@ -28,19 +28,70 @@ jobs:
           sleep 2
       - name: Browser proof
         run: node tests/smoke.mjs http://127.0.0.1:4173/
-      - name: Request GitHub Pages rebuild
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Request successor GitHub Pages rebuild
+        if: github.event_name == 'pull_request' && github.head_ref == 'custodian/verify-journal-release-20261006'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          before="$(curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GH_REPO/pages/builds/latest" || true)"
+          printf '%s' "$before" > /tmp/pages-before.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          raw=Path('/tmp/pages-before.json').read_text()
+          try: data=json.loads(raw) if raw else {}
+          except Exception: data={}
+          Path('/tmp/pages-before-url').write_text(str(data.get('url') or ''))
+          print("Previous Pages build:", data.get('url'), data.get('status'), data.get('commit'), data.get('created_at'))
+          PY
           curl -sS -f -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/$GH_REPO/pages/builds"
+
+      - name: Wait for successor Pages success
+        if: github.event_name == 'pull_request' && github.head_ref == 'custodian/verify-journal-release-20261006'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EXPECTED_MAIN_SHA: 2995d834d6875667f3ac1a44760732729ba4d38c
+        run: |
+          before_url="$(cat /tmp/pages-before-url)"
+          for attempt in $(seq 1 30); do
+            curl -fsSL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GH_REPO/pages/builds/latest" -o /tmp/pages-latest.json
+            read -r url status commit created_at < <(python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/pages-latest.json'))
+          print(d.get('url') or '-', d.get('status') or '-', d.get('commit') or '-', d.get('created_at') or '-')
+          PY
+            )
+            echo "Pages attempt $attempt: url=$url status=$status commit=$commit created_at=$created_at"
+            if [ "$url" != "$before_url" ] && [ "$status" = "built" ] && [ "$commit" = "$EXPECTED_MAIN_SHA" ]; then
+              echo "Successor Pages build completed for exact merged main $EXPECTED_MAIN_SHA."
+              exit 0
+            fi
+            if [ "$url" != "$before_url" ] && [ "$status" = "errored" ]; then
+              echo "Successor Pages build errored."
+              cat /tmp/pages-latest.json
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "Did not observe a distinct successful successor Pages build for $EXPECTED_MAIN_SHA."
+          cat /tmp/pages-latest.json
+          exit 1
       - name: Wait for exact Pages frontend bytes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'pull_request' && github.head_ref == 'custodian/verify-journal-release-20261006'
         run: |
           for attempt in $(seq 1 18); do
             matched=true
@@ -64,5 +115,5 @@ jobs:
           echo "Pages did not converge to all expected frontend blobs."
           exit 1
       - name: Hosted proof
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'pull_request' && github.head_ref == 'custodian/verify-journal-release-20261006'
         run: node tests/smoke.mjs "https://jeremyhennessy.github.io/BriarGlen/?sha=${{ github.sha }}"
