@@ -61,6 +61,11 @@ export async function proveExpeditionGuide(page,vp){
   await visit('stonepine-waycache');for(let i=0;i<6;i++)await activate('[data-cache-take="arrows"]');await refresh();await activate('#objective-open');
   assert.match(await page.locator('#guide-arrows-plan').innerText(),/Stored 0\/6 · Route recorded/);
   assert.equal(await page.locator('#guide-arrows-plan').getAttribute('data-state'),'complete');
+  assert.equal(await page.locator('#objective-text').innerText(),'Craft your earned Trail Pack');
+  await activate('[data-guide-panel="craft"]');
+  assert.equal(await page.locator('[data-craft-filter="gear"]').getAttribute('aria-pressed'),'true');
+  assert.equal(await page.locator('#craft-list .recipe-row:visible').first().locator('[data-craft]').getAttribute('data-craft'),'trailpack','Earned Trail Pack should lead Gear after Stonepine');
+  await activate('#objective-open');
   const leads=page.locator('#exploration-leads'),leadSummary=leads.locator('summary');
   assert.equal(await leads.isVisible(),true);assert.equal(await leads.getAttribute('open'),null,'New leads are collapsed by default');
   const beforeLeads=await state();await activate('#exploration-leads summary');
@@ -68,6 +73,9 @@ export async function proveExpeditionGuide(page,vp){
   assert.match(await leads.innerText(),/Emberback.*working Iron Pick.*14 energy/s);
   assert.match(await leads.innerText(),/Moonwell Hollow.*after dusk.*once each night/s);
   assert.match(await leads.innerText(),/Mireglass Lens.*7 to 11 seconds/s);
+  assert.match(await page.locator('#lead-quarry-state').innerText(),/Emberback/);
+  assert.match(await page.locator('#lead-moonwell-state').innerText(),/Uncharted/);
+  assert.match(await page.locator('#lead-mirecaller-state').innerText(),/Unresolved/);
   assert.deepEqual(await state(),beforeLeads,'Reading leads never grants discoveries, items or progress');
   await leadSummary.focus();await page.keyboard.press('Enter');assert.equal(await leads.getAttribute('open'),null);
   // Finish the native close render before the next held key; immediate mixed-touch input can lose Chromium activation.
@@ -82,6 +90,9 @@ export async function proveExpeditionGuide(page,vp){
   await page.waitForFunction(()=>document.querySelector('#guide-arrows-plan')?.dataset.state==='complete');
   assert.equal(await page.locator('#exploration-leads').isVisible(),true);assert.equal(await page.locator('#exploration-leads').getAttribute('open'),null,'Reload derives availability without persisting disclosure state');
   assert.equal(await page.locator('#guide-arrows-plan').getAttribute('data-state'),'complete');
+  await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('trailpack',1,2.8);d.advance(0);});
+  assert.equal(await page.locator('#objective-text').innerText(),'Choose a wider-field lead');
+  assert.match(await page.locator('#objective-direction').innerText(),/Quarry.*Moonwell.*Mirecaller/);
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.clearEnemies();d.setPosition(900,600);d.give('arrows',1000000);d.advance(0);});
   await activate('.guide-sources summary');assert.match(await page.locator('.guide-sources').innerText(),/Brown Bread/);
   const geometry=await page.locator('#panel-journal').evaluate(el=>({w:el.clientWidth,sw:el.scrollWidth,pageW:document.documentElement.scrollWidth,vw:innerWidth}));
