@@ -89,7 +89,7 @@ export async function proveStonepinePreparationCue(page,vp){
   await activate('#inventory [data-equip="blade"]');
   await page.waitForFunction(()=>document.querySelector('#loadout-weapon')?.dataset.condition==='ready');
   await page.waitForFunction(()=>document.querySelector('#objective-preparation')?.hidden===true);
-  assert.equal(await page.locator('#loadout-weapon-name').innerText(),'Iron Blade');
+  assert.equal(await page.locator('#loadout-weapon-name').innerText(),'Warden Blade');
   assert.match(await page.locator('#objective-text').innerText(),/Chart Stonepine Overlook/);
   assert.match(await page.locator('#objective-direction').innerText(),/Stonepine Ridge/);
 
