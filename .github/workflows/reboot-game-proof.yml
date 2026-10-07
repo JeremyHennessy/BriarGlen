@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: '24'
       - name: Syntax check
-        run: node --check src/game.js && node --check src/play-ui.js && node --check tests/smoke.mjs && node --check tests/play-ui.mjs
+        run: node --check src/game.js && node --check src/play-ui.js && node --check tests/smoke.mjs && node --check tests/play-ui.mjs && node --check tests/fresh-preparation-audit.mjs
       - name: Install browser
         run: |
           npm install --no-save playwright@1.55.0
@@ -28,6 +28,17 @@ jobs:
           sleep 2
       - name: Browser proof
         run: node tests/smoke.mjs http://127.0.0.1:4173/
+      - name: Fresh Stonepine preparation audit
+        env:
+          UI_EVIDENCE_DIR: fresh-preparation-evidence
+        run: node tests/fresh-preparation-audit.mjs http://127.0.0.1:4173/
+      - name: Upload preparation audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fresh-preparation-audit-${{ github.sha }}
+          path: fresh-preparation-evidence
+          if-no-files-found: error
       - name: Request GitHub Pages rebuild
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
