@@ -1,6 +1,7 @@
 import { provePackCategories } from './pack-categories.mjs';
 import { proveJournalSections } from './journal-sections.mjs';
 import { proveCharacterSections } from './character-sections.mjs';
+import { proveStonepinePreparationCue } from './stonepine-preparation-cue.mjs';
 import { proveCraftCategories } from './craft-categories.mjs';
 import { proveNarrowActions } from './narrow-actions.mjs';
 import { provePanelReading } from './panel-reading.mjs';
@@ -132,6 +133,7 @@ export async function provePlayUi(page, vp) {
   await provePackCategories(page, vp);
   await proveJournalSections(page, vp);
   await proveCharacterSections(page, vp);
+  await proveStonepinePreparationCue(page, vp);
   console.log(`PASS ${vp.name}: play UI panels, HUD, recipe requirements, shortcuts, action isolation, journal, resize, saved progress`);
 }
 

@@ -9,7 +9,7 @@
   shell.insertBefore(stage, shell.firstChild);
   const objective = document.createElement('div');
   objective.className = 'objective-strip';
-  objective.innerHTML = '<div><small>YOUR NEXT STEP</small><strong id="objective-text">Explore Briar Glen</strong><span id="objective-direction"></span></div><button id="objective-open" type="button" title="Open expedition journal (J)">Journal <kbd>J</kbd></button>';
+  objective.innerHTML = '<div><small>YOUR NEXT STEP</small><strong id="objective-text">Explore Briar Glen</strong><span id="objective-direction"></span><span id="objective-preparation" class="objective-preparation" hidden></span></div><button id="objective-open" type="button" title="Open expedition journal (J)">Journal <kbd>J</kbd></button>';
   stage.append(objective, $('.canvas-wrap'));
   $('.canvas-wrap').insertAdjacentHTML('beforeend', '<div id="combat-cue" class="combat-cue" hidden role="status"><strong id="combat-threat"></strong><span id="combat-action"></span></div>');
   const controls = $('.mobile-controls');
@@ -83,6 +83,24 @@
   }
   loadout.insertAdjacentHTML('beforeend', '<p id="loadout-supplies"></p><p id="carry-state"></p><details class="equipment-care"><summary>Equipment care</summary><p>Select an item below to equip or stow it. Weapons, armor and tools work when equipped. Your Trail Pack, Trail Bedroll and Mireglass Lens work from your pack. Worn means 25% durability or less; gear remains functional until broken.</p><p>Mend (You → Skills) services a nearby resident who needs gear repair first. Otherwise it repairs your equipped weapon, or your tool when no weapon is equipped. A bow needs Ashwood; other tools and weapons need Iron Ore. Patch Jerkin in Make uses a Wolf Hide.</p><p>Comfort is not a hard capacity: you may carry more, but you move slower and use more energy. Your Trail Pack increases comfort according to its quality.</p></details><h3 class="inventory-heading">Carried items <small>Select gear to equip or stow</small></h3>');
   $('#inventory').before(loadout);
+  // Keep the persistent route honest about the preparation state already shown in Journal.
+  // Presentation only: derive from rendered objective/loadout state; never gate travel or mutate game data.
+  const objectivePreparation = $('#objective-preparation');
+  const syncObjectivePreparation = () => {
+    const next = $('#objective-text')?.textContent.trim() || '';
+    const stonepineActive = next === 'Chart Stonepine Overlook'
+      || next === 'Secure the Stonepine Waycache'
+      || next.startsWith('Store ')
+      || next === 'Return to the Trail Ledger in Briar Glen';
+    const condition = $('#loadout-weapon')?.dataset.condition || 'empty';
+    const needsWeapon = stonepineActive && (condition === 'empty' || condition === 'broken');
+    objectivePreparation.hidden = !needsWeapon;
+    objectivePreparation.textContent = needsWeapon ? 'Prepare first · equip or make a working weapon' : '';
+  };
+  const preparationObserver = new MutationObserver(syncObjectivePreparation);
+  preparationObserver.observe($('#objective-text'), {childList:true,subtree:true,characterData:true});
+  preparationObserver.observe($('#loadout-weapon'), {attributes:true,attributeFilter:['data-condition']});
+  syncObjectivePreparation();
   // Read-only Pack categories: CSS filters existing rows before layout/focus restoration.
   const inventory = $('#inventory'), packCategories = [['all','All'],['gear','Gear'],['supplies','Supplies'],['materials','Materials']];
   const packFilters = document.createElement('div'); packFilters.className = 'pack-filters';
