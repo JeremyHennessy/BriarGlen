@@ -15,6 +15,43 @@ async function activate(page,selector,touch){
   const node=page.locator(selector).first();
   if(touch)await node.tap();else await node.click();
 }
+function fullyInside(inner,outer,slop=1){
+  return !!inner&&!!outer&&inner.top>=outer.top-slop&&inner.bottom<=outer.bottom+slop&&inner.left>=outer.left-slop&&inner.right<=outer.right+slop;
+}
+async function scrollPanelToVisible(page,panelSelector,targetSelector,touch,label){
+  const panel=page.locator(panelSelector).first();
+  const target=page.locator(targetSelector).first();
+  assert.equal(await panel.isVisible(),true,`${label}: scroll panel must be visible`);
+  assert.equal(await target.isVisible(),true,`${label}: target must be rendered before scrolling`);
+  for(let attempt=0;attempt<14;attempt++){
+    const [panelBox,targetBox]=await Promise.all([panel.boundingBox(),target.boundingBox()]);
+    assert.ok(panelBox,`${label}: panel must have an onscreen box`);
+    assert.ok(targetBox,`${label}: target must have a rendered box`);
+    if(fullyInside(targetBox,panelBox))return{panelBox,targetBox,attempts:attempt};
+    const down=targetBox.bottom>panelBox.bottom;
+    if(touch){
+      const client=await page.context().newCDPSession(page);
+      const x=Math.round(panelBox.x+panelBox.width/2);
+      const low=Math.round(panelBox.y+panelBox.height*0.72);
+      const high=Math.round(panelBox.y+panelBox.height*0.28);
+      const startY=down?low:high,endY=down?high:low;
+      await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y:startY}]});
+      for(let step=1;step<=5;step++){
+        const y=Math.round(startY+(endY-startY)*(step/5));
+        await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y}]});
+      }
+      await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+      await client.detach();
+    }else{
+      await page.mouse.move(panelBox.x+panelBox.width/2,panelBox.y+panelBox.height/2);
+      await page.mouse.wheel(0,down?180:-180);
+    }
+    await page.waitForTimeout(90);
+  }
+  const [panelBox,targetBox]=await Promise.all([panel.boundingBox(),target.boundingBox()]);
+  assert.ok(fullyInside(targetBox,panelBox),`${label}: ordinary ${touch?'touch':'wheel'} scrolling must bring target fully inside the visible panel`);
+  return{panelBox,targetBox,attempts:14};
+}
 function compassFromVisible(text=''){
   return (text.match(/North-east|South-east|South-west|North-west|North|South|East|West/i)||[])[0]?.toLowerCase()||null;
 }
@@ -125,6 +162,7 @@ try{
     assert.match(sourceText,/Gather Ashwood in Greenwood/);
     assert.match(sourceText,/hides from wolves/);
     assert.match(sourceText,/Make a bow and arrows/);
+    const sourceVisibility=await scrollPanelToVisible(page,'#panel-journal','.guide-sources .guide-note',vp.touch,`${vp.name} Journal supply guidance`);
     await page.screenshot({path:`${evidence}/${vp.name}-02-journal-sources.png`});
 
     await activate(page,'[data-guide-panel="pack"]',vp.touch);
@@ -141,11 +179,12 @@ try{
     assert.match(bowText||'',/0\/2 Ashwood/);
     assert.match(bowText||'',/0\/1 Wolf Hide/);
     assert.match(bladeText||'',/Smithing 2 required/);
+    const bowVisibility=await scrollPanelToVisible(page,'#panel-craft','#recipe-bow',vp.touch,`${vp.name} Briar Bow recipe`);
     await page.screenshot({path:`${evidence}/${vp.name}-04-make-weapon-plan.png`});
 
     const after=await snapshotVisible(page);
     assert.match(after.preparation||'',/Prepare first/,'Persistent preparation cue must survive planning-panel navigation');
-    results.push({viewport:vp,route,warning,sourceText,packText,bowText,bladeText,after,errors});
+    results.push({viewport:vp,route,warning,sourceText,sourceVisibility,packText,bowText,bowVisibility,bladeText,after,errors});
     assert.deepEqual(errors,[],`${vp.name}: runtime errors during preparation audit`);
     await context.close();
   }
