@@ -119,6 +119,7 @@ try{
   page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text());});
   await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});
   await page.waitForFunction(()=>document.documentElement.dataset.playUi==='ready',{timeout:5000});
+  await page.waitForFunction(()=>document.querySelector('#objective-text')?.textContent.includes('Visit the Stonepine Trail Ledger'),{timeout:3000});
   await reachLedger(page);
   assert.match(await text(page,'#objective-preparation'),/Prepare first/);
   await page.screenshot({path:`${evidence}/01-ledger-started.png`});
