@@ -21,13 +21,24 @@ function fullyInside(inner,outer,slop=1){
 async function scrollPanelToVisible(page,panelSelector,targetSelector,touch,label){
   const panel=page.locator(panelSelector).first();
   const target=page.locator(targetSelector).first();
+  const measure=()=>page.evaluate(({panelSelector,targetSelector})=>{
+    const panel=document.querySelector(panelSelector),target=document.querySelector(targetSelector);
+    const p=panel?.getBoundingClientRect(),t=target?.getBoundingClientRect();
+    return{
+      scrollTop:panel?.scrollTop??null,scrollHeight:panel?.scrollHeight??null,clientHeight:panel?.clientHeight??null,
+      panel:p?{top:p.top,bottom:p.bottom,left:p.left,right:p.right,height:p.height}:null,
+      target:t?{top:t.top,bottom:t.bottom,left:t.left,right:t.right,height:t.height}:null
+    };
+  },{panelSelector,targetSelector});
+  const diagnostics=[];
   assert.equal(await panel.isVisible(),true,`${label}: scroll panel must be visible`);
   assert.equal(await target.isVisible(),true,`${label}: target must be rendered before scrolling`);
   for(let attempt=0;attempt<14;attempt++){
     const [panelBox,targetBox]=await Promise.all([panel.boundingBox(),target.boundingBox()]);
     assert.ok(panelBox,`${label}: panel must have an onscreen box`);
     assert.ok(targetBox,`${label}: target must have a rendered box`);
-    if(fullyInside(targetBox,panelBox))return{panelBox,targetBox,attempts:attempt};
+    const before=await measure();
+    if(fullyInside(targetBox,panelBox))return{panelBox,targetBox,attempts:attempt,diagnostics};
     const down=targetBox.bottom>panelBox.bottom;
     if(touch){
       const client=await page.context().newCDPSession(page);
@@ -47,10 +58,15 @@ async function scrollPanelToVisible(page,panelSelector,targetSelector,touch,labe
       await page.mouse.wheel(0,down?180:-180);
     }
     await page.waitForTimeout(90);
+    const after=await measure();
+    diagnostics.push({attempt,direction:down?'down':'up',before,after});
+    console.log('SCROLL_DIAGNOSTIC '+JSON.stringify({label,touch,attempt,direction:down?'down':'up',before,after}));
   }
   const [panelBox,targetBox]=await Promise.all([panel.boundingBox(),target.boundingBox()]);
-  assert.ok(fullyInside(targetBox,panelBox),`${label}: ordinary ${touch?'touch':'wheel'} scrolling must bring target fully inside the visible panel`);
-  return{panelBox,targetBox,attempts:14};
+  const final=await measure();
+  console.error('SCROLL_DIAGNOSTIC_FAIL '+JSON.stringify({label,touch,diagnostics,final}));
+  assert.ok(fullyInside(targetBox,panelBox),`${label}: ordinary ${touch?'touch':'wheel'} scrolling must bring target fully inside the visible panel; final=${JSON.stringify(final)}`);
+  return{panelBox,targetBox,attempts:14,diagnostics,final};
 }
 function compassFromVisible(text=''){
   return (text.match(/North-east|South-east|South-west|North-west|North|South|East|West/i)||[])[0]?.toLowerCase()||null;
