@@ -219,11 +219,10 @@
   };
   const revealCraftPriority = () => {
     const row = craftRow(craftPriority()), panel = $('#panel-craft'); if (!row || panel.hidden) return;
-    requestAnimationFrame(() => {
-      const box = row.getBoundingClientRect(), bounds = panel.getBoundingClientRect();
-      if (box.bottom > bounds.bottom) panel.scrollTop += box.bottom - bounds.bottom + 8;
-      else if (box.top < bounds.top) panel.scrollTop -= bounds.top - box.top + 8;
-    });
+    const box = row.getBoundingClientRect(), bounds = panel.getBoundingClientRect();
+    if (box.bottom > bounds.bottom - 8) panel.scrollTop += box.bottom - (bounds.bottom - 8);
+    const settled = row.getBoundingClientRect();
+    if (settled.top < bounds.top + 8) panel.scrollTop -= (bounds.top + 8) - settled.top;
   };
   const selectCraftCategory = id => {
     const category = craftCategories.find(([key]) => key === id); if (!category) return;
