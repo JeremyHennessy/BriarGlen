@@ -217,6 +217,14 @@
     for (const node of originalCraftOrder) craftList.append(node);
     const row = craftRow(craftPriority()); if (row) craftList.prepend(row);
   };
+  const revealCraftPriority = () => {
+    const row = craftRow(craftPriority()), panel = $('#panel-craft'); if (!row || panel.hidden) return;
+    requestAnimationFrame(() => {
+      const box = row.getBoundingClientRect(), bounds = panel.getBoundingClientRect();
+      if (box.bottom > bounds.bottom) panel.scrollTop += box.bottom - bounds.bottom + 8;
+      else if (box.top < bounds.top) panel.scrollTop -= bounds.top - box.top + 8;
+    });
+  };
   const selectCraftCategory = id => {
     const category = craftCategories.find(([key]) => key === id); if (!category) return;
     prioritizeCraftRows();
@@ -237,6 +245,7 @@
       tab.setAttribute('aria-selected', String(selected)); tab.tabIndex = selected ? 0 : -1; panel.hidden = !selected;
     }
     if (focus) $(`#panel-tab-${id}`).focus();
+    if (id === 'craft') revealCraftPriority();
   };
   tabs.addEventListener('click', event => { const tab = event.target.closest('[data-panel]'); if (tab) setPanel(tab.dataset.panel); });
   // Reading keys belong to the focused panel, not the world. Keep native scroll/activation.
