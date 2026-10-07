@@ -47,7 +47,7 @@ async function scrollPanelToVisible(page,panelSelector,targetSelector,touch,labe
     assert.ok(targetBox,`${label}: target must have a rendered box`);
     const before=await measure();
     if(fullyInside(targetBox,panelBox))return{panelBox,targetBox,attempts:attempt,diagnostics};
-    const down=targetBox.bottom>panelBox.bottom;
+    const down=(targetBox.y+targetBox.height)>(panelBox.y+panelBox.height);
     if(touch){
       const client=await page.context().newCDPSession(page);
       const x=Math.round(panelBox.x+panelBox.width/2);
