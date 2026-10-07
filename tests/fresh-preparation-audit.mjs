@@ -16,7 +16,15 @@ async function activate(page,selector,touch){
   if(touch)await node.tap();else await node.click();
 }
 function fullyInside(inner,outer,slop=1){
-  return !!inner&&!!outer&&inner.top>=outer.top-slop&&inner.bottom<=outer.bottom+slop&&inner.left>=outer.left-slop&&inner.right<=outer.right+slop;
+  if(!inner||!outer)return false;
+  const edges=box=>({
+    top:box.top??box.y,
+    bottom:box.bottom??(box.y+box.height),
+    left:box.left??box.x,
+    right:box.right??(box.x+box.width)
+  });
+  const i=edges(inner),o=edges(outer);
+  return i.top>=o.top-slop&&i.bottom<=o.bottom+slop&&i.left>=o.left-slop&&i.right<=o.right+slop;
 }
 async function scrollPanelToVisible(page,panelSelector,targetSelector,touch,label){
   const panel=page.locator(panelSelector).first();
