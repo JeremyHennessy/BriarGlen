@@ -588,7 +588,14 @@
   renderInteractionCue(p);
   renderExpeditionSupplyPlan(p);
   const leads=document.getElementById('exploration-leads');if(leads)leads.hidden=!p.completed;
-  const next=p.completed?(itemCount('trailpack')?'Route proven · explore the wilds':'Craft your earned Trail Pack'):!p.started?'Visit the Stonepine Trail Ledger':stonepineExpeditionNext(p);
+  if(p.completed){
+    const seam=world.landmarks.find(l=>l.id==='deep-quarry-seam'),well=world.landmarks.find(l=>l.id==='moonwell-hollow'),mire=world.enemies.find(e=>e.id==='mirecaller');
+    const lead=(id,value,state)=>{const el=document.getElementById(id);if(el){text(id,value);el.dataset.state=state;}};
+    lead('lead-quarry-state',player.deeds?.emberback?(seam?.discovered?'Reopened · deep seam charted':'Reopened · fine iron is available'):'Unresolved · Emberback blocks the richest seam',player.deeds?.emberback?'complete':'warning');
+    lead('lead-moonwell-state',well?.discovered?(moonwellIsNight()?'Charted · night harvest is active':'Charted · return after dusk'):'Uncharted · a timed field opportunity','ready');
+    lead('lead-mirecaller-state',itemCount('mireglass')>0?'Lens carried · Survey lasts 11 seconds':mire?.dead?'Mirecaller defeated · collect the Lens':'Unresolved · marked-ground encounter in Far Moss Fen',itemCount('mireglass')>0?'complete':mire?.dead?'ready':'warning');
+  }
+  const next=p.completed?(itemCount('trailpack')?'Choose a wider-field lead':'Craft your earned Trail Pack'):!p.started?'Visit the Stonepine Trail Ledger':stonepineExpeditionNext(p);
   const compass=(dx,dy)=>['East','South-east','South','South-west','West','North-west','North','North-east'][(Math.round(Math.atan2(dy,dx)/(Math.PI/4))+8)%8];
   let direction='';
   if(navigation.active){
@@ -596,7 +603,7 @@
     const destinationName=destination?(navigation.target.kind==='resource'?itemDefs[destination.type].name:navigation.target.kind==='drop'?itemDefs[destination.item].name:destination.name):'selected spot';
     direction=`Walking ${compass(dx,dy)} · ${destinationName}`;
   }else if(!p.completed&&target){const dx=target.x-player.x,dy=target.y-player.y;direction=dist(player,target)<=55?(nearestNPC()?'Nearby resident has Use priority · see Nearby':nearestLandmark()?.id===target.id?'Within reach · press Use':'Close by · move closer or tap the landmark'):`${compass(dx,dy)} · ${targetId==='stonepine-trail-ledger'?'Briar Glen':'Stonepine Ridge'}`;}
-  text('objective-text',next);text('objective-direction',navigation.active?direction:p.completed?(itemCount('trailpack')?'Your supplies remain in the Waycache':'Make · 2 Wolf Hides + 1 Ashwood'):direction);
+  text('objective-text',next);text('objective-direction',navigation.active?direction:p.completed?(itemCount('trailpack')?'Journal · Quarry · Moonwell · Mirecaller':'Make · 2 Wolf Hides + 1 Ashwood'):direction);
   const guide=document.getElementById('guide-body');if(guide){const html=`<p>${!p.started?'Begin at the Trail Ledger in Briar Glen.':p.completed?'Expedition complete. Your Trail Pack recipe is unlocked.':'Chart the ridge, secure its cache, leave supplies, and return.'}</p>`+[[p.overlook,'Chart Stonepine Overlook'],[p.cache,'Secure the Waycache'],[p.bread>=1&&p.arrows>=6,`Leave supplies: ${Math.min(p.bread,1)}/1 bread · ${Math.min(p.arrows,6)}/6 arrows`],[p.completed,'Return to the Trail Ledger']].map(([done,label])=>`<div class="guide-step" data-complete="${done}">${done?'✓':'○'} ${label}</div>`).join('')+'<p>Reward: 18c, Fieldcraft experience, and the Trail Pack recipe. Stored provisions remain yours.</p>';if(guide.innerHTML!==html)guide.innerHTML=html;}
   const weapon=player.equippedWeapon,working=weapon&&player.inventory[weapon]?.durability>0;
   text('guide-preparation',`${Math.ceil(player.hp)} health · ${Math.floor(player.energy)} energy. ${working?itemDefs[weapon].name+' equipped.':'No working weapon equipped; make one or equip it in Pack.'} ${itemCount('arrows')} arrows · ${itemCount('bread')} bread · ${itemCount('tonic')} tonics. ${player.hp<65?'Low health: brew and drink a tonic before a difficult fight.':''} ${player.energy<30?'Low energy: stop to rest before travelling farther.':''}`);
