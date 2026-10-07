@@ -70,3 +70,7 @@ html,body{height:100%;overflow:hidden}body{padding:max(8px,env(safe-area-inset-t
 
 /* Keep the persistent Stonepine route aligned with the Journal's existing preparation warning. */
 .objective-preparation{color:var(--warn)!important;font-weight:600;overflow-wrap:anywhere}.objective-preparation[hidden]{display:none!important}
+
+
+/* Playable First Chapter: make the post-Stonepine choice readable without turning it into quest-marker UI. */
+.lead-grid{display:grid;gap:8px;margin:8px 0}.lead-card{padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.lead-card strong{display:block;font-size:13px;line-height:1.4}.lead-card small{display:block;margin-top:4px;color:var(--accent);font-size:11px;line-height:1.4}.lead-card p{margin:6px 0 0!important;font-size:12px!important;line-height:1.55!important}.lead-card small[data-state=warning]{color:var(--warn)}.lead-card small[data-state=complete]{color:var(--good)}

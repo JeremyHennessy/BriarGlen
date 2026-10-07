@@ -11,6 +11,14 @@ export async function proveCraftCategories(page, vp) {
   const visible=()=>page.locator('#craft-list button:visible').evaluateAll(nodes=>nodes.map(el=>el.dataset.craft||el.id).sort());
   const choose=async id=>{await activate(`[data-craft-filter="${id}"]`);assert.equal(await page.locator(`[data-craft-filter="${id}"]`).getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.craft-filters [aria-pressed=true]').count(),1);assert.deepEqual(await visible(),[...groups[id]].sort());assert.match(await page.locator('#craft-filter-status').innerText(),new RegExp(`${groups[id].length} actions`));};
   await setup();
+  // Stonepine preparation should surface the viable level-1 weapon without phone-only recipe hunting.
+  await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__,l=d.landmarks().find(x=>x.id==='stonepine-trail-ledger');d.setPosition(l.x,l.y);d.stonepineLedger();d.advance(0);});
+  await activate('#objective-open');await activate('[data-guide-panel="craft"]');
+  assert.equal(await page.locator('[data-craft-filter="gear"]').getAttribute('aria-pressed'),'true');
+  assert.equal(await page.locator('#craft-list .recipe-row:visible').first().locator('[data-craft]').getAttribute('data-craft'),'bow');
+  const bowGeometry=await page.evaluate(()=>{const panel=document.querySelector('#panel-craft').getBoundingClientRect(),row=document.querySelector('[data-craft="bow"]').closest('.recipe-row').getBoundingClientRect();return{panel:{top:panel.top,bottom:panel.bottom},row:{top:row.top,bottom:row.bottom}};});
+  assert.ok(bowGeometry.row.top>=bowGeometry.panel.top-1&&bowGeometry.row.bottom<=bowGeometry.panel.bottom+1,`${vp.name}: Briar Bow preparation path starts offscreen ${JSON.stringify(bowGeometry)}`);
+  await setup();
   // The prior canonical proof really attacks; reset() intentionally leaves transient cooldowns alone.
   await page.waitForFunction(()=>window.__BRIAR_GLEN_DEBUG__.snapshot().player.attackCd===0,null,{timeout:1500});
   await activate('[data-panel="craft"]');await choose('all');

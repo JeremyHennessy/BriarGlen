@@ -157,7 +157,7 @@
   $('#panel-character').prepend(characterSections);
   setCharacterSection('status');
   const guide = document.createElement('section'); guide.id = 'journal-plan'; guide.className = 'card expedition-guide';
-  guide.innerHTML = '<div class="card-title"><span>Stonepine expedition</span><small>Optional adventure</small></div><div class="guide-tools" role="group" aria-label="Expedition preparation panels"><button type="button" data-guide-panel="pack">Check gear</button><button type="button" data-guide-panel="craft">Make supplies</button><button type="button" data-guide-panel="character">Skills &amp; recovery</button></div><h3>Field preparation</h3><p id="guide-preparation"></p><h3>Waycache provisions</h3><div class="guide-provisions"><p id="guide-bread-plan"></p><p id="guide-arrows-plan"></p><p id="guide-deposit-help"></p></div><h3>Route checklist</h3><div id="guide-body"></div><details class="guide-sources"><summary>Where to get supplies</summary><p class="guide-note">Gather Ashwood in Greenwood, herbs in South Meadow and Moss Fen, and hides from wolves. Make a bow and arrows, brew medicine, and rest before heading for the ridge. Keep Brown Bread for the cache; check Nearby trades when you need more. Bring extra arrows for bow combat. The world keeps moving while panels are open.</p></details><details id="exploration-leads" hidden><summary>Exploration leads</summary><p class="guide-note">Beyond Stonepine: these are existing places to explore, not new tracked quests. You may have visited them already.</p><p><strong>Old Quarry · Deep Quarry Seam.</strong> Defeating Emberback reopens the seam. Equip a working Iron Pick and bring 14 energy to mine fine Iron Ore; it can be worked once each day.</p><p><strong>Moss Fen · Moonwell Hollow.</strong> Visit after dusk for fine Mooncaps. Its harvest is available once each night.</p><p><strong>Far Moss Fen · Mirecaller.</strong> Defeating this creature leaves a Mireglass Lens in the reeds. Pick it up and carry it to extend Survey from 7 to 11 seconds.</p></details>';
+  guide.innerHTML = '<div class="card-title"><span>Stonepine expedition</span><small>Optional adventure</small></div><div class="guide-tools" role="group" aria-label="Expedition preparation panels"><button type="button" data-guide-panel="pack">Check gear</button><button type="button" data-guide-panel="craft">Make supplies</button><button type="button" data-guide-panel="character">Skills &amp; recovery</button></div><h3>Field preparation</h3><p id="guide-preparation"></p><h3>Waycache provisions</h3><div class="guide-provisions"><p id="guide-bread-plan"></p><p id="guide-arrows-plan"></p><p id="guide-deposit-help"></p></div><h3>Route checklist</h3><div id="guide-body"></div><details class="guide-sources"><summary>Where to get supplies</summary><p class="guide-note">Greenwood lies east of Briar Glen: gather Ashwood there and watch for wolves whose hides can become field gear. South Meadow and Moss Fen hold herbs. A Briar Bow needs 2 Ashwood + 1 Wolf Hide; Trail Arrows need Ashwood. Brew medicine and rest before heading for the ridge. Keep Brown Bread for the cache; check Nearby trades when you need more. The world keeps moving while panels are open.</p></details><details id="exploration-leads" hidden><summary>Wider field · choose what matters next</summary><p class="guide-note">Stonepine proved the route. These are existing opportunities, not tracked quest markers: choose the problem or reward that fits the kind of adventurer you are becoming.</p><div class="lead-grid"><article class="lead-card"><strong>Old Quarry · Deep Quarry Seam</strong><small id="lead-quarry-state"></small><p>Why care: defeat Emberback to reopen richer iron, then use a working Iron Pick and 14 energy for fine ore once each day.</p></article><article class="lead-card"><strong>Moss Fen · Moonwell Hollow</strong><small id="lead-moonwell-state"></small><p>Why care: chart the Moonwell and return after dusk for a fine Mooncap harvest once each night.</p></article><article class="lead-card"><strong>Far Moss Fen · Mirecaller</strong><small id="lead-mirecaller-state"></small><p>Why care: defeat the marked-ground threat, collect its Mireglass Lens, and extend Survey from 7 to 11 seconds.</p></article></div></details>';
   cards.log.id = 'journal-log';
   const journalSections = document.createElement('div'); journalSections.className = 'journal-sections';
   journalSections.setAttribute('role', 'tablist'); journalSections.setAttribute('aria-label', 'Journal sections');
@@ -205,8 +205,28 @@
   const gearRecipes = new Set(['pick','blade','bow','bedroll','trailpack','jerkin']);
   const craftEntries = [...craftList.querySelectorAll('.recipe-row')].map(row => ({node:row, category:gearRecipes.has(row.querySelector('[data-craft]').dataset.craft) ? 'gear' : 'supplies'}));
   for (const id of ['patch-jerkin','make-camp','drink-tonic']) craftEntries.push({node:document.getElementById(id), category:'care'});
+  const originalCraftOrder = [...craftList.children];
+  const craftRow = id => craftList.querySelector(`[data-craft="${id}"]`)?.closest('.recipe-row') || null;
+  const craftPriority = () => {
+    const next = $('#objective-text')?.textContent.trim() || '';
+    if (next === 'Craft your earned Trail Pack') return 'trailpack';
+    if (!objectivePreparation.hidden) return 'bow';
+    return null;
+  };
+  const prioritizeCraftRows = () => {
+    for (const node of originalCraftOrder) craftList.append(node);
+    const row = craftRow(craftPriority()); if (row) craftList.prepend(row);
+  };
+  const revealCraftPriority = () => {
+    const row = craftRow(craftPriority()), panel = $('#panel-craft'); if (!row || panel.hidden) return;
+    const box = row.getBoundingClientRect(), bounds = panel.getBoundingClientRect();
+    if (box.bottom > bounds.bottom - 8) panel.scrollTop += box.bottom - (bounds.bottom - 8);
+    const settled = row.getBoundingClientRect();
+    if (settled.top < bounds.top + 8) panel.scrollTop -= (bounds.top + 8) - settled.top;
+  };
   const selectCraftCategory = id => {
     const category = craftCategories.find(([key]) => key === id); if (!category) return;
+    prioritizeCraftRows();
     for (const entry of craftEntries) entry.node.hidden = id !== 'all' && entry.category !== id;
     for (const button of craftFilters.querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.craftFilter === id));
     craftStatus.textContent = `${category[1]} · ${craftEntries.filter(entry => !entry.node.hidden).length} actions`;
@@ -218,11 +238,13 @@
   selectCraftCategory('all');
   const setPanel = (id, focus = false) => {
     if (!definitions.some(([key]) => key === id)) return;
+    if (id === 'craft') prioritizeCraftRows();
     for (const [key] of definitions) {
       const selected = key === id, tab = $(`#panel-tab-${key}`), panel = $(`#panel-${key}`);
       tab.setAttribute('aria-selected', String(selected)); tab.tabIndex = selected ? 0 : -1; panel.hidden = !selected;
     }
     if (focus) $(`#panel-tab-${id}`).focus();
+    if (id === 'craft') revealCraftPriority();
   };
   tabs.addEventListener('click', event => { const tab = event.target.closest('[data-panel]'); if (tab) setPanel(tab.dataset.panel); });
   // Reading keys belong to the focused panel, not the world. Keep native scroll/activation.
@@ -256,6 +278,10 @@
     const button = event.target.closest('[data-guide-panel]');
     if (button && guide.contains(button)) {
       if (button.dataset.guidePanel === 'character') setCharacterSection('skills');
+      if (button.dataset.guidePanel === 'craft') {
+        const next = $('#objective-text')?.textContent.trim() || '';
+        selectCraftCategory(!objectivePreparation.hidden || next === 'Craft your earned Trail Pack' ? 'gear' : 'supplies');
+      }
       setPanel(button.dataset.guidePanel, true);
     }
   });
