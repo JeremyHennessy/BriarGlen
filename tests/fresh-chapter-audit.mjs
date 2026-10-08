@@ -103,9 +103,30 @@ async function craftFieldKit(page){
   assert.match(await text(page,'#recipe-bow'),/Ready to make/);
   await activate(page,'[data-craft="bow"]');
   if(await page.locator('[data-craft-filter="supplies"]').count())await activate(page,'[data-craft-filter="supplies"]');
-  for(let i=0;i<2;i++){assert.match(await text(page,'#recipe-arrows'),/Ready to make/);await activate(page,'[data-craft="arrows"]');}
-  await activate(page,'[data-panel="pack"]');
-  await activate(page,'#inventory [data-equip="bow"]');
+  for(let batch=1;batch<=2;batch++){
+    assert.match(await text(page,'#recipe-arrows'),/Ready to make/);
+    await activate(page,'[data-craft="arrows"]');
+    await activate(page,'[data-panel="pack"]');
+    try{
+      await page.waitForFunction(expected=>{
+        const row=document.querySelector('#inventory [data-item-id="arrows"]');
+        return row&&!row.closest('.play-panel')?.hidden&&row.innerText.includes('×'+expected);
+      },batch*6,{timeout:4000});
+    }catch(error){
+      console.error('ARROW_CRAFT_DIAGNOSTIC '+JSON.stringify({batch,inventory:await text(page,'#inventory'),weapon:await text(page,'#loadout-weapon-name'),attack:await text(page,'#attack-readiness')}));
+      await page.screenshot({path:`${evidence}/arrows-batch-${batch}-failure.png`});
+      throw error;
+    }
+    if(batch<2){
+      await activate(page,'[data-panel="craft"]');
+      if(await page.locator('[data-craft-filter="supplies"]').count())await activate(page,'[data-craft-filter="supplies"]');
+    }
+  }
+  const bow=page.locator('#inventory [data-equip="bow"]');
+  const label=await bow.getAttribute('aria-label');
+  if(label==='Equip Briar Bow')await bow.click();
+  else assert.equal(label,'Stow Briar Bow','Bow equipment control should describe its current state');
+  await page.waitForFunction(()=>document.querySelector('#attack-readiness')?.textContent?.trim()==='Bow · 12',null,{timeout:4000});
   assert.equal(await text(page,'#loadout-weapon-name'),'Briar Bow');
   assert.match(await text(page,'#attack-readiness'),/Bow · 12/);
 }
