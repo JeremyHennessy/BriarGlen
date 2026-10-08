@@ -17,7 +17,28 @@ export async function proveCombatUi(page,vp){
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.setHp(100);d.advance(0);});
   const wolf=await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;const id=d.spawnWolfAt(900,600);d.enemy(id).attackCd=100;d.advance(0);return id;});
   await page.waitForTimeout(80);assert.equal(await page.locator('#combat-cue').isVisible(),true);assert.match(await page.locator('#combat-threat').innerText(),/Wolf.*36\/36 health.*Close threat/);assert.match(await page.locator('#combat-action').innerText(),/Attack Wolf · 4 energy/);
-  const ring=await page.evaluate(()=>{const c=document.querySelector('#game'),ctx=c.getContext('2d'),x=Math.floor(c.width/2),y=Math.floor(c.height/2);let count=0;for(let dy=-21;dy<=21;dy++)for(let dx=-21;dx<=21;dx++){if(Math.hypot(dx,dy)<15||Math.hypot(dx,dy)>21)continue;const p=ctx.getImageData(x+dx,y+dy,1,1).data;if(Math.abs(p[0]-213)<8&&Math.abs(p[1]-122)<8&&Math.abs(p[2]-111)<8)count++;}return count;});
+  // The cue is updated synchronously, but canvas painting follows the next animation frame.
+  // Wait for the SAME >40-pixel ring proof, rather than sampling one potentially stale frame.
+  let ring;
+  try{
+    const painted=await page.waitForFunction(()=>{
+      const c=document.querySelector('#game'),ctx=c.getContext('2d'),x=Math.floor(c.width/2),y=Math.floor(c.height/2);
+      let count=0;for(let dy=-21;dy<=21;dy++)for(let dx=-21;dx<=21;dx++){
+        if(Math.hypot(dx,dy)<15||Math.hypot(dx,dy)>21)continue;
+        const p=ctx.getImageData(x+dx,y+dy,1,1).data;
+        if(Math.abs(p[0]-213)<8&&Math.abs(p[1]-122)<8&&Math.abs(p[2]-111)<8)count++;
+      }
+      return count>40?count:false;
+    },null,{timeout:1500,polling:'raf'});
+    ring=await painted.jsonValue();
+  }catch(error){
+    await shot('overlap-missing');
+    const state=await page.evaluate(id=>{
+      const d=window.__BRIAR_GLEN_DEBUG__,p=d.snapshot().player,e=d.enemy(id),c=document.querySelector('#game');
+      return{player:{x:p.x,y:p.y},wolf:e?{x:e.x,y:e.y,hp:e.hp,attackCd:e.attackCd}:null,canvas:{w:c.width,h:c.height}};
+    },wolf);
+    assert.fail('Close wolf marker did not paint above the player within 1500ms: '+JSON.stringify(state));
+  }
   assert.ok(ring>40,'Close wolf marker must remain visible outside player body');await shot('overlap-visible');
   const stable=()=>page.evaluate(id=>{const d=window.__BRIAR_GLEN_DEBUG__,p=d.snapshot().player;return{inventory:p.inventory,coins:p.coins,skills:p.skills,expeditions:p.expeditions,enemy:[id,d.enemy(id)?.hp]};},wolf);
   const before=await stable();for(const panel of ['pack','craft','character','journal','nearby']){await activate(`[data-panel=${panel}]`);assert.equal(await page.locator('.play-panel:visible').count(),1);assert.equal(await page.locator('#combat-cue').isVisible(),true);}assert.deepEqual(await stable(),before,'Reading threats does not change economy/progress/damage');

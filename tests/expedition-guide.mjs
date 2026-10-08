@@ -62,6 +62,14 @@ export async function proveExpeditionGuide(page,vp){
   assert.match(await page.locator('#guide-arrows-plan').innerText(),/Stored 0\/6 · Route recorded/);
   assert.equal(await page.locator('#guide-arrows-plan').getAttribute('data-state'),'complete');
   assert.equal(await page.locator('#objective-text').innerText(),'Craft your earned Trail Pack');
+  const packPlan=page.locator('#guide-trailpack-plan');
+  assert.equal(await packPlan.isVisible(),true,'Earned Trail Pack preparation is visible after Stonepine');
+  assert.equal(await packPlan.getAttribute('role'),'status','Trail Pack guidance exposes accessible status');
+  const beforePackPlan=await state(),hides=beforePackPlan.inventory.hide?.qty||0,wood=beforePackPlan.inventory.wood?.qty||0;
+  assert.ok((await packPlan.innerText()).includes(`Trail Pack · ${hides}/2 Wolf Hides · ${wood}/1 Ashwood`),'Live guidance shows actual carried resources');
+  assert.match(await packPlan.innerText(),/Still need|Materials ready/);
+  assert.deepEqual(await state(),beforePackPlan,'Reading earned Pack guidance cannot change gameplay');
+  await shot('trailpack-needs');
   await activate('[data-guide-panel="craft"]');
   assert.equal(await page.locator('[data-craft-filter="gear"]').getAttribute('aria-pressed'),'true');
   assert.equal(await page.locator('#craft-list .recipe-row:visible').first().locator('[data-craft]').getAttribute('data-craft'),'trailpack','Earned Trail Pack should lead Gear after Stonepine');
@@ -90,7 +98,18 @@ export async function proveExpeditionGuide(page,vp){
   await page.waitForFunction(()=>document.querySelector('#guide-arrows-plan')?.dataset.state==='complete');
   assert.equal(await page.locator('#exploration-leads').isVisible(),true);assert.equal(await page.locator('#exploration-leads').getAttribute('open'),null,'Reload derives availability without persisting disclosure state');
   assert.equal(await page.locator('#guide-arrows-plan').getAttribute('data-state'),'complete');
+  const beforeMaterials=await state();
+  await page.evaluate(({hide,wood})=>{
+    const d=window.__BRIAR_GLEN_DEBUG__;
+    if(hide>0)d.give('hide',hide);
+    if(wood>0)d.give('wood',wood);
+    d.advance(0);
+  },{hide:Math.max(0,2-(beforeMaterials.inventory.hide?.qty||0)),wood:Math.max(0,1-(beforeMaterials.inventory.wood?.qty||0))});
+  assert.equal(await packPlan.isVisible(),true,'Earned Trail Pack guidance remains until the pack is made');
+  assert.match(await packPlan.innerText(),/Materials ready\. Open Make → Gear/);
+  await shot('trailpack-ready');
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.give('trailpack',1,2.8);d.advance(0);});
+  assert.equal(await packPlan.isVisible(),false,'Earned Trail Pack guidance disappears once the item is carried');
   assert.equal(await page.locator('#objective-text').innerText(),'Choose a wider-field lead');
   assert.match(await page.locator('#objective-direction').innerText(),/Quarry.*Moonwell.*Mirecaller/);
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.clearEnemies();d.setPosition(900,600);d.give('arrows',1000000);d.advance(0);});
@@ -99,5 +118,5 @@ export async function proveExpeditionGuide(page,vp){
   assert.ok(geometry.sw<=geometry.w+1&&geometry.pageW<=geometry.vw+1,'Large supply counts must wrap within Journal');
   for(const id of ['pack','craft','character']){const b=await page.locator(`[data-guide-panel="${id}"]`).boundingBox();assert.ok(b.width>=44&&b.height>=44,'Guide touch targets at least44px');}
   await page.evaluate(()=>{const d=window.__BRIAR_GLEN_DEBUG__;d.reset();d.advance(0);});assert.equal(await page.locator('#exploration-leads').isVisible(),false,'Fresh reset hides previously revealed leads');
-  console.log(`PASS ${vp.name}: guide navigation, held input, carried vs stored, partial deposits, withdraw/return/reward, large counts, save and stable controls`);
+  console.log(`PASS ${vp.name}: guide navigation, earned Trail Pack material states, held input, carried vs stored, partial deposits, withdraw/return/reward, large counts, save and stable controls`);
 }
