@@ -103,7 +103,7 @@ async function craftFirstKit(page){
   else assert.equal(equipLabel,'Stow Briar Bow','The first Bow should be equipped');
   await page.waitForFunction(()=>document.querySelector('#attack-readiness')?.textContent?.trim()==='Bow · 6',null,{timeout:4000});
   assert.equal(await text(page,'#loadout-weapon-name'),'Briar Bow');
-  assert.match(await text(page,'#inventory'),/Trail Arrows[\\s\\S]*×6/);
+  assert.match(await text(page,'#inventory'),/Trail Arrows[\s\S]*×6/);
   console.log('FIRST_KIT_READY '+JSON.stringify({weapon:await text(page,'#loadout-weapon-name'),ammo:await text(page,'#attack-readiness'),materials:await text(page,'#inventory')}));
   await page.screenshot({path:`${evidence}/02-first-bow-and-arrows.png`});
   await activate(page,'[data-panel="nearby"]');
@@ -163,16 +163,16 @@ async function craftFieldKit(page){
   // Top up from real materials after the first equipped Bow was made in the field.
   await activate(page,'[data-panel="craft"]');
   if(await page.locator('[data-craft-filter="supplies"]').count())await activate(page,'[data-craft-filter="supplies"]');
-  const before=(await text(page,'#attack-readiness')).match(/Bow · (\\d+)/);
+  const before=(await text(page,'#attack-readiness')).match(/Bow · (\d+)/);
   const previousArrows=Number(before?.[1]||0);
   assert.match(await text(page,'#recipe-arrows'),/Ready to make/);
   await activate(page,'[data-craft="arrows"]');
   await activate(page,'[data-panel="pack"]');
   await page.waitForFunction(previous=>{
-    const match=document.querySelector('#attack-readiness')?.textContent?.match(/Bow · (\\d+)/);
+    const match=document.querySelector('#attack-readiness')?.textContent?.match(/Bow · (\d+)/);
     return Number(match?.[1]||0)>=previous+6;
   },previousArrows,{timeout:4000});
-  const ammo=(await text(page,'#attack-readiness')).match(/Bow · (\\d+)/);
+  const ammo=(await text(page,'#attack-readiness')).match(/Bow · (\d+)/);
   assert.ok(Number(ammo?.[1]||0)>=6,'Prepared field Bow must have at least six arrows');
   assert.equal(await text(page,'#loadout-weapon-name'),'Briar Bow');
   console.log('FIELD_KIT_TOPUP '+JSON.stringify({previousArrows,ammo:Number(ammo?.[1]||0)}));
