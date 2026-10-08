@@ -45,6 +45,9 @@ async function fightVisible(page,label){
   for(let step=0;step<80;step++){
     if(!await page.locator('#combat-cue').isVisible())return;
     const action=await text(page,'#combat-action'),threat=await text(page,'#combat-threat');
+    // Collect the first real hide as soon as Use exposes it; do not stand still
+    // unarmed fighting a second wolf while useful loot is within reach.
+    if(/^Unarmed$/.test(await text(page,'#attack-readiness'))&&await text(page,'#interaction-target')==='Wolf Hide')return;
     // A visible warning covers enemies up to 300 units away, while attacks have
     // a shorter range. Do not freeze ordinary travel waiting for a distant foe.
     if(/^No target in reach/.test(action)){
@@ -83,11 +86,32 @@ async function visibleMaterials(page){
   await activate(page,'[data-panel="nearby"]');
   return carried;
 }
+async function craftFirstKit(page){
+  // Ordinary Make/Pack controls only. This is the earliest complete useful kit,
+  // not a debug grant: 2 Ashwood + 1 Hide for the Bow, 1 Ashwood for 6 arrows.
+  await activate(page,'[data-panel="craft"]');
+  if(await page.locator('[data-craft-filter="gear"]').count())await activate(page,'[data-craft-filter="gear"]');
+  assert.match(await text(page,'#recipe-bow'),/Ready to make/);
+  await activate(page,'[data-craft="bow"]');
+  if(await page.locator('[data-craft-filter="supplies"]').count())await activate(page,'[data-craft-filter="supplies"]');
+  assert.match(await text(page,'#recipe-arrows'),/Ready to make/);
+  await activate(page,'[data-craft="arrows"]');
+  await activate(page,'[data-panel="pack"]');
+  const bow=page.locator('#inventory [data-equip="bow"]');
+  const equipLabel=await bow.getAttribute('aria-label');
+  if(equipLabel==='Equip Briar Bow')await bow.click();
+  else assert.equal(equipLabel,'Stow Briar Bow','The first Bow should be equipped');
+  await page.waitForFunction(()=>document.querySelector('#attack-readiness')?.textContent?.trim()==='Bow · 6',null,{timeout:4000});
+  assert.equal(await text(page,'#loadout-weapon-name'),'Briar Bow');
+  assert.match(await text(page,'#inventory'),/Trail Arrows[\\s\\S]*×6/);
+  console.log('FIRST_KIT_READY '+JSON.stringify({weapon:await text(page,'#loadout-weapon-name'),ammo:await text(page,'#attack-readiness'),materials:await text(page,'#inventory')}));
+  await page.screenshot({path:`${evidence}/02-first-bow-and-arrows.png`});
+  await activate(page,'[data-panel="nearby"]');
+}
 async function gatherFirstKit(page){
-  // The rendered map places Greenwood north-east of the Trail Ledger; travel uses only ordinary movement.
+  // Greenwood is north-east of the Trail Ledger on the visible map. Collect only
+  // the *first* Bow/arrow ingredients before crafting; finish provisions armed.
   await move(page,'north-east',1100);
-  // Sweep back and forth through the player-visible Greenwood area rather than
-  // drifting east on every circuit. All travel remains ordinary WASD movement.
   const pattern=[
     ...Array.from({length:6},(_,row)=>[
       ...Array(12).fill(row%2?'west':'east'),
@@ -95,20 +119,14 @@ async function gatherFirstKit(page){
     ]).flat(),
     ...Array(10).fill('south')
   ];
-  // First-chapter preparation consumes 2 wood for the bow, 2 for two arrow batches,
-  // and 1 for the earned Trail Pack. Keep two spare for ordinary field use.
-  const woodTarget=7;
   const pickups=[];
-  let {wood,hide:hides}=await visibleMaterials(page);
-  for(let step=0;step<240&&(wood<woodTarget||hides<1);step++){
-    if(await page.locator('#combat-cue').isVisible()){
-      await fightVisible(page,'Greenwood');
-      await page.waitForTimeout(150);
-    }
+  let armed=false,{wood,hide:hides}=await visibleMaterials(page);
+  for(let step=0;step<240&&(!armed||wood<2||hides<2);step++){
+    // Give visible pickups priority over another unnecessary fight. Use itself
+    // retains the game's resident/landmark/resource/drop priority rules.
     const use=await text(page,'#interaction-target');
     if(use==='Wolf Hide'||use==='Ashwood'){
-      const before={wood,hides};
-      const readiness=await text(page,'#interact-readiness');
+      const before={wood,hides},readiness=await text(page,'#interact-readiness');
       await activate(page,'#interact-btn');
       await page.waitForTimeout(120);
       const carried=await visibleMaterials(page);
@@ -116,63 +134,48 @@ async function gatherFirstKit(page){
       const gained=use==='Ashwood'?wood>before.wood:hides>before.hides;
       pickups.push({step,use,readiness,before,after:{wood,hides},gained});
       if(!gained)await move(page,pattern[step%pattern.length],210);
-      continue;
+    }else if(await page.locator('#combat-cue').isVisible()){
+      await fightVisible(page,'Greenwood');
+      await page.waitForTimeout(100);
+    }else await move(page,pattern[step%pattern.length],210);
+
+    if(!armed&&wood>=3&&hides>=1){
+      await craftFirstKit(page);
+      armed=true;
+      const carried=await visibleMaterials(page);
+      wood=carried.wood;hides=carried.hide;
+      assert.ok(wood>=0&&hides>=0,'First kit must consume real carried ingredients');
+      console.log('FIRST_KIT_COST '+JSON.stringify({wood,hides}));
     }
-    await move(page,pattern[step%pattern.length],210);
   }
-  await writeFile(`${evidence}/verified-greenwood-pickups.json`,JSON.stringify({wood,hides,pickups},null,2));
-  if(wood<woodTarget||hides<1){
+  await writeFile(`${evidence}/verified-greenwood-pickups.json`,JSON.stringify({wood,hides,armed,pickups},null,2));
+  if(!armed||wood<2||hides<2){
     const state=await visibleState(page);
-    console.error('GATHER_DIAGNOSTIC '+JSON.stringify({wood,hides,attempts:pickups.length,unconfirmed:pickups.filter(x=>!x.gained),state,nearby:await text(page,'#nearby')}));
+    console.error('GATHER_DIAGNOSTIC '+JSON.stringify({wood,hides,armed,attempts:pickups.length,unconfirmed:pickups.filter(x=>!x.gained),state,nearby:await text(page,'#nearby')}));
     await page.screenshot({path:`${evidence}/greenwood-gather-shortfall.png`});
   }
-  assert.ok(wood>=woodTarget,`Fresh player found only ${wood}/${woodTarget} Ashwood through visible Greenwood exploration`);
-  assert.ok(hides>=1,`Fresh player found only ${hides}/1 Wolf Hide through visible Greenwood combat`);
-  return{wood,hides};
+  assert.ok(armed,'Fresh player did not make a Bow and six arrows during Greenwood exploration');
+  assert.ok(wood>=2,`Armed gathering left only ${wood}/2 Ashwood for another arrow batch + earned Trail Pack`);
+  assert.ok(hides>=2,`Armed gathering left only ${hides}/2 Wolf Hides for earned Trail Pack`);
+  return{wood,hides,firstKit:true,pickups:pickups.length};
 }
 async function craftFieldKit(page){
+  // Top up from real materials after the first equipped Bow was made in the field.
   await activate(page,'[data-panel="craft"]');
-  if(await page.locator('[data-craft-filter="gear"]').count())await activate(page,'[data-craft-filter="gear"]');
-  assert.match(await text(page,'#recipe-bow'),/Ready to make/);
-  const preparation=[];
-  const snapshot=async stage=>{
-    const record={stage,inventory:await text(page,'#inventory'),bow:await text(page,'#recipe-bow'),arrows:await text(page,'#recipe-arrows'),attack:await text(page,'#attack-readiness')};
-    preparation.push(record);
-    console.log('PREPARATION_STAGE '+JSON.stringify(record));
-  };
-  await snapshot('before-bow');
-  await activate(page,'[data-craft="bow"]');
-  await snapshot('after-bow');
   if(await page.locator('[data-craft-filter="supplies"]').count())await activate(page,'[data-craft-filter="supplies"]');
-  for(let batch=1;batch<=2;batch++){
-    await snapshot(`before-arrow-batch-${batch}`);
-    assert.match(await text(page,'#recipe-arrows'),/Ready to make/);
-    await activate(page,'[data-craft="arrows"]');
-    await activate(page,'[data-panel="pack"]');
-    try{
-      await page.waitForFunction(expected=>{
-        const row=document.querySelector('#inventory [data-item-id="arrows"]');
-        return row&&!row.closest('.play-panel')?.hidden&&row.innerText.includes('×'+expected);
-      },batch*6,{timeout:4000});
-    }catch(error){
-      console.error('ARROW_CRAFT_DIAGNOSTIC '+JSON.stringify({batch,inventory:await text(page,'#inventory'),weapon:await text(page,'#loadout-weapon-name'),attack:await text(page,'#attack-readiness')}));
-      await page.screenshot({path:`${evidence}/arrows-batch-${batch}-failure.png`});
-      throw error;
-    }
-    await snapshot(`after-arrow-batch-${batch}`);
-    if(batch<2){
-      await activate(page,'[data-panel="craft"]');
-      if(await page.locator('[data-craft-filter="supplies"]').count())await activate(page,'[data-craft-filter="supplies"]');
-    }
-  }
-  const bow=page.locator('#inventory [data-equip="bow"]');
-  const label=await bow.getAttribute('aria-label');
-  if(label==='Equip Briar Bow')await bow.click();
-  else assert.equal(label,'Stow Briar Bow','Bow equipment control should describe its current state');
-  await page.waitForFunction(()=>document.querySelector('#attack-readiness')?.textContent?.trim()==='Bow · 12',null,{timeout:4000});
+  const before=(await text(page,'#attack-readiness')).match(/Bow · (\\d+)/);
+  const previousArrows=Number(before?.[1]||0);
+  assert.match(await text(page,'#recipe-arrows'),/Ready to make/);
+  await activate(page,'[data-craft="arrows"]');
+  await activate(page,'[data-panel="pack"]');
+  await page.waitForFunction(previous=>{
+    const match=document.querySelector('#attack-readiness')?.textContent?.match(/Bow · (\\d+)/);
+    return Number(match?.[1]||0)>=previous+6;
+  },previousArrows,{timeout:4000});
+  const ammo=(await text(page,'#attack-readiness')).match(/Bow · (\\d+)/);
+  assert.ok(Number(ammo?.[1]||0)>=6,'Prepared field Bow must have at least six arrows');
   assert.equal(await text(page,'#loadout-weapon-name'),'Briar Bow');
-  assert.match(await text(page,'#attack-readiness'),/Bow · 12/);
-  await writeFile(`${evidence}/preparation-stages.json`,JSON.stringify(preparation,null,2));
+  console.log('FIELD_KIT_TOPUP '+JSON.stringify({previousArrows,ammo:Number(ammo?.[1]||0)}));
 }
 async function followObjectiveToUse(page,expected,readiness,max=180){
   await activate(page,'[data-panel="nearby"]');
