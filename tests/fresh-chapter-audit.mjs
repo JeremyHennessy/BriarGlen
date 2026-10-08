@@ -86,6 +86,27 @@ async function visibleMaterials(page){
   await activate(page,'[data-panel="nearby"]');
   return carried;
 }
+// Select only Ashwood circles actually painted in the visible world canvas.
+// No coordinate/hidden-world reads: the same clickable brown nodes a player sees.
+async function visibleAshwoodOnMap(page){
+  return page.locator('#game').evaluate(canvas=>{
+    const {width,height}=canvas, pixels=canvas.getContext('2d').getImageData(0,0,width,height).data;
+    const clusters=[];
+    for(let y=12;y<height-12;y+=3)for(let x=12;x<width-12;x+=3){
+      const p=(y*width+x)*4;
+      if(pixels[p]!==170||pixels[p+1]!==132||pixels[p+2]!==87||pixels[p+3]!==255)continue;
+      let group=clusters.find(g=>Math.hypot(x-g.x/g.n,y-g.y/g.n)<19);
+      if(!group){group={x:0,y:0,n:0};clusters.push(group);}
+      group.x+=x;group.y+=y;group.n++;
+    }
+    const rect=canvas.getBoundingClientRect();
+    return clusters.filter(g=>g.n>=9).map(g=>({
+      x:g.x/g.n*rect.width/width,y:g.y/g.n*rect.height/height,
+      distance:Math.hypot(g.x/g.n-width/2,g.y/g.n-height/2)
+    })).sort((a,b)=>a.distance-b.distance);
+  });
+}
+
 async function craftFirstKit(page){
   // Ordinary Make/Pack controls only. This is the earliest complete useful kit,
   // not a debug grant: 2 Ashwood + 1 Hide for the Bow, 1 Ashwood for 6 arrows.
@@ -134,6 +155,16 @@ async function gatherFirstKit(page){
       const gained=use==='Ashwood'?wood>before.wood:hides>before.hides;
       pickups.push({step,use,readiness,before,after:{wood,hides},gained});
       if(!gained)await move(page,pattern[step%pattern.length],210);
+    }else if(wood<3&&await visibleAshwoodOnMap(page).then(targets=>targets.some(t=>t.distance<260))){
+      // The previous blind sweep passed painted Ashwood repeatedly. Tap the
+      // closest visible node with the game's native click-to-travel control.
+      const targets=await visibleAshwoodOnMap(page),target=targets.find(t=>t.distance<260);
+      const before=wood;
+      await page.locator('#game').click({position:{x:target.x,y:target.y}});
+      await page.waitForTimeout(Math.min(4000,Math.max(900,target.distance/110*1000)));
+      const carried=await visibleMaterials(page);
+      wood=carried.wood;hides=carried.hide;
+      pickups.push({step,use:'Painted Ashwood',readiness:'World tap',before:{wood:before},after:{wood,hides},gained:wood>before});
     }else if(await page.locator('#combat-cue').isVisible()){
       await fightVisible(page,'Greenwood');
       await page.waitForTimeout(100);
