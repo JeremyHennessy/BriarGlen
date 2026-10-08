@@ -44,6 +44,18 @@ async function fightVisible(page,label){
   const samples=[];
   for(let step=0;step<80;step++){
     if(!await page.locator('#combat-cue').isVisible())return;
+    // Recover the first visible wolf hide instead of chaining unarmed fights.
+    if(label==='Greenwood' && await text(page,'#attack-readiness')==='Unarmed' && await text(page,'#interaction-target')==='Wolf Hide'){
+      await activate(page,'#interact-btn');
+      await page.waitForTimeout(120);
+      const carried=await visibleMaterials(page);
+      assert.ok(carried.hide>=1,'First Wolf Hide must be collected with ordinary Use and confirmed in visible Pack');
+      const state=await visibleState(page);
+      await writeFile(`${evidence}/first-wolf-recovery.json`,JSON.stringify({carried,state,samples},null,2));
+      console.log('FIRST_WOLF_RECOVERY '+JSON.stringify({carried,state}));
+      await move(page,'south-west',2500);
+      return {firstHideRecovered:true,carried};
+    }
     const action=await text(page,'#combat-action'),threat=await text(page,'#combat-threat');
     const hp=Number((await text(page,'#hp-text')).split('/')[0].trim());
     samples.push({step,action,threat,hp,energy:await text(page,'#energy-text'),attackReadiness:await text(page,'#attack-readiness'),braceReadiness:await text(page,'#brace-readiness'),direction:await text(page,'#objective-direction')});
@@ -96,7 +108,12 @@ async function gatherFirstKit(page){
   let {wood,hide:hides}=await visibleMaterials(page);
   for(let step=0;step<240&&(wood<woodTarget||hides<1);step++){
     if(await page.locator('#combat-cue').isVisible()){
-      await fightVisible(page,'Greenwood');
+      const combat=await fightVisible(page,'Greenwood');
+      if(combat?.firstHideRecovered){
+        wood=combat.carried.wood;hides=combat.carried.hide;
+        pickups.push({step,use:'Wolf Hide',after:{wood,hides},gained:true,retreated:true});
+        continue;
+      }
       await page.waitForTimeout(150);
     }
     const use=await text(page,'#interaction-target');
