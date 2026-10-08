@@ -213,7 +213,8 @@ try{
   const cacheHides=await collectHidesAroundCache(page,2);
   await followObjectiveToUse(page,'Stonepine Trail Ledger','Finish');
   assert.match(await text(page,'#objective-text'),/Craft your earned Trail Pack/);
-  await activate(page,'#objective-open');await activate(page,'[data-guide-panel="craft"]');
+  await activate(page,'#objective-open');
+  assert.match(await text(page,'#guide-trailpack-plan'),/Trail Pack · .*Wolf Hides · .*Ashwood/);await activate(page,'[data-guide-panel="craft"]');
   assert.match(await text(page,'#recipe-trailpack'),/Ready to make/);
   await activate(page,'[data-craft="trailpack"]');
   await activate(page,'[data-panel="pack"]');
