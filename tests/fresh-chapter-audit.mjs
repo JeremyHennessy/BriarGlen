@@ -157,16 +157,21 @@ async function followObjectiveToUse(page,expected,readiness,max=180){
   }
   assert.fail(`${expected}: not reached through visible objective guidance`);
 }
-async function collectHidesAroundCache(page,needed=2){
-  let hides=0;
-  const pattern=['north','east','south','west','north','west','south','east'];
-  for(let step=0;step<50&&hides<needed;step++){
-    const use=await text(page,'#interaction-target');
-    if(use==='Wolf Hide'){await activate(page,'#interact-btn');hides++;await page.waitForTimeout(100);continue;}
-    await move(page,pattern[step%pattern.length],120);
+async function verifyEarnedPackMaterials(page){
+  // The recipe needs two carried Wolf Hides, not two NEW hides from the Waycache.
+  // Read the actual visible Pack, including resources legitimately collected in Greenwood.
+  await activate(page,'[data-panel="pack"]');
+  const materials={};
+  for(const [id,label,required] of [['hide','Wolf Hides',2],['wood','Ashwood',1]]){
+    const row=page.locator(`#inventory [data-item-id="${id}"]`);
+    const visible=await row.count()&&(await row.isVisible())?(await row.innerText()).trim():'';
+    const carried=Number(visible.match(/×(\d+)/)?.[1]||0);
+    materials[id]=carried;
+    assert.ok(carried>=required,`Earned Trail Pack requires ${required} carried ${label}; visible Pack shows ${carried}. Revisit Greenwood using ordinary play if short.`);
   }
-  assert.ok(hides>=needed,`Only ${hides}/${needed} visible Waycache Wolf Hides were recovered`);
-  return hides;
+  console.log('EARNED_PACK_MATERIALS '+JSON.stringify(materials));
+  await activate(page,'[data-panel="nearby"]');
+  return materials;
 }
 
 const browser=await chromium.launch({headless:true});
@@ -209,12 +214,12 @@ try{
   for(let i=0;i<6;i++){const button=page.locator('[data-cache-store="arrows"]');assert.ok(await button.count(),`Arrow storage missing at ${i}/6`);await button.click();await page.waitForTimeout(60);}
   assert.match(await text(page,'#objective-text'),/Return to the Trail Ledger/);
 
-  await activate(page,'[data-panel="nearby"]');
-  const cacheHides=await collectHidesAroundCache(page,2);
+  const earnedPackMaterials=await verifyEarnedPackMaterials(page);
   await followObjectiveToUse(page,'Stonepine Trail Ledger','Finish');
   assert.match(await text(page,'#objective-text'),/Craft your earned Trail Pack/);
   await activate(page,'#objective-open');
-  assert.match(await text(page,'#guide-trailpack-plan'),/Trail Pack · .*Wolf Hides · .*Ashwood/);await activate(page,'[data-guide-panel="craft"]');
+  assert.match(await text(page,'#guide-trailpack-plan'),/Trail Pack · .*Wolf Hides · .*Ashwood/);
+  await activate(page,'[data-guide-panel="craft"]');
   assert.match(await text(page,'#recipe-trailpack'),/Ready to make/);
   await activate(page,'[data-craft="trailpack"]');
   await activate(page,'[data-panel="pack"]');
@@ -226,7 +231,7 @@ try{
   assert.match(await text(page,'#objective-text'),/Choose a wider-field lead/);
   await activate(page,'[data-panel="pack"]');assert.match(await text(page,'#inventory'),/Trail Pack/);
   assert.deepEqual(errors,[],'Fresh chapter audit produced runtime console errors');
-  results.push({gathered,cacheHides,finalObjective:await text(page,'#objective-text'),errors});
+  results.push({gathered,earnedPackMaterials,finalObjective:await text(page,'#objective-text'),errors});
   await context.close();
 }finally{await browser.close();}
 await writeFile(`${evidence}/fresh-chapter.json`,JSON.stringify(results,null,2));
