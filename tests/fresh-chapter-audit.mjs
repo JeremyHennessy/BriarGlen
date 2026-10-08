@@ -42,7 +42,7 @@ async function reachLedger(page){
 }
 async function fightVisible(page,label){
   const samples=[];
-  for(let step=0;step<160;step++){
+  for(let step=0;step<80;step++){
     if(!await page.locator('#combat-cue').isVisible())return;
     const action=await text(page,'#combat-action'),threat=await text(page,'#combat-threat');
     const hp=Number((await text(page,'#hp-text')).split('/')[0].trim());
