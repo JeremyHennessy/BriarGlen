@@ -46,8 +46,13 @@ async function fightVisible(page,label){
     if(!await page.locator('#combat-cue').isVisible())return;
     const action=await text(page,'#combat-action'),threat=await text(page,'#combat-threat');
     const hp=Number((await text(page,'#hp-text')).split('/')[0].trim());
-    if(step%8===0) samples.push({step,action,threat,hp,readiness:await text(page,'#attack-readiness'),direction:await text(page,'#objective-direction')});
-    assert.ok(hp>20,`${label}: health fell below safe diagnostic floor while fighting: ${threat}`);
+    samples.push({step,action,threat,hp,energy:await text(page,'#energy-text'),attackReadiness:await text(page,'#attack-readiness'),braceReadiness:await text(page,'#brace-readiness'),direction:await text(page,'#objective-direction')});
+    if(hp<=20){
+      await writeFile(`${evidence}/combat-${label.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.json`,JSON.stringify({reason:'low-health',samples},null,2));
+      await page.screenshot({path:`${evidence}/combat-${label.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.png`});
+      console.error('COMBAT_DIAGNOSTIC '+JSON.stringify({label,reason:'low-health',samples}));
+      assert.fail(`${label}: health fell below safe diagnostic floor while fighting: ${threat}; see combat diagnostic evidence`);
+    }
     if(/Strike incoming|Pounce incoming|Close threat/.test(threat)){
       const brace=await text(page,'#brace-readiness');
       if(!/Braced|Low energy/.test(brace))await activate(page,'#quick-brace');
