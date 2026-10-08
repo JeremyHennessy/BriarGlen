@@ -65,6 +65,18 @@ async function fightVisible(page,label){
   console.error('COMBAT_DIAGNOSTIC '+JSON.stringify({label,samples}));
   assert.fail(`${label}: threat did not resolve through visible combat actions; see diagnostic evidence`);
 }
+// Read only the actually rendered Pack, never a debug snapshot or an inferred pickup count.
+async function visibleMaterials(page){
+  await activate(page,'[data-panel="pack"]');
+  const carried={};
+  for(const id of ['wood','hide']){
+    const row=page.locator(`#inventory [data-item-id="${id}"]`);
+    const value=await row.count()&&await row.isVisible()?(await row.innerText()).trim():'';
+    carried[id]=Number(value.match(/×(\d+)/)?.[1]||0);
+  }
+  await activate(page,'[data-panel="nearby"]');
+  return carried;
+}
 async function gatherFirstKit(page){
   // The rendered map places Greenwood north-east of the Trail Ledger; travel uses only ordinary movement.
   await move(page,'north-east',1100);
@@ -80,20 +92,32 @@ async function gatherFirstKit(page){
   // First-chapter preparation consumes 2 wood for the bow, 2 for two arrow batches,
   // and 1 for the earned Trail Pack. Keep two spare for ordinary field use.
   const woodTarget=7;
-  let wood=0,hides=0;
+  const pickups=[];
+  let {wood,hide:hides}=await visibleMaterials(page);
   for(let step=0;step<240&&(wood<woodTarget||hides<1);step++){
     if(await page.locator('#combat-cue').isVisible()){
       await fightVisible(page,'Greenwood');
       await page.waitForTimeout(150);
     }
     const use=await text(page,'#interaction-target');
-    if(use==='Wolf Hide'){await activate(page,'#interact-btn');hides++;await page.waitForTimeout(120);continue;}
-    if(use==='Ashwood'){await activate(page,'#interact-btn');wood++;await page.waitForTimeout(120);continue;}
+    if(use==='Wolf Hide'||use==='Ashwood'){
+      const before={wood,hides};
+      const readiness=await text(page,'#interact-readiness');
+      await activate(page,'#interact-btn');
+      await page.waitForTimeout(120);
+      const carried=await visibleMaterials(page);
+      wood=carried.wood;hides=carried.hide;
+      const gained=use==='Ashwood'?wood>before.wood:hides>before.hides;
+      pickups.push({step,use,readiness,before,after:{wood,hides},gained});
+      if(!gained)await move(page,pattern[step%pattern.length],210);
+      continue;
+    }
     await move(page,pattern[step%pattern.length],210);
   }
+  await writeFile(`${evidence}/verified-greenwood-pickups.json`,JSON.stringify({wood,hides,pickups},null,2));
   if(wood<woodTarget||hides<1){
     const state=await visibleState(page);
-    console.error('GATHER_DIAGNOSTIC '+JSON.stringify({wood,hides,state,nearby:await text(page,'#nearby')}));
+    console.error('GATHER_DIAGNOSTIC '+JSON.stringify({wood,hides,attempts:pickups.length,unconfirmed:pickups.filter(x=>!x.gained),state,nearby:await text(page,'#nearby')}));
     await page.screenshot({path:`${evidence}/greenwood-gather-shortfall.png`});
   }
   assert.ok(wood>=woodTarget,`Fresh player found only ${wood}/${woodTarget} Ashwood through visible Greenwood exploration`);
