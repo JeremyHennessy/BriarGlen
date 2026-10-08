@@ -45,6 +45,12 @@ async function fightVisible(page,label){
   for(let step=0;step<80;step++){
     if(!await page.locator('#combat-cue').isVisible())return;
     const action=await text(page,'#combat-action'),threat=await text(page,'#combat-threat');
+    // A visible warning covers enemies up to 300 units away, while attacks have
+    // a shorter range. Do not freeze ordinary travel waiting for a distant foe.
+    if(/^No target in reach/.test(action)){
+      console.log('DISTANT_THREAT '+JSON.stringify({label,action,threat}));
+      return;
+    }
     const hp=Number((await text(page,'#hp-text')).split('/')[0].trim());
     samples.push({step,action,threat,hp,energy:await text(page,'#energy-text'),attackReadiness:await text(page,'#attack-readiness'),braceReadiness:await text(page,'#brace-readiness'),direction:await text(page,'#objective-direction')});
     if(hp<=20){
@@ -172,7 +178,10 @@ async function followObjectiveToUse(page,expected,readiness,max=180){
   await activate(page,'[data-panel="nearby"]');
   let last=null;
   for(let step=0;step<max;step++){
-    if(await page.locator('#combat-cue').isVisible()){await fightVisible(page,expected);continue;}
+    if(await page.locator('#combat-cue').isVisible()&&!/^No target in reach/.test(await text(page,'#combat-action'))){
+      await fightVisible(page,expected);
+      continue;
+    }
     const s=await visibleState(page);
     if(s.use===expected&&(!readiness||s.readiness===readiness)){await activate(page,'#interact-btn');await page.waitForTimeout(220);return;}
     if(s.direction.includes('Nearby resident has Use priority')){await page.waitForTimeout(350);continue;}
