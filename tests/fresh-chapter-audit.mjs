@@ -131,6 +131,7 @@ async function craftFieldKit(page){
   assert.match(await text(page,'#attack-readiness'),/Bow · 12/);
 }
 async function followObjectiveToUse(page,expected,readiness,max=180){
+  await activate(page,'[data-panel="nearby"]');
   let last=null;
   for(let step=0;step<max;step++){
     if(await page.locator('#combat-cue').isVisible()){await fightVisible(page,expected);continue;}
