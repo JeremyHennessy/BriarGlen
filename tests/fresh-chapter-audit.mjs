@@ -41,10 +41,12 @@ async function reachLedger(page){
   assert.fail('Ledger not reached through visible objective guidance');
 }
 async function fightVisible(page,label){
+  const samples=[];
   for(let step=0;step<80;step++){
     if(!await page.locator('#combat-cue').isVisible())return;
     const action=await text(page,'#combat-action'),threat=await text(page,'#combat-threat');
     const hp=Number((await text(page,'#hp-text')).split('/')[0].trim());
+    if(step%8===0) samples.push({step,action,threat,hp,readiness:await text(page,'#attack-readiness'),direction:await text(page,'#objective-direction')});
     assert.ok(hp>20,`${label}: health fell below safe diagnostic floor while fighting: ${threat}`);
     if(/Strike incoming|Pounce incoming|Close threat/.test(threat)){
       const brace=await text(page,'#brace-readiness');
@@ -53,7 +55,10 @@ async function fightVisible(page,label){
     if(/^Attack /.test(action)&&!/recovering/.test(action))await activate(page,'#attack-btn');
     await page.waitForTimeout(/Bow/.test(await text(page,'#attack-readiness'))?680:440);
   }
-  assert.fail(`${label}: threat did not resolve through visible combat actions`);
+  await writeFile(`${evidence}/combat-${label.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.json`,JSON.stringify(samples,null,2));
+  await page.screenshot({path:`${evidence}/combat-${label.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.png`});
+  console.error('COMBAT_DIAGNOSTIC '+JSON.stringify({label,samples}));
+  assert.fail(`${label}: threat did not resolve through visible combat actions; see diagnostic evidence`);
 }
 async function gatherFirstKit(page){
   // The rendered map places Greenwood north-east of the Trail Ledger; travel uses only ordinary movement.
