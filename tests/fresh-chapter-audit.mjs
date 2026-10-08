@@ -77,8 +77,11 @@ async function gatherFirstKit(page){
     ]).flat(),
     ...Array(10).fill('south')
   ];
+  // First-chapter preparation consumes 2 wood for the bow, 2 for two arrow batches,
+  // and 1 for the earned Trail Pack. Keep two spare for ordinary field use.
+  const woodTarget=7;
   let wood=0,hides=0;
-  for(let step=0;step<180&&(wood<5||hides<1);step++){
+  for(let step=0;step<240&&(wood<woodTarget||hides<1);step++){
     if(await page.locator('#combat-cue').isVisible()){
       await fightVisible(page,'Greenwood');
       await page.waitForTimeout(150);
@@ -88,12 +91,12 @@ async function gatherFirstKit(page){
     if(use==='Ashwood'){await activate(page,'#interact-btn');wood++;await page.waitForTimeout(120);continue;}
     await move(page,pattern[step%pattern.length],210);
   }
-  if(wood<5||hides<1){
+  if(wood<woodTarget||hides<1){
     const state=await visibleState(page);
     console.error('GATHER_DIAGNOSTIC '+JSON.stringify({wood,hides,state,nearby:await text(page,'#nearby')}));
     await page.screenshot({path:`${evidence}/greenwood-gather-shortfall.png`});
   }
-  assert.ok(wood>=5,`Fresh player found only ${wood}/5 Ashwood through visible Greenwood exploration`);
+  assert.ok(wood>=woodTarget,`Fresh player found only ${wood}/${woodTarget} Ashwood through visible Greenwood exploration`);
   assert.ok(hides>=1,`Fresh player found only ${hides}/1 Wolf Hide through visible Greenwood combat`);
   return{wood,hides};
 }
@@ -101,9 +104,18 @@ async function craftFieldKit(page){
   await activate(page,'[data-panel="craft"]');
   if(await page.locator('[data-craft-filter="gear"]').count())await activate(page,'[data-craft-filter="gear"]');
   assert.match(await text(page,'#recipe-bow'),/Ready to make/);
+  const preparation=[];
+  const snapshot=async stage=>{
+    const record={stage,inventory:await text(page,'#inventory'),bow:await text(page,'#recipe-bow'),arrows:await text(page,'#recipe-arrows'),attack:await text(page,'#attack-readiness')};
+    preparation.push(record);
+    console.log('PREPARATION_STAGE '+JSON.stringify(record));
+  };
+  await snapshot('before-bow');
   await activate(page,'[data-craft="bow"]');
+  await snapshot('after-bow');
   if(await page.locator('[data-craft-filter="supplies"]').count())await activate(page,'[data-craft-filter="supplies"]');
   for(let batch=1;batch<=2;batch++){
+    await snapshot(`before-arrow-batch-${batch}`);
     assert.match(await text(page,'#recipe-arrows'),/Ready to make/);
     await activate(page,'[data-craft="arrows"]');
     await activate(page,'[data-panel="pack"]');
@@ -117,6 +129,7 @@ async function craftFieldKit(page){
       await page.screenshot({path:`${evidence}/arrows-batch-${batch}-failure.png`});
       throw error;
     }
+    await snapshot(`after-arrow-batch-${batch}`);
     if(batch<2){
       await activate(page,'[data-panel="craft"]');
       if(await page.locator('[data-craft-filter="supplies"]').count())await activate(page,'[data-craft-filter="supplies"]');
@@ -129,6 +142,7 @@ async function craftFieldKit(page){
   await page.waitForFunction(()=>document.querySelector('#attack-readiness')?.textContent?.trim()==='Bow · 12',null,{timeout:4000});
   assert.equal(await text(page,'#loadout-weapon-name'),'Briar Bow');
   assert.match(await text(page,'#attack-readiness'),/Bow · 12/);
+  await writeFile(`${evidence}/preparation-stages.json`,JSON.stringify(preparation,null,2));
 }
 async function followObjectiveToUse(page,expected,readiness,max=180){
   await activate(page,'[data-panel="nearby"]');
