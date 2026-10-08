@@ -63,7 +63,15 @@ async function fightVisible(page,label){
 async function gatherFirstKit(page){
   // The rendered map places Greenwood north-east of the Trail Ledger; travel uses only ordinary movement.
   await move(page,'north-east',1100);
-  const pattern=['east','north','east','south','east','north','west','north','east','south','west','south'];
+  // Sweep back and forth through the player-visible Greenwood area rather than
+  // drifting east on every circuit. All travel remains ordinary WASD movement.
+  const pattern=[
+    ...Array.from({length:6},(_,row)=>[
+      ...Array(12).fill(row%2?'west':'east'),
+      ...(row<5?Array(2).fill('north'):[])
+    ]).flat(),
+    ...Array(10).fill('south')
+  ];
   let wood=0,hides=0;
   for(let step=0;step<180&&(wood<5||hides<1);step++){
     if(await page.locator('#combat-cue').isVisible()){
@@ -74,6 +82,11 @@ async function gatherFirstKit(page){
     if(use==='Wolf Hide'){await activate(page,'#interact-btn');hides++;await page.waitForTimeout(120);continue;}
     if(use==='Ashwood'){await activate(page,'#interact-btn');wood++;await page.waitForTimeout(120);continue;}
     await move(page,pattern[step%pattern.length],210);
+  }
+  if(wood<5||hides<1){
+    const state=await visibleState(page);
+    console.error('GATHER_DIAGNOSTIC '+JSON.stringify({wood,hides,state,nearby:await text(page,'#nearby')}));
+    await page.screenshot({path:`${evidence}/greenwood-gather-shortfall.png`});
   }
   assert.ok(wood>=5,`Fresh player found only ${wood}/5 Ashwood through visible Greenwood exploration`);
   assert.ok(hides>=1,`Fresh player found only ${hides}/1 Wolf Hide through visible Greenwood combat`);
