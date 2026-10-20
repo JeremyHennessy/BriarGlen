@@ -482,7 +482,74 @@
       ctx.restore();
     }
   }
-  function drawResources(){const survey=performance.now()<player.surveyUntil;for(const r of world.resources){if(!r.available)continue;const p=worldToScreen(r.x,r.y);if(p.x<-20||p.y<-20||p.x>canvas.width+20||p.y>canvas.height+20)continue;ctx.fillStyle=itemDefs[r.type].color;ctx.beginPath();ctx.arc(p.x,p.y,r.r,0,TAU);ctx.fill();if(survey){const q=resourceGatherQuality(r);ctx.strokeStyle=q>=2?'#f3df88':'rgba(255,255,255,.55)';ctx.lineWidth=q>=2?3:1;ctx.beginPath();ctx.arc(p.x,p.y,r.r+5,0,TAU);ctx.stroke();ctx.fillStyle='#fff';ctx.font='10px system-ui';ctx.fillText(`${qualityLabel(q)} ${itemDefs[r.type].name}`,p.x+12,p.y-10);}}}
+  function drawResources(){
+    const survey=performance.now()<player.surveyUntil;
+    for(const r of world.resources){
+      if(!r.available)continue;
+      const p=worldToScreen(r.x,r.y);
+      if(p.x<-20||p.y<-20||p.x>canvas.width+20||p.y>canvas.height+20)continue;
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      // Presentation only: node locations, collision radii, yield, quality and Use range are untouched.
+      ctx.fillStyle='rgba(13,20,12,.27)';
+      ctx.beginPath();ctx.ellipse(2,7,r.r+1,3.5,0,0,TAU);ctx.fill();
+      if(r.type==='briarleaf'){
+        ctx.strokeStyle='#35593b';ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(0,7);ctx.lineTo(0,-6);ctx.stroke();
+        ctx.fillStyle=itemDefs[r.type].color;
+        ctx.beginPath();
+        ctx.ellipse(-3,-2,3.5,6,-.7,0,TAU);
+        ctx.ellipse(3,-3,3.5,6,.7,0,TAU);
+        ctx.fill();
+        ctx.strokeStyle='rgba(231,247,195,.85)';ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(-5,0);ctx.lineTo(-1,-5);ctx.moveTo(5,-1);ctx.lineTo(1,-6);ctx.stroke();
+      }else if(r.type==='mooncap'){
+        ctx.fillStyle='#e6d9ef';
+        ctx.fillRect(-2,0,4,8);
+        ctx.fillStyle=itemDefs[r.type].color;
+        ctx.beginPath();ctx.moveTo(-9,1);
+        ctx.quadraticCurveTo(-8,-9,0,-10);
+        ctx.quadraticCurveTo(8,-9,9,1);
+        ctx.closePath();ctx.fill();
+        ctx.fillStyle='#ede4f4';
+        for(const x of [-4,3]){
+          ctx.beginPath();ctx.arc(x,-3,1.8,0,TAU);ctx.fill();
+        }
+      }else if(r.type==='iron'){
+        ctx.fillStyle=itemDefs[r.type].color;
+        ctx.beginPath();
+        ctx.moveTo(-10,4);ctx.lineTo(-6,-7);ctx.lineTo(1,-9);
+        ctx.lineTo(10,-2);ctx.lineTo(8,6);ctx.lineTo(-2,9);
+        ctx.closePath();ctx.fill();
+        ctx.fillStyle='#c9d1d3';
+        ctx.beginPath();ctx.moveTo(-6,-7);ctx.lineTo(1,-9);
+        ctx.lineTo(0,2);ctx.lineTo(-10,4);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='#5b696f';ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(1,-9);ctx.lineTo(0,2);ctx.lineTo(8,6);ctx.stroke();
+      }else if(r.type==='wood'){
+        ctx.fillStyle='#735135';
+        ctx.fillRect(-7,-5,13,10);
+        ctx.fillStyle=itemDefs[r.type].color;
+        ctx.beginPath();ctx.ellipse(-5,0,4,5,0,0,TAU);ctx.fill();
+        ctx.strokeStyle='#63452e';ctx.lineWidth=1;
+        ctx.beginPath();ctx.ellipse(-5,0,2,3,0,0,TAU);ctx.stroke();
+        ctx.strokeStyle='rgba(234,209,155,.7)';
+        ctx.beginPath();ctx.moveTo(-1,-3);ctx.lineTo(6,-3);ctx.moveTo(-1,2);ctx.lineTo(6,2);ctx.stroke();
+      }else{
+        ctx.fillStyle=itemDefs[r.type].color;
+        ctx.beginPath();ctx.arc(0,0,r.r,0,TAU);ctx.fill();
+      }
+      ctx.restore();
+      if(survey){
+        const q=resourceGatherQuality(r);
+        ctx.strokeStyle=q>=2?'#f3df88':'rgba(255,255,255,.55)';
+        ctx.lineWidth=q>=2?3:1;
+        ctx.beginPath();ctx.arc(p.x,p.y,r.r+5,0,TAU);ctx.stroke();
+        ctx.fillStyle='#fff';ctx.font='10px system-ui';
+        ctx.fillText(`${qualityLabel(q)} ${itemDefs[r.type].name}`,p.x+12,p.y-10);
+      }
+    }
+  }
   function drawLandmarks(){for(const l of world.landmarks||[]){const p=worldToScreen(l.x,l.y);if(p.x<-40||p.y<-40||p.x>canvas.width+40||p.y>canvas.height+40)continue;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(Math.PI/4);ctx.fillStyle=l.discovered?'#aeb8a5':'#d2c48d';ctx.fillRect(-9,-9,18,18);ctx.strokeStyle='rgba(24,28,24,.7)';ctx.lineWidth=2;ctx.strokeRect(-9,-9,18,18);ctx.restore();if(l.discovered||dist(player,l)<140){ctx.fillStyle='#f0efe4';ctx.font='11px system-ui';ctx.fillText(l.name,p.x+16,p.y-12);}}
   }
   function drawNPCs(){for(const n of npcs){const p=worldToScreen(n.x,n.y);ctx.fillStyle=n.color;ctx.beginPath();ctx.arc(p.x,p.y,n.r,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.font='11px system-ui';ctx.fillText(n.name,p.x-18,p.y-17);if(n.request){ctx.fillStyle='#efc96f';ctx.fillText('!',p.x-2,p.y+4);}if(performance.now()<player.readNeedUntil&&dist(player,n)<240){ctx.fillStyle='rgba(14,17,13,.86)';ctx.fillRect(p.x-55,p.y+18,110,28);ctx.fillStyle='#fff';ctx.font='10px system-ui';ctx.fillText(npcNeedText(n).slice(0,25),p.x-50,p.y+35);}}}
