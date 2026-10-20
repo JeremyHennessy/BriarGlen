@@ -413,7 +413,75 @@
 
   function worldToScreen(x,y){return{x:x-camera.x,y:y-camera.y};}
   function drawGround(){ctx.fillStyle=world.weather==='rain'?'#27332d':'#2d3a2c';ctx.fillRect(0,0,canvas.width,canvas.height);for(const z of zones){const p=worldToScreen(z.x,z.y);ctx.fillStyle=z.color;ctx.globalAlpha=.58;ctx.fillRect(p.x,p.y,z.w,z.h);ctx.globalAlpha=1;ctx.fillStyle='rgba(240,239,228,.65)';ctx.font='12px system-ui';ctx.fillText(z.name,p.x+10,p.y+18);}if(world.weather==='rain'){ctx.strokeStyle='rgba(184,208,220,.22)';ctx.lineWidth=1;for(let i=0;i<80;i++){const x=(i*83+performance.now()*.12)%canvas.width,y=(i*47+performance.now()*.22)%canvas.height;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-4,y+10);ctx.stroke();}}}
-  function drawBuildings(){for(const b of buildings){const p=worldToScreen(b.x,b.y);ctx.fillStyle=b.color;ctx.fillRect(p.x,p.y,b.w,b.h);ctx.strokeStyle='rgba(0,0,0,.35)';ctx.strokeRect(p.x,p.y,b.w,b.h);ctx.fillStyle='#f0efe4';ctx.font='11px system-ui';ctx.fillText(b.name,p.x+7,p.y+16);}}
+  function drawBuildings(){
+    for(const b of buildings){
+      const p=worldToScreen(b.x,b.y);
+      if(p.x+b.w<-8||p.y+b.h<-8||p.x>canvas.width+8||p.y>canvas.height+8)continue;
+      ctx.save();
+      // Visual-only detail: the original building position, footprint and interaction area stay unchanged.
+      ctx.fillStyle='rgba(12,18,12,.28)';
+      ctx.fillRect(p.x+5,p.y+6,b.w,b.h);
+      ctx.fillStyle=b.color;
+      ctx.fillRect(p.x,p.y,b.w,b.h);
+      ctx.strokeStyle='rgba(19,27,19,.65)';
+      ctx.lineWidth=2;
+      ctx.strokeRect(p.x+1,p.y+1,b.w-2,b.h-2);
+      if(b.id==='apothecary'){
+        // Mira's outdoor growing beds and the narrow path between them.
+        ctx.fillStyle='#314b32';
+        ctx.fillRect(p.x+5,p.y+26,b.w-10,b.h-32);
+        ctx.fillStyle='#b29c72';
+        ctx.fillRect(p.x+b.w/2-7,p.y+26,14,b.h-27);
+        for(let row=0;row<3;row++){
+          const y=p.y+33+row*12;
+          ctx.fillStyle='#658950';
+          ctx.fillRect(p.x+10,y,30,7);
+          ctx.fillRect(p.x+b.w-40,y,30,7);
+          ctx.fillStyle=row===1?'#e3c47d':'#c3d3a1';
+          for(const x of [p.x+19,p.x+31,p.x+b.w-31,p.x+b.w-19]){
+            ctx.beginPath();ctx.arc(x,y+3,2.5,0,TAU);ctx.fill();
+          }
+        }
+      }else if(b.id==='market'){
+        // Rowan's striped awning, timber counter and visible market crates.
+        ctx.fillStyle='#514333';
+        ctx.fillRect(p.x+8,p.y+24,b.w-16,b.h-27);
+        const stripe=(b.w-16)/8;
+        for(let i=0;i<8;i++){
+          ctx.fillStyle=i%2===0?'#9c6447':'#c5aa78';
+          ctx.fillRect(p.x+8+i*stripe,p.y+27,stripe+0.5,17);
+        }
+        ctx.fillStyle='#a88959';
+        ctx.fillRect(p.x+12,p.y+49,b.w-24,10);
+        ctx.fillStyle='#665239';
+        ctx.fillRect(p.x+18,p.y+60,19,10);
+        ctx.fillRect(p.x+b.w-38,p.y+60,19,10);
+      }else{
+        // Alden's forge and the Warden Hall gain shallow roofs, warm windows and a doorway.
+        ctx.fillStyle='rgba(226,208,169,.16)';
+        ctx.fillRect(p.x+4,p.y+41,b.w-8,b.h-45);
+        ctx.fillStyle=b.id==='forge'?'#49362d':'#444940';
+        ctx.beginPath();
+        ctx.moveTo(p.x-3,p.y+42);
+        ctx.lineTo(p.x+15,p.y+25);
+        ctx.lineTo(p.x+b.w-15,p.y+25);
+        ctx.lineTo(p.x+b.w+3,p.y+42);
+        ctx.closePath();ctx.fill();
+        ctx.strokeStyle='#ad8d61';ctx.lineWidth=2;ctx.stroke();
+        ctx.fillStyle='#332923';
+        ctx.fillRect(p.x+b.w/2-9,p.y+b.h-26,18,26);
+        ctx.fillStyle='#e0b469';
+        for(const x of [p.x+13,p.x+b.w-25])ctx.fillRect(x,p.y+b.h-30,12,9);
+      }
+      // A dark sign stays readable over the more detailed building silhouettes.
+      ctx.fillStyle='rgba(19,24,18,.9)';
+      ctx.fillRect(p.x+4,p.y+4,b.w-8,18);
+      ctx.fillStyle='#f0efe4';
+      ctx.font='11px system-ui';
+      ctx.fillText(b.name,p.x+7,p.y+17);
+      ctx.restore();
+    }
+  }
   function drawResources(){const survey=performance.now()<player.surveyUntil;for(const r of world.resources){if(!r.available)continue;const p=worldToScreen(r.x,r.y);if(p.x<-20||p.y<-20||p.x>canvas.width+20||p.y>canvas.height+20)continue;ctx.fillStyle=itemDefs[r.type].color;ctx.beginPath();ctx.arc(p.x,p.y,r.r,0,TAU);ctx.fill();if(survey){const q=resourceGatherQuality(r);ctx.strokeStyle=q>=2?'#f3df88':'rgba(255,255,255,.55)';ctx.lineWidth=q>=2?3:1;ctx.beginPath();ctx.arc(p.x,p.y,r.r+5,0,TAU);ctx.stroke();ctx.fillStyle='#fff';ctx.font='10px system-ui';ctx.fillText(`${qualityLabel(q)} ${itemDefs[r.type].name}`,p.x+12,p.y-10);}}}
   function drawLandmarks(){for(const l of world.landmarks||[]){const p=worldToScreen(l.x,l.y);if(p.x<-40||p.y<-40||p.x>canvas.width+40||p.y>canvas.height+40)continue;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(Math.PI/4);ctx.fillStyle=l.discovered?'#aeb8a5':'#d2c48d';ctx.fillRect(-9,-9,18,18);ctx.strokeStyle='rgba(24,28,24,.7)';ctx.lineWidth=2;ctx.strokeRect(-9,-9,18,18);ctx.restore();if(l.discovered||dist(player,l)<140){ctx.fillStyle='#f0efe4';ctx.font='11px system-ui';ctx.fillText(l.name,p.x+16,p.y-12);}}
   }
