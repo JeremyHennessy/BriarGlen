@@ -62,7 +62,7 @@ async function fightVisible(page,label){
       console.error('COMBAT_DIAGNOSTIC '+JSON.stringify({label,reason:'low-health',samples}));
       assert.fail(`${label}: health fell below safe diagnostic floor while fighting: ${threat}; see combat diagnostic evidence`);
     }
-    if(/Strike incoming|Pounce incoming|Close threat/.test(threat)){
+    if(/Strike incoming|Pounce incoming/.test(threat)||(/Close threat/.test(threat)&&hp<=60)){
       const brace=await text(page,'#brace-readiness');
       if(!/Braced|Low energy/.test(brace))await activate(page,'#quick-brace');
     }
