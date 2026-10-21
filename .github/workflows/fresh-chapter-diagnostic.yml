@@ -1,0 +1,41 @@
+name: Fresh first chapter diagnostic
+on:
+  pull_request:
+    paths:
+      - 'tests/fresh-chapter-audit.mjs'
+      - '.github/workflows/fresh-chapter-diagnostic.yml'
+      - 'src/**'
+      - 'index.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fresh-player:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Audit syntax
+        run: node --check tests/fresh-chapter-audit.mjs
+      - name: Install browser
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+      - name: Serve game
+        run: |
+          python3 -m http.server 4173 >/tmp/briar-fresh.log 2>&1 &
+          sleep 2
+      - name: Fresh first chapter audit
+        env:
+          UI_EVIDENCE_DIR: fresh-chapter-evidence
+        run: node tests/fresh-chapter-audit.mjs http://127.0.0.1:4173/
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fresh-chapter-${{ github.sha }}
+          path: fresh-chapter-evidence
+          if-no-files-found: warn
