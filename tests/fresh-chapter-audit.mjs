@@ -108,22 +108,6 @@ async function craftFirstKit(page){
   await page.screenshot({path:`${evidence}/02-first-bow-and-arrows.png`});
   await activate(page,'[data-panel="nearby"]');
 }
-
-// Developer-only forensic snapshot: report observed route geometry;
-// never use these coordinates, inventory or world objects to steer the test.
-async function traceRoute(page,step,routeMoves) {
-  const sample=await page.evaluate(()=>{
-    const d=window.__BRIAR_GLEN_DEBUG__,p=d.snapshot().player;
-    const wood=d.resourcesAll().filter(r=>r.type==='wood'&&r.available);
-    const woodland=wood.filter(r=>r.x>=1160&&r.x<=1720&&r.y>=220&&r.y<=690);
-    return{player:[Math.round(p.x),Math.round(p.y)],energy:Math.round(p.energy),
-      aliveWood:woodland.length,
-      nearestWood:Math.round(Math.min(...woodland.map(r=>Math.hypot(p.x-r.x,p.y-r.y)))),
-      withinUse:woodland.filter(r=>Math.hypot(p.x-r.x,p.y-r.y)<44).length};
-  });
-  console.log('ROUTE_TRACE '+JSON.stringify({step,routeMoves,...sample,interaction:await text(page,'#interaction-target')}));
-}
-
 async function gatherFirstKit(page){
   // Greenwood is north-east of the Trail Ledger on the visible map. Collect only
   // the *first* Bow/arrow ingredients before crafting; finish provisions armed.
@@ -138,7 +122,6 @@ async function gatherFirstKit(page){
   const pickups=[];
   let armed=false,routeMoves=0,{wood,hide:hides}=await visibleMaterials(page);
   for(let step=0;step<240&&(!armed||wood<2||hides<2);step++){
-    if(step%12===0)await traceRoute(page,step,routeMoves);
     // Give visible pickups priority over another unnecessary fight. Use itself
     // retains the game's resident/landmark/resource/drop priority rules.
     const use=await text(page,'#interaction-target');
@@ -151,7 +134,7 @@ async function gatherFirstKit(page){
       const gained=use==='Ashwood'?wood>before.wood:hides>before.hides;
       pickups.push({step,use,readiness,before,after:{wood,hides},gained});
       if(!gained)await move(page,pattern[routeMoves++%pattern.length],210);
-    }else if(await page.locator('#combat-cue').isVisible()){
+    }else if(await page.locator('#combat-cue').isVisible()&&!/^No target in reach/.test(await text(page,'#combat-action'))){
       await fightVisible(page,'Greenwood');
       await page.waitForTimeout(100);
     }else await move(page,pattern[routeMoves++%pattern.length],210);
