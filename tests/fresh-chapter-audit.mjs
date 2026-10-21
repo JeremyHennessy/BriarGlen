@@ -108,6 +108,64 @@ async function craftFirstKit(page){
   await page.screenshot({path:`${evidence}/02-first-bow-and-arrows.png`});
   await activate(page,'[data-panel="nearby"]');
 }
+
+/*
+ * Visually identify Ashwood from the displayed canvas, then use the game's
+ * existing tap-to-approach interaction. No world positions, save payloads,
+ * debug facilities or source-derived resource locations are consulted.
+ * Diagnostic-only: this tests whether the prior blind sweep was the blocker.
+ */
+async function tryVisibleAshwood(page){
+  const spots=await page.evaluate(()=>{
+    const c=document.querySelector('#game'),ctx=c.getContext('2d'),w=c.width,h=c.height;
+    const img=ctx.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h),seen=new Uint8Array(w*h),found=[];
+    for(let y=50;y<h-14;y++)for(let x=18;x<w-18;x++){
+      const i=y*w+x,k=i*4;
+      if(img[k]===170&&img[k+1]===132&&img[k+2]===87&&img[k+3]===255)mask[i]=1;
+    }
+    for(let y=50;y<h-14;y++)for(let x=18;x<w-18;x++){
+      const seed=y*w+x;if(!mask[seed]||seen[seed])continue;
+      const queue=[seed];seen[seed]=1;let count=0,sumX=0,sumY=0;
+      for(let at=0;at<queue.length;at++){
+        const i=queue[at],xx=i%w,yy=Math.floor(i/w);count++;sumX+=xx;sumY+=yy;
+        for(const next of [i-1,i+1,i-w,i+w]){
+          if(next<0||next>=mask.length||seen[next]||!mask[next])continue;
+          seen[next]=1;queue.push(next);
+        }
+      }
+      if(count>=5)found.push({x:sumX/count+5,y:sumY/count,count});
+    }
+    const merged=[];
+    for(const f of found){
+      const existing=merged.find(a=>Math.hypot(a.x-f.x,a.y-f.y)<20);
+      if(existing){if(f.count>existing.count)Object.assign(existing,f);}
+      else merged.push(f);
+    }
+    const r=c.getBoundingClientRect();
+    return merged.sort((a,b)=>Math.hypot(a.x-w/2,a.y-h/2)-Math.hypot(b.x-w/2,b.y-h/2))
+      .slice(0,6).map(a=>({...a,cssX:a.x*r.width/w,cssY:a.y*r.height/h}));
+  });
+  if(!spots.length)return false;
+  console.log('VISIBLE_ASHWOOD '+JSON.stringify({count:spots.length,candidates:spots.map(x=>({x:Math.round(x.x),y:Math.round(x.y),count:x.count}))}));
+  const before=await visibleMaterials(page);
+  for(const spot of spots.slice(0,3)){
+    const game=page.locator('#game');
+    await game.click({position:{x:spot.cssX,y:spot.cssY}});
+    await page.waitForTimeout(120);
+    const travel=await text(page,'#interaction-travel');
+    if(!/Walking to Ashwood/.test(travel)){
+      console.log('VISUAL_CLICK_SKIPPED '+JSON.stringify({x:Math.round(spot.x),y:Math.round(spot.y),travel}));
+      continue;
+    }
+    await page.waitForFunction(()=>!document.querySelector('#interaction-travel')?.textContent?.includes('Walking to Ashwood'),null,{timeout:5500}).catch(()=>{});
+    await page.waitForTimeout(150);
+    const after=await visibleMaterials(page);
+    console.log('VISUAL_WOOD_RESULT '+JSON.stringify({before,after,travel}));
+    if(after.wood>before.wood)return true;
+  }
+  return false;
+}
+
 async function gatherFirstKit(page){
   // Greenwood is north-east of the Trail Ledger on the visible map. Collect only
   // the *first* Bow/arrow ingredients before crafting; finish provisions armed.
@@ -134,6 +192,9 @@ async function gatherFirstKit(page){
       const gained=use==='Ashwood'?wood>before.wood:hides>before.hides;
       pickups.push({step,use,readiness,before,after:{wood,hides},gained});
       if(!gained)await move(page,pattern[step%pattern.length],210);
+    }else if(wood<3&&step%3===0&&await tryVisibleAshwood(page)){
+      const carried=await visibleMaterials(page);wood=carried.wood;hides=carried.hide;
+      pickups.push({step,use:'Ashwood by visible canvas tap',after:{wood,hides},gained:true});
     }else if(await page.locator('#combat-cue').isVisible()){
       await fightVisible(page,'Greenwood');
       await page.waitForTimeout(100);
