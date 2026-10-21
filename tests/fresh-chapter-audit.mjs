@@ -108,26 +108,6 @@ async function craftFirstKit(page){
   await page.screenshot({path:`${evidence}/02-first-bow-and-arrows.png`});
   await activate(page,'[data-panel="nearby"]');
 }
-
-/* Forensic log only. Never feed these developer-side measurements into a route,
-   inventory decision, interaction, or the player's acceptance proof. */
-async function logWorldForensics(page,checkpoint){
-  const sample=await page.evaluate(()=>{
-    const d=window.__BRIAR_GLEN_DEBUG__,p=d.snapshot().player,resources=d.resourcesAll();
-    const wood=resources.filter(r=>r.type==='wood'),available=wood.filter(r=>r.available),
-      within=available.filter(r=>Math.hypot(r.x-p.x,r.y-p.y)<44);
-    return {
-      player:{x:Math.round(p.x),y:Math.round(p.y),energy:Math.round(p.energy),hp:Math.round(p.hp)},
-      availableWood:available.length,unavailableWood:wood.length-available.length,
-      nearbyWood:within.length,
-      nearestWood:available.length?Math.round(Math.min(...available.map(r=>Math.hypot(r.x-p.x,r.y-p.y)))):null,
-      availableInGreenwood:available.filter(r=>r.x>=1160&&r.x<=1720&&r.y>=220&&r.y<=690).length,
-      availableWoodLocations:available.map(r=>[Math.round(r.x),Math.round(r.y)])
-    };
-  });
-  console.log('WORLD_FORENSICS '+JSON.stringify({checkpoint,...sample}));
-}
-
 async function gatherFirstKit(page){
   // Greenwood is north-east of the Trail Ledger on the visible map. Collect only
   // the *first* Bow/arrow ingredients before crafting; finish provisions armed.
@@ -140,10 +120,8 @@ async function gatherFirstKit(page){
     ...Array(10).fill('south')
   ];
   const pickups=[];
-  let armed=false,{wood,hide:hides}=await visibleMaterials(page);
-  await logWorldForensics(page,'greenwood-entry');
+  let armed=false,routeMoves=0,{wood,hide:hides}=await visibleMaterials(page);
   for(let step=0;step<240&&(!armed||wood<2||hides<2);step++){
-    if([24,60,120,180,239].includes(step))await logWorldForensics(page,'step-'+step);
     // Give visible pickups priority over another unnecessary fight. Use itself
     // retains the game's resident/landmark/resource/drop priority rules.
     const use=await text(page,'#interaction-target');
@@ -155,11 +133,11 @@ async function gatherFirstKit(page){
       wood=carried.wood;hides=carried.hide;
       const gained=use==='Ashwood'?wood>before.wood:hides>before.hides;
       pickups.push({step,use,readiness,before,after:{wood,hides},gained});
-      if(!gained)await move(page,pattern[step%pattern.length],210);
+      if(!gained)await move(page,pattern[routeMoves++%pattern.length],210);
     }else if(await page.locator('#combat-cue').isVisible()){
       await fightVisible(page,'Greenwood');
       await page.waitForTimeout(100);
-    }else await move(page,pattern[step%pattern.length],210);
+    }else await move(page,pattern[routeMoves++%pattern.length],210);
 
     if(!armed&&wood>=3&&hides>=1){
       await craftFirstKit(page);
@@ -172,7 +150,6 @@ async function gatherFirstKit(page){
   }
   await writeFile(`${evidence}/verified-greenwood-pickups.json`,JSON.stringify({wood,hides,armed,pickups},null,2));
   if(!armed||wood<2||hides<2){
-    await logWorldForensics(page,'final-shortfall');
     const state=await visibleState(page);
     console.error('GATHER_DIAGNOSTIC '+JSON.stringify({wood,hides,armed,attempts:pickups.length,unconfirmed:pickups.filter(x=>!x.gained),state,nearby:await text(page,'#nearby')}));
     await page.screenshot({path:`${evidence}/greenwood-gather-shortfall.png`});
