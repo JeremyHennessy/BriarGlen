@@ -108,6 +108,61 @@ async function craftFirstKit(page){
   await page.screenshot({path:`${evidence}/02-first-bow-and-arrows.png`});
   await activate(page,'[data-panel="nearby"]');
 }
+
+/* Visual-only test: find candidate Ashwood icons in the displayed canvas and
+   verify the game's normal tap-to-approach feedback in its expanded help panel.
+   No hidden entity positions or debug state are used to choose targets. */
+async function gatherVisibleAshwood(page){
+  const details=page.locator('.interaction-controls');
+  if(!(await details.evaluate(el=>el.open)))await activate(page,'.interaction-controls summary');
+  const candidates=await page.locator('#game').evaluate(canvas=>{
+    const w=canvas.width,h=canvas.height,img=canvas.getContext('2d').getImageData(0,0,w,h).data;
+    const mask=new Uint8Array(w*h),seen=new Uint8Array(w*h),found=[];
+    for(let y=55;y<h-12;y++)for(let x=15;x<w-15;x++){
+      const i=y*w+x,j=i*4;
+      if(img[j]===170&&img[j+1]===132&&img[j+2]===87&&img[j+3]===255)mask[i]=1;
+    }
+    for(let y=55;y<h-12;y++)for(let x=15;x<w-15;x++){
+      const start=y*w+x;if(!mask[start]||seen[start])continue;
+      const queue=[start];seen[start]=1;let pixels=0,sumX=0,sumY=0;
+      for(let i=0;i<queue.length;i++){
+        const at=queue[i],cx=at%w,cy=Math.floor(at/w);
+        pixels++;sumX+=cx;sumY+=cy;
+        for(const neighbor of [at-1,at+1,at-w,at+w]){
+          if(neighbor<0||neighbor>=mask.length||seen[neighbor]||!mask[neighbor])continue;
+          seen[neighbor]=1;queue.push(neighbor);
+        }
+      }
+      if(pixels>=5&&pixels<=36)found.push({x:sumX/pixels+5,y:sumY/pixels,pixels});
+    }
+    const unique=[];
+    for(const p of found){
+      const close=unique.find(q=>Math.hypot(q.x-p.x,q.y-p.y)<20);
+      if(close){if(p.pixels>close.pixels)Object.assign(close,p);}
+      else unique.push(p);
+    }
+    const box=canvas.getBoundingClientRect();
+    return unique.sort((a,b)=>Math.hypot(a.x-w/2,a.y-h/2)-Math.hypot(b.x-w/2,b.y-h/2))
+      .slice(0,8).map(p=>({...p,cx:p.x*box.width/w,cy:p.y*box.height/h}));
+  });
+  const before=await visibleMaterials(page);
+  console.log('VISUAL_WOOD_CANDIDATES '+JSON.stringify({count:candidates.length,inventory:before}));
+  for(const c of candidates){
+    await page.locator('#game').click({position:{x:c.cx,y:c.cy}});
+    await page.waitForTimeout(280);
+    const travel=await text(page,'#interaction-travel');
+    console.log('VISUAL_WOOD_TAP '+JSON.stringify({screen:[Math.round(c.x),Math.round(c.y)],pixels:c.pixels,travel}));
+    if(travel.includes('Walking to Ashwood')){
+      await page.waitForFunction(()=>!document.querySelector('#interaction-travel')?.textContent?.includes('Walking to Ashwood'),null,{timeout:5500}).catch(()=>{});
+      await page.waitForTimeout(160);
+      const after=await visibleMaterials(page);
+      console.log('VISUAL_WOOD_OUTCOME '+JSON.stringify({before,after}));
+      if(after.wood>before.wood)return true;
+    }
+  }
+  return false;
+}
+
 async function gatherFirstKit(page){
   // Greenwood is north-east of the Trail Ledger on the visible map. Collect only
   // the *first* Bow/arrow ingredients before crafting; finish provisions armed.
@@ -134,6 +189,9 @@ async function gatherFirstKit(page){
       const gained=use==='Ashwood'?wood>before.wood:hides>before.hides;
       pickups.push({step,use,readiness,before,after:{wood,hides},gained});
       if(!gained)await move(page,pattern[routeMoves++%pattern.length],210);
+    }else if(wood<3&&step%4===0&&await gatherVisibleAshwood(page)){
+      const carried=await visibleMaterials(page);wood=carried.wood;hides=carried.hide;
+      pickups.push({step,use:'canvas Ashwood tap',after:{wood,hides},gained:true});
     }else if(await page.locator('#combat-cue').isVisible()&&!/^No target in reach/.test(await text(page,'#combat-action'))){
       await fightVisible(page,'Greenwood');
       await page.waitForTimeout(100);
